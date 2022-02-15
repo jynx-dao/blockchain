@@ -22,6 +22,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * TODO:
+ * 1 - market cannot have more decimals than asset
+ */
+
 @Slf4j
 @Service
 @Transactional
@@ -65,7 +70,6 @@ public class MarketService {
         Market market = new Market()
                 .setName(request.getName())
                 .setSettlementAsset(settlementAsset)
-                .setDecimalPlaces(request.getDecimalPlaces())
                 .setInitialMargin(request.getInitialMargin())
                 .setMaintenanceMargin(request.getMaintenanceMargin())
                 .setTickSize(request.getTickSize())
@@ -87,30 +91,29 @@ public class MarketService {
     ) {
         stakeService.checkProposerStake(request.getUser());
         proposalService.checkProposalTimes(request.getOpenTime(), request.getClosingTime(), request.getEnactmentTime());
-        Market market = marketRepository.findById(request.getId())
-                .orElseThrow(() -> new JynxProException(ErrorCode.MARKET_NOT_FOUND));
-        if(!request.getMaintenanceMargin().equals(market.getMaintenanceMargin())) {
+        Market market = get(request.getId());
+        if(!market.getStatus().equals(MarketStatus.ACTIVE)) {
+            throw new JynxProException(ErrorCode.MARKET_NOT_ACTIVE);
+        }
+        if(!Objects.isNull(request.getMaintenanceMargin())) {
             market.setPendingMaintenanceMargin(request.getMaintenanceMargin());
         }
-        if(!request.getDecimalPlaces().equals(market.getDecimalPlaces())) {
-            market.setPendingDecimalPlaces(request.getDecimalPlaces());
-        }
-        if(!request.getInitialMargin().equals(market.getInitialMargin())) {
+        if(!Objects.isNull(request.getInitialMargin())) {
             market.setPendingInitialMargin(request.getInitialMargin());
         }
-        if(!request.getMakerFee().equals(market.getMakerFee())) {
+        if(!Objects.isNull(request.getMakerFee())) {
             market.setPendingMakerFee(request.getMakerFee());
         }
-        if(!request.getTakerFee().equals(market.getTakerFee())) {
+        if(!Objects.isNull(request.getTakerFee())) {
             market.setPendingTakerFee(request.getTakerFee());
         }
-        if(!request.getStepSize().equals(market.getStepSize())) {
+        if(!Objects.isNull(request.getStepSize())) {
             market.setPendingStepSize(request.getStepSize());
         }
-        if(!request.getTickSize().equals(market.getTickSize())) {
+        if(!Objects.isNull(request.getTickSize())) {
             market.setPendingTickSize(request.getTickSize());
         }
-        if(!request.getSettlementFrequency().equals(market.getSettlementFrequency())) {
+        if(!Objects.isNull(request.getSettlementFrequency())) {
             market.setPendingSettlementFrequency(request.getSettlementFrequency());
         }
         market = marketRepository.save(market);
@@ -124,8 +127,10 @@ public class MarketService {
     ) {
         stakeService.checkProposerStake(request.getUser());
         proposalService.checkProposalTimes(request.getOpenTime(), request.getClosingTime(), request.getEnactmentTime());
-        Market market = marketRepository.findById(request.getId())
-                .orElseThrow(() -> new JynxProException(ErrorCode.MARKET_NOT_FOUND));
+        Market market = get(request.getId());
+        if(!market.getStatus().equals(MarketStatus.ACTIVE)) {
+            throw new JynxProException(ErrorCode.MARKET_NOT_ACTIVE);
+        }
         proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
                 request.getEnactmentTime(), market.getId(), ProposalType.SUSPEND_MARKET);
         return market;
@@ -136,8 +141,10 @@ public class MarketService {
     ) {
         stakeService.checkProposerStake(request.getUser());
         proposalService.checkProposalTimes(request.getOpenTime(), request.getClosingTime(), request.getEnactmentTime());
-        Market market = marketRepository.findById(request.getId())
-                .orElseThrow(() -> new JynxProException(ErrorCode.MARKET_NOT_FOUND));
+        Market market = get(request.getId());
+        if(!market.getStatus().equals(MarketStatus.SUSPENDED)) {
+            throw new JynxProException(ErrorCode.MARKET_NOT_SUSPENDED);
+        }
         proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
                 request.getEnactmentTime(), market.getId(), ProposalType.UNSUSPEND_MARKET);
         return market;
@@ -161,6 +168,7 @@ public class MarketService {
     public void add(
             final Proposal proposal
     ) {
+        proposalService.checkEnacted(proposal);
         updateStatus(proposal, MarketStatus.ACTIVE);
     }
 
@@ -173,34 +181,35 @@ public class MarketService {
     public void amend(
             final Proposal proposal
     ) {
-        if(!proposal.getStatus().equals(ProposalStatus.ENACTED)) {
-            throw new JynxProException(ErrorCode.PROPOSAL_NOT_ENACTED);
-        }
-        Market market = marketRepository.findById(proposal.getLinkedId())
-                .orElseThrow(() -> new JynxProException(ErrorCode.MARKET_NOT_FOUND));
-        if(!Objects.isNull(market.getPendingDecimalPlaces())) {
-            market.setDecimalPlaces(market.getPendingDecimalPlaces());
-        }
+        proposalService.checkEnacted(proposal);
+        Market market = get(proposal.getLinkedId());
         if(!Objects.isNull(market.getPendingInitialMargin())) {
             market.setInitialMargin(market.getPendingInitialMargin());
+            market.setPendingInitialMargin(null);
         }
         if(!Objects.isNull(market.getPendingMaintenanceMargin())) {
             market.setMaintenanceMargin(market.getPendingMaintenanceMargin());
+            market.setPendingMaintenanceMargin(null);
         }
         if(!Objects.isNull(market.getPendingMakerFee())) {
             market.setMakerFee(market.getPendingMakerFee());
+            market.setPendingMakerFee(null);
         }
         if(!Objects.isNull(market.getPendingTakerFee())) {
             market.setTakerFee(market.getPendingTakerFee());
+            market.setPendingTakerFee(null);
         }
         if(!Objects.isNull(market.getPendingSettlementFrequency())) {
             market.setSettlementFrequency(market.getPendingSettlementFrequency());
+            market.setPendingSettlementFrequency(null);
         }
         if(!Objects.isNull(market.getPendingTickSize())) {
-            market.setTickSize(market.getTickSize());
+            market.setTickSize(market.getPendingTickSize());
+            market.setPendingTickSize(null);
         }
         if(!Objects.isNull(market.getPendingStepSize())) {
-            market.setStepSize(market.getTickSize());
+            market.setStepSize(market.getPendingStepSize());
+            market.setPendingStepSize(null);
         }
         // TODO - orders breaching the new step size, tick size, or decimal places will be cancelled
         // TODO - orders breaching the new margin requirements will be cancelled
@@ -211,6 +220,7 @@ public class MarketService {
     public void suspend(
             final Proposal proposal
     ) {
+        proposalService.checkEnacted(proposal);
         // TODO - the market can only be settled (it cannot be unsuspended until it has been) and all orders will be cancelled
         updateStatus(proposal, MarketStatus.SUSPENDED);
     }
@@ -218,6 +228,7 @@ public class MarketService {
     public void unsuspend(
             final Proposal proposal
     ) {
+        proposalService.checkEnacted(proposal);
         // TODO - the market can only be unsuspended if it was settled, so when it opens again nobody will have any positions and all orders will be cancelled
         updateStatus(proposal, MarketStatus.ACTIVE);
     }

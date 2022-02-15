@@ -12,7 +12,6 @@ import java.util.UUID;
 @Accessors(chain = true)
 public class AmendMarketRequest extends ProposalRequest {
     private UUID id;
-    private Integer decimalPlaces;
     private BigDecimal initialMargin;
     private BigDecimal maintenanceMargin;
     private Integer tickSize;

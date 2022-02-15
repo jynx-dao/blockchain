@@ -88,6 +88,14 @@ public class ProposalService {
         return totalVotes;
     }
 
+    public void checkEnacted(
+            final Proposal proposal
+    ) {
+        if(!ProposalStatus.ENACTED.equals(proposal.getStatus())) {
+            throw new JynxProException(ErrorCode.PROPOSAL_NOT_ENACTED);
+        }
+    }
+
     private boolean isAboveThreshold(
             final Proposal proposal
     ) {

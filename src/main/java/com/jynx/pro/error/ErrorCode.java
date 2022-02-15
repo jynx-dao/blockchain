@@ -23,4 +23,7 @@ public class ErrorCode {
     public static final String INVALID_ORDER_STATUS = "The order status is invalid.";
     public static final String INVALID_ORDER_TYPE = "The order type is invalid.";
     public static final String MARKET_NOT_ACTIVE = "This market is not active.";
+    public static final String MARKET_NOT_SUSPENDED = "This market is not suspended/";
+    public static final String INSUFFICIENT_MARGIN = "Insufficient margin.";
+    public static final String MARGIN_NOT_ALLOCATED = "Margin has not been allocated";
 }

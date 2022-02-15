@@ -1,13 +1,14 @@
 package com.jynx.pro.service;
 
 import com.jynx.pro.Application;
-import com.jynx.pro.constant.AssetStatus;
 import com.jynx.pro.constant.MarketStatus;
 import com.jynx.pro.entity.Asset;
 import com.jynx.pro.entity.Market;
 import com.jynx.pro.entity.Oracle;
 import com.jynx.pro.entity.OracleType;
 import com.jynx.pro.error.ErrorCode;
+import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.request.AmendMarketRequest;
 import com.jynx.pro.request.SingleItemRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -19,8 +20,11 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Testcontainers
@@ -125,5 +129,184 @@ public class MarketServiceTest extends IntegrationTest {
         proposalService.reject();
         market = marketRepository.findById(market.getId()).orElse(new Market());
         Assertions.assertEquals(market.getStatus(), MarketStatus.ACTIVE);
+    }
+
+    @Test
+    public void testAmendInitialMargin() throws InterruptedException {
+        Market market = createAndEnactMarket();
+        Assertions.assertEquals(market.getInitialMargin().setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.valueOf(0.1).setScale(2, RoundingMode.HALF_UP));
+        long[] times = proposalTimes();
+        AmendMarketRequest request = new AmendMarketRequest()
+                .setId(market.getId())
+                .setInitialMargin(BigDecimal.valueOf(0.2));
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setUser(takerUser);
+        marketService.proposeToAmend(request);
+        Thread.sleep(3000L);
+        configService.setTimestamp(nowAsMillis());
+        proposalService.open();
+        proposalService.approve();
+        proposalService.enact();
+        proposalService.reject();
+        market = marketRepository.findById(market.getId()).orElse(new Market());
+        Assertions.assertEquals(market.getInitialMargin().setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.valueOf(0.20).setScale(2, RoundingMode.HALF_UP));
+    }
+
+    @Test
+    public void testAmendMaintenanceMargin() throws InterruptedException {
+        Market market = createAndEnactMarket();
+        Assertions.assertEquals(market.getMaintenanceMargin().setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.valueOf(0.15).setScale(2, RoundingMode.HALF_UP));
+        long[] times = proposalTimes();
+        AmendMarketRequest request = new AmendMarketRequest()
+                .setId(market.getId())
+                .setMaintenanceMargin(BigDecimal.valueOf(0.2));
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setUser(takerUser);
+        marketService.proposeToAmend(request);
+        Thread.sleep(3000L);
+        configService.setTimestamp(nowAsMillis());
+        proposalService.open();
+        proposalService.approve();
+        proposalService.enact();
+        proposalService.reject();
+        market = marketRepository.findById(market.getId()).orElse(new Market());
+        Assertions.assertEquals(market.getMaintenanceMargin().setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.valueOf(0.20).setScale(2, RoundingMode.HALF_UP));
+    }
+
+    @Test
+    public void testAmendTickSize() throws InterruptedException {
+        Market market = createAndEnactMarket();
+        Assertions.assertEquals(market.getTickSize(), 1);
+        long[] times = proposalTimes();
+        AmendMarketRequest request = new AmendMarketRequest()
+                .setId(market.getId())
+                .setTickSize(2);
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setUser(takerUser);
+        marketService.proposeToAmend(request);
+        Thread.sleep(3000L);
+        configService.setTimestamp(nowAsMillis());
+        proposalService.open();
+        proposalService.approve();
+        proposalService.enact();
+        proposalService.reject();
+        market = marketRepository.findById(market.getId()).orElse(new Market());
+        Assertions.assertEquals(market.getTickSize(), 2);
+    }
+
+    @Test
+    public void testAmendStepSize() throws InterruptedException {
+        Market market = createAndEnactMarket();
+        Assertions.assertEquals(market.getStepSize(), 1);
+        long[] times = proposalTimes();
+        AmendMarketRequest request = new AmendMarketRequest()
+                .setId(market.getId())
+                .setStepSize(2);
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setUser(takerUser);
+        marketService.proposeToAmend(request);
+        Thread.sleep(3000L);
+        configService.setTimestamp(nowAsMillis());
+        proposalService.open();
+        proposalService.approve();
+        proposalService.enact();
+        proposalService.reject();
+        market = marketRepository.findById(market.getId()).orElse(new Market());
+        Assertions.assertEquals(market.getStepSize(), 2);
+    }
+
+    @Test
+    public void testAmendMakerFee() throws InterruptedException {
+        Market market = createAndEnactMarket();
+        Assertions.assertEquals(market.getMakerFee().setScale(3, RoundingMode.HALF_UP),
+                BigDecimal.valueOf(0.001).setScale(3, RoundingMode.HALF_UP));
+        long[] times = proposalTimes();
+        AmendMarketRequest request = new AmendMarketRequest()
+                .setId(market.getId())
+                .setMakerFee(BigDecimal.valueOf(0.002));
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setUser(takerUser);
+        marketService.proposeToAmend(request);
+        Thread.sleep(3000L);
+        configService.setTimestamp(nowAsMillis());
+        proposalService.open();
+        proposalService.approve();
+        proposalService.enact();
+        proposalService.reject();
+        market = marketRepository.findById(market.getId()).orElse(new Market());
+        Assertions.assertEquals(market.getMakerFee().setScale(3, RoundingMode.HALF_UP),
+                BigDecimal.valueOf(0.002).setScale(3, RoundingMode.HALF_UP));
+    }
+
+    @Test
+    public void testAmendTakerFee() throws InterruptedException {
+        Market market = createAndEnactMarket();
+        Assertions.assertEquals(market.getTakerFee().setScale(3, RoundingMode.HALF_UP),
+                BigDecimal.valueOf(0.001).setScale(3, RoundingMode.HALF_UP));
+        long[] times = proposalTimes();
+        AmendMarketRequest request = new AmendMarketRequest()
+                .setId(market.getId())
+                .setTakerFee(BigDecimal.valueOf(0.002));
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setUser(takerUser);
+        marketService.proposeToAmend(request);
+        Thread.sleep(3000L);
+        configService.setTimestamp(nowAsMillis());
+        proposalService.open();
+        proposalService.approve();
+        proposalService.enact();
+        proposalService.reject();
+        market = marketRepository.findById(market.getId()).orElse(new Market());
+        Assertions.assertEquals(market.getTakerFee().setScale(3, RoundingMode.HALF_UP),
+                BigDecimal.valueOf(0.002).setScale(3, RoundingMode.HALF_UP));
+    }
+
+    @Test
+    public void testAmendSettlementFrequency() throws InterruptedException {
+        Market market = createAndEnactMarket();
+        Assertions.assertEquals(market.getSettlementFrequency(), 8);
+        long[] times = proposalTimes();
+        AmendMarketRequest request = new AmendMarketRequest()
+                .setId(market.getId())
+                .setSettlementFrequency(4);
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setUser(takerUser);
+        marketService.proposeToAmend(request);
+        Thread.sleep(3000L);
+        configService.setTimestamp(nowAsMillis());
+        proposalService.open();
+        proposalService.approve();
+        proposalService.enact();
+        proposalService.reject();
+        market = marketRepository.findById(market.getId()).orElse(new Market());
+        Assertions.assertEquals(market.getSettlementFrequency(), 4);
+    }
+
+    @Test
+    public void testCannotGetMissingMarket() {
+        try {
+            marketService.get(UUID.randomUUID());
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.MARKET_NOT_FOUND);
+        }
     }
 }

@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.experimental.Accessors;
 
 import javax.persistence.*;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Data
@@ -20,21 +21,21 @@ public class Position {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
-    @Column(name = "average_entry_price", nullable = false)
-    private Long averageEntryPrice;
+    @Column(name = "average_entry_price", nullable = false, scale = 8, precision = 18)
+    private BigDecimal averageEntryPrice;
     @Enumerated(EnumType.STRING)
     @Column(name = "side", nullable = false)
     private MarketSide side;
-    @Column(name = "size", nullable = false)
-    private Long size;
-    @Column(name = "allocated_margin", nullable = false)
-    private Long allocatedMargin;
-    @Column(name = "liquidation_price", nullable = false)
-    private Long liquidationPrice;
-    @Column(name = "bankruptcy_price", nullable = false)
-    private Long bankruptcyPrice;
-    @Column(name = "realised_pnl", nullable = false)
-    private Long realisedPnl;
-    @Column(name = "unrealised_pnl", nullable = false)
-    private Long unrealisedPnl;
+    @Column(name = "size", nullable = false, scale = 8, precision = 18)
+    private BigDecimal size;
+    @Column(name = "allocated_margin", nullable = false, scale = 8, precision = 18)
+    private BigDecimal allocatedMargin;
+    @Column(name = "liquidation_price", nullable = false, scale = 8, precision = 18)
+    private BigDecimal liquidationPrice;
+    @Column(name = "bankruptcy_price", nullable = false, scale = 8, precision = 18)
+    private BigDecimal bankruptcyPrice;
+    @Column(name = "realised_pnl", nullable = false, scale = 8, precision = 18)
+    private BigDecimal realisedPnl;
+    @Column(name = "unrealised_pnl", nullable = false, scale = 8, precision = 18)
+    private BigDecimal unrealisedPnl;
 }

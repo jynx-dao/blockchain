@@ -49,18 +49,10 @@ public class AssetService {
         assetRepository.save(asset);
     }
 
-    private void checkEnacted(
-            final Proposal proposal
-    ) {
-        if(!ProposalStatus.ENACTED.equals(proposal.getStatus())) {
-            throw new JynxProException(ErrorCode.PROPOSAL_NOT_ENACTED);
-        }
-    }
-
     public void add(
             final Proposal proposal
     ) {
-        checkEnacted(proposal);
+        proposalService.checkEnacted(proposal);
         // TODO - the asset should be added to the ERC20 bridge
         updateStatus(proposal, AssetStatus.ACTIVE);
     }
@@ -75,7 +67,7 @@ public class AssetService {
             final Proposal proposal
     ) {
         // TODO - need to suspend all markets that are using this asset
-        checkEnacted(proposal);
+        proposalService.checkEnacted(proposal);
         // TODO - the asset should be suspended on the ERC20 bridge
         updateStatus(proposal, AssetStatus.SUSPENDED);
     }
@@ -84,7 +76,7 @@ public class AssetService {
             final Proposal proposal
     ) {
         // TODO - need to suspend all markets that are using this asset
-        checkEnacted(proposal);
+        proposalService.checkEnacted(proposal);
         // TODO - the asset should be enabled on the ERC20 bridge
         updateStatus(proposal, AssetStatus.ACTIVE);
     }

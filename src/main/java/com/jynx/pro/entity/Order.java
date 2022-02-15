@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.experimental.Accessors;
 
 import javax.persistence.*;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Data
@@ -27,10 +28,12 @@ public class Order {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
-    @Column(name = "price", nullable = false)
-    private Long price;
-    @Column(name = "size", nullable = false)
-    private Long size;
+    @Column(name = "price", nullable = false, scale = 8, precision = 18)
+    private BigDecimal price;
+    @Column(name = "size", nullable = false, scale = 8, precision = 18)
+    private BigDecimal size;
+    @Column(name = "remaining_size", nullable = false, scale = 8, precision = 18)
+    private BigDecimal remainingSize;
     @Enumerated(EnumType.STRING)
     @Column(name = "side", nullable = false)
     private MarketSide side;

@@ -20,8 +20,6 @@ public class Market {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "settlement_asset_id", nullable = false)
     private Asset settlementAsset;
-    @Column(name = "decimal_places", nullable = false)
-    private Integer decimalPlaces;
     @Column(name = "initial_margin", nullable = false)
     private BigDecimal initialMargin;
     @Column(name = "maintenance_margin", nullable = false)
@@ -32,22 +30,20 @@ public class Market {
     private Integer stepSize;
     @Column(name = "settlement_frequency", nullable = false)
     private Integer settlementFrequency;
-    @Column(name = "maker_fee", nullable = false)
+    @Column(name = "maker_fee", nullable = false, scale = 8, precision = 18)
     private BigDecimal makerFee;
-    @Column(name = "taker_fee", nullable = false)
+    @Column(name = "taker_fee", nullable = false, scale = 8, precision = 18)
     private BigDecimal takerFee;
-    @Column(name = "open_volume", nullable = false)
-    private Long openVolume = 0L;
-    @Column(name = "volume_24h", nullable = false)
-    private Long volume24h = 0L;
+    @Column(name = "open_volume", nullable = false, scale = 8, precision = 18)
+    private BigDecimal openVolume = BigDecimal.ZERO;
+    @Column(name = "volume_24h", nullable = false, scale = 8, precision = 18)
+    private BigDecimal volume24h = BigDecimal.ZERO;
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private MarketStatus status;
-    @Column(name = "pending_decimal_places")
-    private Integer pendingDecimalPlaces;
-    @Column(name = "pending_initial_margin")
+    @Column(name = "pending_initial_margin", scale = 8, precision = 18)
     private BigDecimal pendingInitialMargin;
-    @Column(name = "pending_maintenance_margin")
+    @Column(name = "pending_maintenance_margin", scale = 8, precision = 18)
     private BigDecimal pendingMaintenanceMargin;
     @Column(name = "pending_tick_size")
     private Integer pendingTickSize;
@@ -55,8 +51,8 @@ public class Market {
     private Integer pendingStepSize;
     @Column(name = "pending_settlement_frequency")
     private Integer pendingSettlementFrequency;
-    @Column(name = "pending_maker_fee")
+    @Column(name = "pending_maker_fee", scale = 8, precision = 18)
     private BigDecimal pendingMakerFee;
-    @Column(name = "pending_taker_fee")
+    @Column(name = "pending_taker_fee", scale = 8, precision = 18)
     private BigDecimal pendingTakerFee;
 }

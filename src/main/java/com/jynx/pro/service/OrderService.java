@@ -4,8 +4,10 @@ import com.jynx.pro.constant.MarketSide;
 import com.jynx.pro.constant.MarketStatus;
 import com.jynx.pro.constant.OrderStatus;
 import com.jynx.pro.constant.OrderType;
+import com.jynx.pro.entity.Account;
 import com.jynx.pro.entity.Market;
 import com.jynx.pro.entity.Order;
+import com.jynx.pro.entity.User;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.model.OrderBook;
@@ -31,48 +33,36 @@ public class OrderService {
     @Autowired
     private MarketService marketService;
     @Autowired
+    private AccountService accountService;
+    @Autowired
     private UUIDUtils uuidUtils;
 
     private static final int MAX_BULK = 25;
     private static final int ORDER_BOOK_LIMIT = 100;
 
-    private BigDecimal convertFromLong(Long longValue, int decimals) {
-        double modifier = Math.pow(10, decimals);
-        return BigDecimal.valueOf(longValue.doubleValue() / modifier);
-    }
-
-    public Long convertFromDecimal(BigDecimal decimalValue, int decimals) {
-        double modifier = Math.pow(10, decimals);
-        return decimalValue.multiply(BigDecimal.valueOf(modifier)).longValueExact();
-    }
-
-    private OrderBookItem toOrderBookItem(
-            final Order order,
-            final int decimals
+    public OrderBook getOrderBook(
+            final Market market
     ) {
-        return new OrderBookItem()
-                .setPrice(convertFromLong(order.getPrice(), decimals))
-                .setSize(convertFromLong(order.getSize(), decimals));
+        return getOrderBook(market, ORDER_BOOK_LIMIT);
     }
 
     public OrderBook getOrderBook(
             final Market market,
             final Integer limit
     ) {
-        int bookLimit = limit == null ? ORDER_BOOK_LIMIT : limit;
         OrderBook orderBook = new OrderBook();
         List<Order> openOrders = getOpenLimitOrders(market);
         List<OrderBookItem> bids = openOrders.stream()
                 .filter(o -> o.getSide().equals(MarketSide.BUY))
                 .sorted(Comparator.comparing(Order::getPrice).reversed())
-                .map(o -> toOrderBookItem(o, market.getDecimalPlaces()))
-                .limit(bookLimit)
+                .map(o -> new OrderBookItem().setSize(o.getRemainingSize()).setPrice(o.getPrice()))
+                .limit(limit)
                 .collect(Collectors.toList());
         List<OrderBookItem> asks = openOrders.stream()
                 .filter(o -> o.getSide().equals(MarketSide.SELL))
                 .sorted(Comparator.comparing(Order::getPrice))
-                .map(o -> toOrderBookItem(o, market.getDecimalPlaces()))
-                .limit(bookLimit)
+                .map(o -> new OrderBookItem().setSize(o.getRemainingSize()).setPrice(o.getPrice()))
+                .limit(limit)
                 .collect(Collectors.toList());
         orderBook.setAsks(asks);
         orderBook.setBids(bids);
@@ -93,7 +83,7 @@ public class OrderService {
      *
      * @return {@link Order}
      */
-    private Order cancel(
+    public Order cancel(
             final CancelOrderRequest request
     ) {
         Order order = orderRepository.findById(request.getId())
@@ -109,7 +99,9 @@ public class OrderService {
             throw new JynxProException(ErrorCode.INVALID_ORDER_TYPE);
         }
         order.setStatus(OrderStatus.CANCELLED);
-        // TODO - free margin
+        BigDecimal margin = getInitialMarginRequirement(order.getMarket(), order.getType(),
+                order.getRemainingSize(), order.getPrice());
+        accountService.releaseMargin(margin, request.getUser(), order.getMarket().getSettlementAsset());
         return orderRepository.save(order);
     }
 
@@ -121,12 +113,14 @@ public class OrderService {
                 .setId(uuidUtils.next())
                 .setMarket(market)
                 .setUser(request.getUser())
-                .setPrice(convertFromDecimal(request.getPrice(), market.getDecimalPlaces()))
+                .setPrice(request.getPrice())
                 .setSide(request.getSide())
-                .setSize(convertFromDecimal(request.getSize(), market.getDecimalPlaces()))
+                .setSize(request.getSize())
+                .setRemainingSize(request.getSize())
                 .setStatus(OrderStatus.OPEN)
                 .setType(request.getType());
-        // TODO - allocate margin
+        BigDecimal margin = getInitialMarginRequirement(market, order.getType(), request.getSize(), request.getPrice());
+        accountService.allocateMargin(margin, request.getUser(), market.getSettlementAsset());
         return orderRepository.save(order);
     }
 
@@ -142,13 +136,11 @@ public class OrderService {
             final CreateOrderRequest request,
             final Market market
     ) {
-        double modifier = Math.pow(10, market.getDecimalPlaces());
-        long price = request.getPrice().multiply(BigDecimal.valueOf(modifier)).longValueExact();
         List<Order> openLimitOrders = getOpenLimitOrders(market);
         if(request.getSide().equals(MarketSide.BUY)) {
             Optional<Order> bestOffer = openLimitOrders.stream()
                     .filter(o -> o.getSide().equals(MarketSide.SELL)).min(Comparator.comparing(Order::getPrice));
-            if(bestOffer.isEmpty() || price < bestOffer.get().getPrice()) {
+            if(bestOffer.isEmpty() || request.getPrice().doubleValue() < bestOffer.get().getPrice().doubleValue()) {
                 return createLimitOrder(request, market);
             } else {
                 throw new JynxProException("Cannot place limit order that crosses");
@@ -157,7 +149,7 @@ public class OrderService {
         } else if(request.getSide().equals(MarketSide.SELL)) {
             Optional<Order> bestBid = openLimitOrders.stream()
                     .filter(o -> o.getSide().equals(MarketSide.BUY)).max(Comparator.comparing(Order::getPrice));
-            if(bestBid.isEmpty() || price > bestBid.get().getPrice()) {
+            if(bestBid.isEmpty() || request.getPrice().doubleValue() > bestBid.get().getPrice().doubleValue()) {
                 return createLimitOrder(request, market);
             } else {
                 throw new JynxProException("Cannot place limit order that crosses");
@@ -170,8 +162,8 @@ public class OrderService {
     public Order create(
             final CreateOrderRequest request
     ) {
-        performMarginCheck(request);
         Market market = marketService.get(request.getMarketId());
+        performMarginCheck(market, request.getType(), request.getSize(), request.getPrice(), request.getUser());
         if(!market.getStatus().equals(MarketStatus.ACTIVE)) {
             throw new JynxProException(ErrorCode.MARKET_NOT_ACTIVE);
         }
@@ -183,13 +175,6 @@ public class OrderService {
             return createMarketOrder(request, market);
         }
         throw new JynxProException(ErrorCode.INVALID_ORDER_TYPE);
-    }
-
-    public Order cancel(
-            final UUID id
-    ) {
-        // TODO - cancel order
-        return null;
     }
 
     public Order amend(
@@ -218,7 +203,7 @@ public class OrderService {
     }
 
     public List<Order> cancelMany(
-            final List<UUID> ids
+            final List<CancelOrderRequest> ids
     ) {
         if(ids.size() > MAX_BULK) {
             throw new JynxProException(ErrorCode.MAX_BULK_EXCEEDED);
@@ -226,9 +211,36 @@ public class OrderService {
         return ids.stream().map(this::cancel).collect(Collectors.toList());
     }
 
-    private void performMarginCheck(
-            final CreateOrderRequest request
+    private BigDecimal getInitialMarginRequirement(
+            final Market market,
+            final OrderType type,
+            final BigDecimal size,
+            final BigDecimal price
     ) {
-        // TODO - check if the user has sufficient margin for their requested order
+        if(type.equals(OrderType.LIMIT)) {
+            BigDecimal notionalSize = price.multiply(size);
+            return notionalSize.multiply(market.getInitialMargin());
+        } else if(type.equals(OrderType.MARKET)) {
+            // TODO - need to estimate the price from the order book
+            throw new JynxProException("Cannot place market order");
+        } else if(type.equals(OrderType.STOP_MARKET)) {
+            throw new JynxProException("Cannot place stop market order");
+        }
+        throw new JynxProException(ErrorCode.INVALID_ORDER_TYPE);
+    }
+
+    private void performMarginCheck(
+            final Market market,
+            final OrderType type,
+            final BigDecimal size,
+            final BigDecimal price,
+            final User user
+    ) {
+        Account account = accountService.get(user, market.getSettlementAsset())
+                .orElseThrow(() -> new JynxProException(ErrorCode.INSUFFICIENT_MARGIN));
+        BigDecimal margin = getInitialMarginRequirement(market, type, size, price);
+        if(account.getAvailableBalance().doubleValue() < margin.doubleValue()) {
+            throw new JynxProException(ErrorCode.INSUFFICIENT_MARGIN);
+        }
     }
 }

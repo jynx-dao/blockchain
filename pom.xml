@@ -102,6 +102,7 @@
                     <excludes>
                         <exclude>**/*com/jynx/pro/entity/**</exclude>
                         <exclude>**/*com/jynx/pro/ethereum/**</exclude>
+                        <exclude>**/*com/jynx/pro/model/**</exclude>
                         <exclude>**/*com/jynx/pro/request/**</exclude>
                     </excludes>
                 </configuration>

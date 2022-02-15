@@ -16,7 +16,6 @@ import java.util.UUID;
 public class AddMarketRequest extends ProposalRequest {
     private String name;
     private UUID settlementAssetId;
-    private Integer decimalPlaces;
     private BigDecimal initialMargin;
     private BigDecimal maintenanceMargin;
     private Integer tickSize;

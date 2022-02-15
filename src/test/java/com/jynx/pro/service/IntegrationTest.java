@@ -37,6 +37,8 @@ public abstract class IntegrationTest {
     @Autowired
     protected AssetRepository assetRepository;
     @Autowired
+    protected AccountRepository accountRepository;
+    @Autowired
     protected ProposalRepository proposalRepository;
     @Autowired
     protected VoteRepository voteRepository;
@@ -81,6 +83,14 @@ public abstract class IntegrationTest {
         proposalService.reject();
         asset = assetRepository.findById(asset.getId()).orElse(new Asset());
         Assertions.assertEquals(asset.getStatus(), activate ? AssetStatus.ACTIVE : AssetStatus.PENDING);
+        accountRepository.save(new Account().setAsset(asset).setUser(takerUser).setId(uuidUtils.next())
+                .setBalance(BigDecimal.valueOf(1000000))
+                .setAvailableBalance(BigDecimal.valueOf(1000000))
+                .setMarginBalance(BigDecimal.ZERO));
+        accountRepository.save(new Account().setAsset(asset).setUser(makerUser).setId(uuidUtils.next())
+                .setBalance(BigDecimal.valueOf(1000000))
+                .setAvailableBalance(BigDecimal.valueOf(1000000))
+                .setMarginBalance(BigDecimal.ZERO));
         return asset;
     }
 
@@ -122,7 +132,6 @@ public abstract class IntegrationTest {
     ) {
         long[] times = proposalTimes();
         AddMarketRequest request = new AddMarketRequest();
-        request.setDecimalPlaces(1);
         request.setInitialMargin(BigDecimal.valueOf(0.1));
         request.setMaintenanceMargin(BigDecimal.valueOf(0.15));
         request.setName("BTC/USDT");
@@ -156,6 +165,7 @@ public abstract class IntegrationTest {
         oracleRepository.deleteAll();
         orderRepository.deleteAll();
         marketRepository.deleteAll();
+        accountRepository.deleteAll();
         assetRepository.deleteAll();
         voteRepository.deleteAll();
         proposalRepository.deleteAll();
