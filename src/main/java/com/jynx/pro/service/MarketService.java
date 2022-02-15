@@ -1,23 +1,24 @@
 package com.jynx.pro.service;
 
+import com.jynx.pro.constant.AssetStatus;
 import com.jynx.pro.constant.MarketStatus;
 import com.jynx.pro.constant.ProposalStatus;
 import com.jynx.pro.constant.ProposalType;
 import com.jynx.pro.entity.Asset;
 import com.jynx.pro.entity.Market;
 import com.jynx.pro.entity.Proposal;
-import com.jynx.pro.entity.User;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.MarketRepository;
 import com.jynx.pro.request.AddMarketRequest;
+import com.jynx.pro.request.AmendMarketRequest;
+import com.jynx.pro.request.SingleItemRequest;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -39,12 +40,25 @@ public class MarketService {
     @Autowired
     private OracleService oracleService;
 
+    public Market get(
+            final UUID id
+    ) {
+        return marketRepository.findById(id).orElseThrow(() -> new JynxProException(ErrorCode.MARKET_NOT_FOUND));
+    }
+
+    public void settleMarkets() {
+        // TODO - settle markets using their oracles
+    }
+
     public Market proposeToAdd(
             final AddMarketRequest request
     ) {
         stakeService.checkProposerStake(request.getUser());
         proposalService.checkProposalTimes(request.getOpenTime(), request.getClosingTime(), request.getEnactmentTime());
         Asset settlementAsset = assetService.get(request.getSettlementAssetId());
+        if(!settlementAsset.getStatus().equals(AssetStatus.ACTIVE)) {
+            throw new JynxProException(ErrorCode.ASSET_NOT_ACTIVE);
+        }
         if(request.getOracles().size() == 0) {
             throw new JynxProException(ErrorCode.ORACLE_NOT_DEFINED);
         }
@@ -69,80 +83,63 @@ public class MarketService {
     }
 
     public Market proposeToAmend(
-            final UUID id,
-            final Integer decimalPlaces,
-            final BigDecimal initialMargin,
-            final BigDecimal maintenanceMargin,
-            final Integer tickSize,
-            final Integer stepSize,
-            final Integer settlementFrequency,
-            final BigDecimal makerFee,
-            final BigDecimal takerFee,
-            final Long openTime,
-            final Long closingTime,
-            final Long enactmentTime,
-            final User user
+            final AmendMarketRequest request
     ) {
-        stakeService.checkProposerStake(user);
-        proposalService.checkProposalTimes(openTime, closingTime, enactmentTime);
-        Market market = marketRepository.findById(id)
+        stakeService.checkProposerStake(request.getUser());
+        proposalService.checkProposalTimes(request.getOpenTime(), request.getClosingTime(), request.getEnactmentTime());
+        Market market = marketRepository.findById(request.getId())
                 .orElseThrow(() -> new JynxProException(ErrorCode.MARKET_NOT_FOUND));
-        if(!maintenanceMargin.equals(market.getMaintenanceMargin())) {
-            market.setPendingMaintenanceMargin(maintenanceMargin);
+        if(!request.getMaintenanceMargin().equals(market.getMaintenanceMargin())) {
+            market.setPendingMaintenanceMargin(request.getMaintenanceMargin());
         }
-        if(!decimalPlaces.equals(market.getDecimalPlaces())) {
-            market.setPendingDecimalPlaces(decimalPlaces);
+        if(!request.getDecimalPlaces().equals(market.getDecimalPlaces())) {
+            market.setPendingDecimalPlaces(request.getDecimalPlaces());
         }
-        if(!initialMargin.equals(market.getInitialMargin())) {
-            market.setPendingInitialMargin(initialMargin);
+        if(!request.getInitialMargin().equals(market.getInitialMargin())) {
+            market.setPendingInitialMargin(request.getInitialMargin());
         }
-        if(!makerFee.equals(market.getMakerFee())) {
-            market.setPendingMakerFee(makerFee);
+        if(!request.getMakerFee().equals(market.getMakerFee())) {
+            market.setPendingMakerFee(request.getMakerFee());
         }
-        if(!takerFee.equals(market.getTakerFee())) {
-            market.setPendingTakerFee(takerFee);
+        if(!request.getTakerFee().equals(market.getTakerFee())) {
+            market.setPendingTakerFee(request.getTakerFee());
         }
-        if(!stepSize.equals(market.getStepSize())) {
-            market.setPendingStepSize(stepSize);
+        if(!request.getStepSize().equals(market.getStepSize())) {
+            market.setPendingStepSize(request.getStepSize());
         }
-        if(!tickSize.equals(market.getTickSize())) {
-            market.setPendingTickSize(tickSize);
+        if(!request.getTickSize().equals(market.getTickSize())) {
+            market.setPendingTickSize(request.getTickSize());
         }
-        if(!settlementFrequency.equals(market.getSettlementFrequency())) {
-            market.setPendingSettlementFrequency(settlementFrequency);
+        if(!request.getSettlementFrequency().equals(market.getSettlementFrequency())) {
+            market.setPendingSettlementFrequency(request.getSettlementFrequency());
         }
         market = marketRepository.save(market);
-        proposalService.create(user, openTime, closingTime, enactmentTime, market.getId(), ProposalType.AMEND_MARKET);
+        proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
+                request.getEnactmentTime(), market.getId(), ProposalType.AMEND_MARKET);
         return market;
     }
 
     public Market proposeToSuspend(
-            final UUID id,
-            final Long openTime,
-            final Long closingTime,
-            final Long enactmentTime,
-            final User user
+            final SingleItemRequest request
     ) {
-        stakeService.checkProposerStake(user);
-        proposalService.checkProposalTimes(openTime, closingTime, enactmentTime);
-        Market market = marketRepository.findById(id)
+        stakeService.checkProposerStake(request.getUser());
+        proposalService.checkProposalTimes(request.getOpenTime(), request.getClosingTime(), request.getEnactmentTime());
+        Market market = marketRepository.findById(request.getId())
                 .orElseThrow(() -> new JynxProException(ErrorCode.MARKET_NOT_FOUND));
-        proposalService.create(user, openTime, closingTime, enactmentTime, market.getId(), ProposalType.SUSPEND_MARKET);
+        proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
+                request.getEnactmentTime(), market.getId(), ProposalType.SUSPEND_MARKET);
         return market;
     }
 
     public Market proposeToUnsuspend(
-            final UUID id,
-            final Long openTime,
-            final Long closingTime,
-            final Long enactmentTime,
-            final User user
+            final SingleItemRequest request
     ) {
-        stakeService.checkProposerStake(user);
-        proposalService.checkProposalTimes(openTime, closingTime, enactmentTime);
-        Market market = marketRepository.findById(id)
+        stakeService.checkProposerStake(request.getUser());
+        proposalService.checkProposalTimes(request.getOpenTime(), request.getClosingTime(), request.getEnactmentTime());
+        Market market = marketRepository.findById(request.getId())
                 .orElseThrow(() -> new JynxProException(ErrorCode.MARKET_NOT_FOUND));
-        proposalService.create(user, openTime, closingTime, enactmentTime, market.getId(), ProposalType.UNSUSPEND_MARKET);
+        proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
+                request.getEnactmentTime(), market.getId(), ProposalType.UNSUSPEND_MARKET);
         return market;
     }
 
@@ -156,8 +153,7 @@ public class MarketService {
             final Proposal proposal,
             final MarketStatus status
     ) {
-        Market market = marketRepository.findById(proposal.getLinkedId())
-                .orElseThrow(() -> new JynxProException(ErrorCode.MARKET_NOT_FOUND));
+        Market market = get(proposal.getLinkedId());
         market.setStatus(status);
         marketRepository.save(market);
     }

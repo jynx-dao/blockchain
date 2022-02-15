@@ -2,16 +2,12 @@ package com.jynx.pro.service;
 
 import com.jynx.pro.Application;
 import com.jynx.pro.constant.AssetStatus;
-import com.jynx.pro.constant.AssetType;
 import com.jynx.pro.constant.ProposalStatus;
 import com.jynx.pro.entity.Asset;
 import com.jynx.pro.entity.Proposal;
-import com.jynx.pro.entity.User;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
-import com.jynx.pro.request.AddAssetRequest;
-import com.jynx.pro.request.SuspendAssetRequest;
-import com.jynx.pro.request.UnsuspendAssetRequest;
+import com.jynx.pro.request.SingleItemRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -42,22 +38,6 @@ public class AssetServiceTest extends IntegrationTest {
     @AfterEach
     public void shutdown() {
         clearState();
-    }
-
-    private AddAssetRequest getAddAssetRequest(
-            final User user
-    ) {
-        long[] times = proposalTimes();
-        AddAssetRequest request = new AddAssetRequest()
-                .setName("USD")
-                .setAddress("0x0")
-                .setType(AssetType.ERC20)
-                .setDecimalPlaces(4);
-        request.setUser(user);
-        request.setOpenTime(times[0]);
-        request.setClosingTime(times[1]);
-        request.setEnactmentTime(times[2]);
-        return request;
     }
 
     @Test
@@ -210,7 +190,7 @@ public class AssetServiceTest extends IntegrationTest {
         asset = assetRepository.findById(asset.getId()).orElse(new Asset());
         Assertions.assertEquals(asset.getStatus(), AssetStatus.ACTIVE);
         long[] times = proposalTimes();
-        SuspendAssetRequest request = new SuspendAssetRequest().setId(asset.getId());
+        SingleItemRequest request = new SingleItemRequest().setId(asset.getId());
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
@@ -241,7 +221,7 @@ public class AssetServiceTest extends IntegrationTest {
         asset = assetRepository.findById(asset.getId()).orElse(new Asset());
         Assertions.assertEquals(asset.getStatus(), AssetStatus.PENDING);
         long[] times = proposalTimes();
-        SuspendAssetRequest request = new SuspendAssetRequest().setId(asset.getId());
+        SingleItemRequest request = new SingleItemRequest().setId(asset.getId());
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
@@ -267,7 +247,7 @@ public class AssetServiceTest extends IntegrationTest {
         asset = assetRepository.findById(asset.getId()).orElse(new Asset());
         Assertions.assertEquals(asset.getStatus(), AssetStatus.ACTIVE);
         long[] times = proposalTimes();
-        SuspendAssetRequest request = new SuspendAssetRequest().setId(asset.getId());
+        SingleItemRequest request = new SingleItemRequest().setId(asset.getId());
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
@@ -284,7 +264,7 @@ public class AssetServiceTest extends IntegrationTest {
         proposalService.reject();
         asset = assetRepository.findById(asset.getId()).orElse(new Asset());
         Assertions.assertEquals(asset.getStatus(), AssetStatus.SUSPENDED);
-        UnsuspendAssetRequest request2 = new UnsuspendAssetRequest().setId(asset.getId());
+        SingleItemRequest request2 = new SingleItemRequest().setId(asset.getId());
         request2.setOpenTime(times[0]);
         request2.setClosingTime(times[1]);
         request2.setEnactmentTime(times[2]);
@@ -315,7 +295,7 @@ public class AssetServiceTest extends IntegrationTest {
         asset = assetRepository.findById(asset.getId()).orElse(new Asset());
         Assertions.assertEquals(asset.getStatus(), AssetStatus.PENDING);
         long[] times = proposalTimes();
-        UnsuspendAssetRequest request = new UnsuspendAssetRequest().setId(asset.getId());
+        SingleItemRequest request = new SingleItemRequest().setId(asset.getId());
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);

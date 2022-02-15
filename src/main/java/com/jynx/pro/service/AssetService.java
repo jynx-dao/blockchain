@@ -9,8 +9,7 @@ import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.AssetRepository;
 import com.jynx.pro.request.AddAssetRequest;
-import com.jynx.pro.request.SuspendAssetRequest;
-import com.jynx.pro.request.UnsuspendAssetRequest;
+import com.jynx.pro.request.SingleItemRequest;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -113,7 +112,7 @@ public class AssetService {
     }
 
     public void proposeToSuspend(
-            final SuspendAssetRequest request
+            final SingleItemRequest request
     ) {
         stakeService.checkProposerStake(request.getUser());
         proposalService.checkProposalTimes(request.getOpenTime(), request.getClosingTime(), request.getEnactmentTime());
@@ -126,7 +125,7 @@ public class AssetService {
     }
 
     public void proposeToUnsuspend(
-            final UnsuspendAssetRequest request
+            final SingleItemRequest request
     ) {
         stakeService.checkProposerStake(request.getUser());
         proposalService.checkProposalTimes(request.getOpenTime(), request.getClosingTime(), request.getEnactmentTime());

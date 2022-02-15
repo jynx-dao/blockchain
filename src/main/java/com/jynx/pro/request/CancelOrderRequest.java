@@ -9,6 +9,6 @@ import java.util.UUID;
 @EqualsAndHashCode(callSuper = true)
 @Data
 @Accessors(chain = true)
-public class SuspendAssetRequest extends ProposalRequest {
+public class CancelOrderRequest extends SignedRequest {
     private UUID id;
 }

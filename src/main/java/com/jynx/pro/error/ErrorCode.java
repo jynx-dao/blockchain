@@ -16,5 +16,11 @@ public class ErrorCode {
     public static final String ORACLE_NOT_DEFINED = "Oracles must be defined to add a market.";
     public static final String CANNOT_GET_JYNX_SUPPLY = "An error occurred whilst trying to get the supply of JYNX tokens.";
     public static final String ASSET_NOT_SUSPENDED = "You can only unsuspend a suspended asset.";
-    public static final String ASSET_NOT_ACTIVE = "You can only suspend an active asset.";
+    public static final String ASSET_NOT_ACTIVE = "This asset is not active.";
+    public static final String UNKNOWN_MARKET_SIDE = "Market side must be buy or sell.";
+    public static final String ORDER_NOT_FOUND = "The order was not found.";
+    public static final String PERMISSION_DENIED = "You do not have permission to perform this action.";
+    public static final String INVALID_ORDER_STATUS = "The order status is invalid.";
+    public static final String INVALID_ORDER_TYPE = "The order type is invalid.";
+    public static final String MARKET_NOT_ACTIVE = "This market is not active.";
 }

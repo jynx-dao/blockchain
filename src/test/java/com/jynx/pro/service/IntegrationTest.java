@@ -1,11 +1,15 @@
 package com.jynx.pro.service;
 
-import com.jynx.pro.entity.Config;
-import com.jynx.pro.entity.Stake;
-import com.jynx.pro.entity.User;
+import com.jynx.pro.constant.AssetStatus;
+import com.jynx.pro.constant.AssetType;
+import com.jynx.pro.constant.MarketStatus;
+import com.jynx.pro.entity.*;
 import com.jynx.pro.helper.EthereumHelper;
 import com.jynx.pro.repository.*;
+import com.jynx.pro.request.AddAssetRequest;
+import com.jynx.pro.request.AddMarketRequest;
 import com.jynx.pro.utils.UUIDUtils;
+import org.junit.jupiter.api.Assertions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
@@ -14,6 +18,7 @@ import org.testcontainers.utility.DockerImageName;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 
 public abstract class IntegrationTest {
 
@@ -39,6 +44,16 @@ public abstract class IntegrationTest {
     protected ConfigService configService;
     @Autowired
     protected StakeRepository stakeRepository;
+    @Autowired
+    protected AssetService assetService;
+    @Autowired
+    protected MarketRepository marketRepository;
+    @Autowired
+    protected OracleRepository oracleRepository;
+    @Autowired
+    protected OrderRepository orderRepository;
+    @Autowired
+    protected MarketService marketService;
 
     protected static final String PRIVATE_KEY = "0x4b077050dd12f33bb78773d957d87b0b477f6470017d9d6f0539c3c0683b6eb3";
     private static final String GANACHE_CMD = String
@@ -50,6 +65,80 @@ public abstract class IntegrationTest {
 
     protected User takerUser;
     protected User makerUser;
+
+    protected Asset createAndEnactAsset(
+            final boolean activate
+    ) throws InterruptedException {
+        Asset asset = assetService.proposeToAdd(getAddAssetRequest(takerUser));
+        Assertions.assertEquals(asset.getStatus(), AssetStatus.PENDING);
+        Thread.sleep(3000L);
+        if(activate) {
+            configService.setTimestamp(nowAsMillis());
+        }
+        proposalService.open();
+        proposalService.approve();
+        proposalService.enact();
+        proposalService.reject();
+        asset = assetRepository.findById(asset.getId()).orElse(new Asset());
+        Assertions.assertEquals(asset.getStatus(), activate ? AssetStatus.ACTIVE : AssetStatus.PENDING);
+        return asset;
+    }
+
+    protected Market createAndEnactMarket() throws InterruptedException {
+        Asset asset = createAndEnactAsset(true);
+        List<Oracle> oracles = List.of(new Oracle().setType(OracleType.SIGNED_DATA).setIdentifier("price"));
+        Market market = marketService.proposeToAdd(getAddMarketRequest(asset, oracles));
+        Assertions.assertEquals(market.getStatus(), MarketStatus.PENDING);
+        Thread.sleep(3000L);
+        configService.setTimestamp(nowAsMillis());
+        proposalService.open();
+        proposalService.approve();
+        proposalService.enact();
+        proposalService.reject();
+        market = marketRepository.findById(market.getId()).orElse(new Market());
+        Assertions.assertEquals(market.getStatus(), MarketStatus.ACTIVE);
+        return market;
+    }
+
+    protected AddAssetRequest getAddAssetRequest(
+            final User user
+    ) {
+        long[] times = proposalTimes();
+        AddAssetRequest request = new AddAssetRequest()
+                .setName("USD")
+                .setAddress("0x0")
+                .setType(AssetType.ERC20)
+                .setDecimalPlaces(4);
+        request.setUser(user);
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        return request;
+    }
+
+    protected AddMarketRequest getAddMarketRequest(
+            final Asset asset,
+            final List<Oracle> oracles
+    ) {
+        long[] times = proposalTimes();
+        AddMarketRequest request = new AddMarketRequest();
+        request.setDecimalPlaces(1);
+        request.setInitialMargin(BigDecimal.valueOf(0.1));
+        request.setMaintenanceMargin(BigDecimal.valueOf(0.15));
+        request.setName("BTC/USDT");
+        request.setStepSize(1);
+        request.setTickSize(1);
+        request.setSettlementFrequency(8);
+        request.setMakerFee(BigDecimal.valueOf(0.001));
+        request.setTakerFee(BigDecimal.valueOf(0.001));
+        request.setSettlementAssetId(asset.getId());
+        request.setUser(takerUser);
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setOracles(oracles);
+        return request;
+    }
 
     protected long nowAsMillis() {
         return LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
@@ -64,6 +153,9 @@ public abstract class IntegrationTest {
     }
 
     protected void clearState() {
+        oracleRepository.deleteAll();
+        orderRepository.deleteAll();
+        marketRepository.deleteAll();
         assetRepository.deleteAll();
         voteRepository.deleteAll();
         proposalRepository.deleteAll();
