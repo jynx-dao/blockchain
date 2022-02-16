@@ -112,6 +112,18 @@ public class EthereumHelper {
         }
     }
 
+    public void removeTokens(
+            final String jynxKey,
+            final BigInteger amount
+    ) {
+        try {
+            TransactionReceipt transactionReceipt = jynxProBridge.remove_stake(amount, Hex.decode(jynxKey)).send();
+            log.info(transactionReceipt.getTransactionHash());
+        } catch(Exception e) {
+            log.error("Failed to stake tokens", e);
+        }
+    }
+
     public void stakeTokens(
             final String jynxKey,
             final BigInteger amount

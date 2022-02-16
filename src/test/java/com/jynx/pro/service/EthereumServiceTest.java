@@ -45,13 +45,16 @@ public class EthereumServiceTest extends IntegrationTest {
                 .setScale(1, RoundingMode.HALF_UP));
     }
 
-    @Test
-    public void testStakeTokens() throws InterruptedException {
+    private void stakeTokens(double expectedStake, boolean unstake) throws InterruptedException {
         String jynxKey = "02d47b3068c9ff8e25eec7c83b74eb2c61073a1862f925b644b4b234c21e83dd";
         long modifier = (long) Math.pow(10, 18);
         BigInteger amount = BigInteger.valueOf(100).multiply(BigInteger.valueOf(modifier));
         ethereumHelper.approveJynx(ethereumHelper.getJynxProBridge().getContractAddress(), amount);
-        ethereumHelper.stakeTokens(jynxKey, amount);
+        if(unstake) {
+            ethereumHelper.removeTokens(jynxKey, amount);
+        } else {
+            ethereumHelper.stakeTokens(jynxKey, amount);
+        }
         Thread.sleep(30000L);
         ethereumService.confirmEvents();
         List<Event> events = eventRepository.findByConfirmed(false);
@@ -61,6 +64,12 @@ public class EthereumServiceTest extends IntegrationTest {
         Optional<Stake> stake = stakeRepository.findByUser(user.get());
         Assertions.assertTrue(stake.isPresent());
         Assertions.assertEquals(stake.get().getAmount().setScale(2, RoundingMode.HALF_UP),
-                BigDecimal.valueOf(100).setScale(2, RoundingMode.HALF_UP));
+                BigDecimal.valueOf(expectedStake).setScale(2, RoundingMode.HALF_UP));
+    }
+
+    @Test
+    public void testStakeAndRemoveTokens() throws InterruptedException {
+        stakeTokens(100, false);
+        stakeTokens(0, true);
     }
 }
