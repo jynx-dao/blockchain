@@ -179,6 +179,8 @@ public abstract class IntegrationTest {
         ethereumHelper.deploy(ganache.getHost(), ganache.getFirstMappedPort(), PRIVATE_KEY);
         ethereumService.setRpcHost(ganache.getHost());
         ethereumService.setRpcPort(ganache.getFirstMappedPort());
+        ethereumService.setBridgeAddress(ethereumHelper.getJynxProBridge().getContractAddress());
+        ethereumService.initializeFilters();
         Config config = new Config()
                 .setId(1L)
                 .setGovernanceTokenAddress(ethereumHelper.getJynxToken().getContractAddress())

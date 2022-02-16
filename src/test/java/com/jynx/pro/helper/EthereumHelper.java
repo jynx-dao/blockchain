@@ -6,9 +6,11 @@ import com.jynx.pro.ethereum.JYNX_Distribution;
 import com.jynx.pro.ethereum.JynxPro_Bridge;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
+import org.bouncycastle.util.encoders.Hex;
 import org.springframework.stereotype.Component;
 import org.web3j.crypto.Credentials;
 import org.web3j.protocol.Web3j;
+import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.protocol.http.HttpService;
 import org.web3j.tx.gas.DefaultGasProvider;
 
@@ -94,6 +96,30 @@ public class EthereumHelper {
             jynxProBridge = deployJynxBridge(ganacheHost, ganachePort, privateKey);
         } catch(Exception e) {
             log.error("Failed to deploy contracts", e);
+        }
+    }
+
+    public void approveJynx(
+            final String address,
+            final BigInteger amount
+    ) {
+        try {
+            TransactionReceipt transactionReceipt = jynxToken.approve(address, amount).send();
+            log.info(transactionReceipt.getTransactionHash());
+        } catch(Exception e) {
+            log.error("Failed to stake tokens", e);
+        }
+    }
+
+    public void stakeTokens(
+            final String jynxKey,
+            final BigInteger amount
+    ) {
+        try {
+            TransactionReceipt transactionReceipt = jynxProBridge.add_stake(amount, Hex.decode(jynxKey)).send();
+            log.info(transactionReceipt.getTransactionHash());
+        } catch(Exception e) {
+            log.error("Failed to stake tokens", e);
         }
     }
 }
