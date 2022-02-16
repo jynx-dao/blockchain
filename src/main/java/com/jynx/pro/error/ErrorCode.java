@@ -26,4 +26,6 @@ public class ErrorCode {
     public static final String MARKET_NOT_SUSPENDED = "This market is not suspended/";
     public static final String INSUFFICIENT_MARGIN = "Insufficient margin.";
     public static final String MARGIN_NOT_ALLOCATED = "Margin has not been allocated";
+    public static final String USER_NOT_FOUND = "The user was not found.";
+    public static final String INVALID_EVENT_TYPE = "The event type is invalid.";
 }

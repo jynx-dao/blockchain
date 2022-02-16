@@ -13,6 +13,7 @@ import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.protocol.http.HttpService;
 import org.web3j.tx.gas.DefaultGasProvider;
+import org.web3j.utils.Convert;
 
 import java.math.BigInteger;
 

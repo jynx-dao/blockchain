@@ -77,13 +77,13 @@ public class ProposalService {
         proposalRepository.saveAll(proposals);
     }
 
-    private Long getTotalVotes(
+    private BigDecimal getTotalVotes(
             final Proposal proposal
     ) {
         List<Vote> votes = voteRepository.findByProposal(proposal);
-        Long totalVotes = 0L;
+        BigDecimal totalVotes = BigDecimal.ZERO;
         for(Vote vote : votes) {
-            totalVotes += stakeService.getStakeForUser(vote.getUser());
+            totalVotes = totalVotes.add(stakeService.getStakeForUser(vote.getUser()));
         }
         return totalVotes;
     }
@@ -99,7 +99,7 @@ public class ProposalService {
     private boolean isAboveThreshold(
             final Proposal proposal
     ) {
-        Long totalVotes = getTotalVotes(proposal);
+        BigDecimal totalVotes = getTotalVotes(proposal);
         BigDecimal totalSupply = ethereumService.totalSupply(configService.get().getGovernanceTokenAddress());
         double threshold = totalVotes.doubleValue() / totalSupply.doubleValue();
         return threshold >= configService.get().getParticipationThreshold().doubleValue();

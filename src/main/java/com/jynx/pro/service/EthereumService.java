@@ -3,8 +3,11 @@ package com.jynx.pro.service;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.ethereum.ERC20Detailed;
 import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.repository.EventRepository;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.binary.Hex;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.web3j.abi.EventEncoder;
@@ -19,16 +22,21 @@ import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.request.EthFilter;
 import org.web3j.protocol.core.methods.response.Log;
+import org.web3j.protocol.core.methods.response.Transaction;
 import org.web3j.protocol.http.HttpService;
 import org.web3j.tx.gas.DefaultGasProvider;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.Arrays;
+import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
 public class EthereumService {
+
+    private final int REQUIRED_BLOCKS = 5;
 
     @Setter
     @Value("${ethereum.rpc.host}")
@@ -41,6 +49,14 @@ public class EthereumService {
     @Setter
     @Value("${jynx.pro.bridge.address}")
     private String bridgeAddress;
+    @Setter
+    @Value("${eth.required.confirmations}")
+    private Integer requiredConfirmations; // TODO - network parameter?
+
+    @Autowired
+    private StakeService stakeService;
+    @Autowired
+    private EventRepository eventRepository;
 
     private Address decodeAddress(
             final Log ethLog,
@@ -66,6 +82,23 @@ public class EthereumService {
                 new TypeReference<Bytes32>() {});
     }
 
+    public void confirmEvents() {
+        try {
+            BigInteger blockNumber = getWeb3j().ethBlockNumber().send().getBlockNumber();
+            List<com.jynx.pro.entity.Event> events = eventRepository.findByConfirmed(false);
+            for(com.jynx.pro.entity.Event event : events) {
+                Optional<Transaction> transactionOptional = getWeb3j()
+                        .ethGetTransactionByHash(event.getHash()).send().getTransaction();
+                long confirmations = blockNumber.longValue() - event.getBlockNumber();
+                if(transactionOptional.isPresent() && confirmations >= requiredConfirmations) {
+                    stakeService.confirmEvent(event);
+                }
+            }
+        } catch(Exception e) {
+            log.error("Failed to confirm events", e);
+        }
+    }
+
     public void initializeFilters() {
         EthFilter bridgeFilter = new EthFilter(DefaultBlockParameterName.EARLIEST,
                 DefaultBlockParameterName.LATEST, bridgeAddress);
@@ -87,7 +120,6 @@ public class EthereumService {
         final String addStakeEventHash = EventEncoder.encode(addStakeEvent);
         final String removeStakeEventHash = EventEncoder.encode(removeStakeEvent);
         final String depositAssetEventHash = EventEncoder.encode(depositAssetEvent);
-        // TODO - we need an async callback on every block so that we can confirm events when they have enough confirmations
         getWeb3j().ethLogFlowable(bridgeFilter).subscribe(ethLog -> {
             String eventHash = ethLog.getTopics().get(0);
             String txHash = ethLog.getTransactionHash();
@@ -96,12 +128,14 @@ public class EthereumService {
                 Address user = decodeAddress(ethLog, 1);
                 Uint256 amount = decodeUint256(ethLog, 2);
                 Bytes32 jynxKey = decodeBytes32(ethLog, 3);
-                // TODO - process event
+                stakeService.add(user.getValue(), amount.getValue(), Hex.encodeHexString(jynxKey.getValue()),
+                        blockNumber.longValue(), txHash);
             } else if(eventHash.equals(removeStakeEventHash)) {
                 Address user = decodeAddress(ethLog, 1);
                 Uint256 amount = decodeUint256(ethLog, 2);
                 Bytes32 jynxKey = decodeBytes32(ethLog, 3);
-                // TODO - process event
+                stakeService.remove(user.getValue(), amount.getValue(), Hex.encodeHexString(jynxKey.getValue()),
+                        blockNumber.longValue(), txHash);
             } else if(eventHash.equals(depositAssetEventHash)) {
                 Address user = decodeAddress(ethLog, 1);
                 Address asset = decodeAddress(ethLog, 2);
@@ -119,7 +153,8 @@ public class EthereumService {
     private ERC20Detailed getERC20Contract(
             final String erc20contractAddress
     ) {
-        return ERC20Detailed.load(erc20contractAddress, getWeb3j(), Credentials.create(privateKey), new DefaultGasProvider());
+        return ERC20Detailed.load(erc20contractAddress, getWeb3j(),
+                Credentials.create(privateKey), new DefaultGasProvider());
     }
 
     public BigDecimal totalSupply(

@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.experimental.Accessors;
 
 import javax.persistence.*;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Data
@@ -30,4 +31,10 @@ public class Event {
     private User user;
     @Column(name = "block_number", nullable = false)
     private Long blockNumber;
+    @Column(name = "amount", nullable = false)
+    private BigDecimal amount;
+    @Column(name = "asset")
+    private String asset;
+    @Column(name = "address", nullable = false)
+    private String address;
 }

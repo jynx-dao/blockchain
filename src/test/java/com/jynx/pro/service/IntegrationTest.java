@@ -57,6 +57,8 @@ public abstract class IntegrationTest {
     protected OrderRepository orderRepository;
     @Autowired
     protected MarketService marketService;
+    @Autowired
+    protected EventRepository eventRepository;
 
     protected static final String PRIVATE_KEY = "0x4b077050dd12f33bb78773d957d87b0b477f6470017d9d6f0539c3c0683b6eb3";
     private static final String GANACHE_CMD = String
@@ -170,6 +172,7 @@ public abstract class IntegrationTest {
         assetRepository.deleteAll();
         voteRepository.deleteAll();
         proposalRepository.deleteAll();
+        eventRepository.deleteAll();
         stakeRepository.deleteAll();
         userRepository.deleteAll();
         configRepository.deleteAll();
@@ -180,6 +183,7 @@ public abstract class IntegrationTest {
         ethereumService.setRpcHost(ganache.getHost());
         ethereumService.setRpcPort(ganache.getFirstMappedPort());
         ethereumService.setBridgeAddress(ethereumHelper.getJynxProBridge().getContractAddress());
+        ethereumService.setRequiredConfirmations(0);
         ethereumService.initializeFilters();
         Config config = new Config()
                 .setId(1L)
@@ -203,7 +207,7 @@ public abstract class IntegrationTest {
                 .setPublicKey("22222222222222222222222222222222")
                 .setUsername("test-user2");
         makerUser = userRepository.save(makerUser);
-        stakeRepository.save(new Stake().setId(uuidUtils.next()).setUser(makerUser).setAmount(500000000L));
-        stakeRepository.save(new Stake().setId(uuidUtils.next()).setUser(takerUser).setAmount(700000000L));
+        stakeRepository.save(new Stake().setId(uuidUtils.next()).setUser(makerUser).setAmount(BigDecimal.valueOf(500000000L)));
+        stakeRepository.save(new Stake().setId(uuidUtils.next()).setUser(takerUser).setAmount(BigDecimal.valueOf(700000000L)));
     }
 }
