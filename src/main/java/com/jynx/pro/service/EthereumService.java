@@ -1,7 +1,7 @@
 package com.jynx.pro.service;
 
 import com.jynx.pro.error.ErrorCode;
-import com.jynx.pro.ethereum.ERC20;
+import com.jynx.pro.ethereum.ERC20Detailed;
 import com.jynx.pro.exception.JynxProException;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -13,10 +13,10 @@ import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.request.EthFilter;
 import org.web3j.protocol.http.HttpService;
 import org.web3j.tx.gas.DefaultGasProvider;
-import org.web3j.utils.Convert;
 
 import javax.annotation.PostConstruct;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 
 @Slf4j
 @Service
@@ -49,19 +49,19 @@ public class EthereumService {
         return Web3j.build(new HttpService(provider));
     }
 
-    private ERC20 getERC20Contract(
+    private ERC20Detailed getERC20Contract(
             final String erc20contractAddress
     ) {
-        return ERC20.load(erc20contractAddress, getWeb3j(), Credentials.create(privateKey), new DefaultGasProvider());
+        return ERC20Detailed.load(erc20contractAddress, getWeb3j(), Credentials.create(privateKey), new DefaultGasProvider());
     }
 
     public BigDecimal totalSupply(
             final String contractAddress
     ) {
         try {
-            // TODO - this needs to use decimal places for the conversion
-            ERC20 erc20contract = getERC20Contract(contractAddress);
-            return Convert.fromWei(erc20contract.totalSupply().send().toString(), Convert.Unit.ETHER);
+            ERC20Detailed erc20contract = getERC20Contract(contractAddress);
+            double modifier = BigInteger.TEN.pow(erc20contract.decimals().send().intValue()).doubleValue();
+            return BigDecimal.valueOf(erc20contract.totalSupply().send().doubleValue() / modifier);
         } catch (Exception e) {
             log.error(e.getMessage(), e);
             throw new JynxProException(ErrorCode.CANNOT_GET_JYNX_SUPPLY);

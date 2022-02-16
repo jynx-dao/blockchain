@@ -1,5 +1,6 @@
 package com.jynx.pro.entity;
 
+import com.jynx.pro.constant.OracleType;
 import lombok.Data;
 import lombok.experimental.Accessors;
 

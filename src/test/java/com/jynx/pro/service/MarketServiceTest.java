@@ -5,7 +5,7 @@ import com.jynx.pro.constant.MarketStatus;
 import com.jynx.pro.entity.Asset;
 import com.jynx.pro.entity.Market;
 import com.jynx.pro.entity.Oracle;
-import com.jynx.pro.entity.OracleType;
+import com.jynx.pro.constant.OracleType;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.AmendMarketRequest;

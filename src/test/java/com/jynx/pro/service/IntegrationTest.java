@@ -3,6 +3,7 @@ package com.jynx.pro.service;
 import com.jynx.pro.constant.AssetStatus;
 import com.jynx.pro.constant.AssetType;
 import com.jynx.pro.constant.MarketStatus;
+import com.jynx.pro.constant.OracleType;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.helper.EthereumHelper;
 import com.jynx.pro.repository.*;
@@ -180,7 +181,7 @@ public abstract class IntegrationTest {
         ethereumService.setRpcPort(ganache.getFirstMappedPort());
         Config config = new Config()
                 .setId(1L)
-                .setGovernanceTokenAddress(ethereumHelper.getJynxTokenContract().getContractAddress())
+                .setGovernanceTokenAddress(ethereumHelper.getJynxToken().getContractAddress())
                 .setMinClosingDelay(1L)
                 .setMinEnactmentDelay(1L)
                 .setMinOpenDelay(1L)

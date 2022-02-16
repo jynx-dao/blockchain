@@ -12,6 +12,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.web3j.utils.Convert;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 
 @Slf4j
 @Testcontainers
@@ -32,7 +33,9 @@ public class EthereumServiceTest extends IntegrationTest {
     @Test
     public void testGetTokenSupply() {
         BigDecimal jynxTotalSupply = ethereumService.totalSupply(
-                ethereumHelper.getJynxTokenContract().getContractAddress());
-        Assertions.assertEquals(Convert.toWei("1000000000", Convert.Unit.WEI), jynxTotalSupply);
+                ethereumHelper.getJynxToken().getContractAddress());
+        Assertions.assertEquals(Convert.toWei("1000000000", Convert.Unit.WEI)
+                .setScale(1, RoundingMode.HALF_UP), jynxTotalSupply
+                .setScale(1, RoundingMode.HALF_UP));
     }
 }
