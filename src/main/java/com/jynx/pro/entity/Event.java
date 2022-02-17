@@ -35,6 +35,4 @@ public class Event {
     private BigDecimal amount;
     @Column(name = "asset")
     private String asset;
-    @Column(name = "address", nullable = false)
-    private String address;
 }

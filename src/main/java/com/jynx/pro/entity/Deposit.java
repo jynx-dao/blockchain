@@ -6,13 +6,12 @@ import lombok.experimental.Accessors;
 
 import javax.persistence.*;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
 @Entity
 @Table(name = "jynx_deposit")
-@Accessors
+@Accessors(chain = true)
 public class Deposit {
     @Id
     private UUID id;
@@ -28,7 +27,7 @@ public class Deposit {
     @JoinColumn(name = "event_id", nullable = false)
     private Event event;
     @Column(name = "created", nullable = false)
-    private LocalDateTime created;
+    private Long created;
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private DepositStatus status;

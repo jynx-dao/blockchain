@@ -28,9 +28,9 @@ public class StakeService {
     @Autowired
     private ConfigService configService;
     @Autowired
-    private UserRepository userRepository;
+    private UserService userService;
     @Autowired
-    private EventRepository eventRepository;
+    private EventService eventService;
     @Autowired
     private UUIDUtils uuidUtils;
 
@@ -60,30 +60,7 @@ public class StakeService {
         }
     }
 
-    private void saveEvent(
-            final User user,
-            final Long blockNumber,
-            final String txHash,
-            final String address,
-            final BigInteger amount,
-            final EventType type
-    ) {
-        double modifier = Math.pow(10, 18);
-        Event event = new Event()
-                .setId(uuidUtils.next())
-                .setUser(user)
-                .setBlockchain(Blockchain.ETHEREUM)
-                .setConfirmed(false)
-                .setBlockNumber(blockNumber)
-                .setHash(txHash)
-                .setType(type)
-                .setAddress(address)
-                .setAmount(BigDecimal.valueOf(amount.doubleValue())
-                        .divide(BigDecimal.valueOf(modifier), 4, RoundingMode.HALF_DOWN));
-        eventRepository.save(event);
-    }
-
-    private Stake getOrCreateStake(
+    public Stake getAndCreateStake(
             final User user
     ) {
         return stakeRepository.findByUser(user)
@@ -93,57 +70,23 @@ public class StakeService {
                         .setAmount(BigDecimal.ZERO));
     }
 
-    public void confirmEvent(
-            final Event event
-    ) {
-        if(event.getType().equals(EventType.ADD_STAKE)) {
-            Stake stake = getOrCreateStake(event.getUser());
-            stake.setAmount(stake.getAmount().add(event.getAmount()));
-            stakeRepository.save(stake);
-            event.setConfirmed(true);
-            eventRepository.save(event);
-        } else if(event.getType().equals(EventType.REMOVE_STAKE)) {
-            Stake stake = getOrCreateStake(event.getUser());
-            stake.setAmount(stake.getAmount().subtract(event.getAmount()));
-            stakeRepository.save(stake);
-            event.setConfirmed(true);
-            eventRepository.save(event);
-        } else if(event.getType().equals(EventType.DEPOSIT_ASSET)) {
-            // TODO - credit deposit
-        }
-    }
-
-    private User getAndCreateUser(
-            final String publicKey
-    ) {
-        User user = userRepository.findByPublicKey(publicKey)
-                .orElse(new User()
-                        .setId(uuidUtils.next())
-                        .setPublicKey(publicKey)
-                        .setReputationScore(1L)
-                        .setUsername(publicKey));
-        return userRepository.save(user);
-    }
-
     public void remove(
-            final String address,
             final BigInteger amount,
             final String publicKey,
             final Long blockNumber,
             final String txHash
     ) {
-        User user = getAndCreateUser(publicKey);
-        saveEvent(user, blockNumber, txHash, address, amount, EventType.REMOVE_STAKE);
+        eventService.save(userService.getAndCreateUser(publicKey), blockNumber,
+                txHash, amount, EventType.REMOVE_STAKE);
     }
 
     public void add(
-            final String address,
             final BigInteger amount,
             final String publicKey,
             final Long blockNumber,
             final String txHash
     ) {
-        User user = getAndCreateUser(publicKey);
-        saveEvent(user, blockNumber, txHash, address, amount, EventType.ADD_STAKE);
+        eventService.save(userService.getAndCreateUser(publicKey), blockNumber,
+                txHash, amount, EventType.ADD_STAKE);
     }
 }

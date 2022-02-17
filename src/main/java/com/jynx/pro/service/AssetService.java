@@ -1,7 +1,7 @@
 package com.jynx.pro.service;
 
 import com.jynx.pro.constant.AssetStatus;
-import com.jynx.pro.constant.ProposalStatus;
+import com.jynx.pro.constant.AssetType;
 import com.jynx.pro.constant.ProposalType;
 import com.jynx.pro.entity.Asset;
 import com.jynx.pro.entity.Proposal;
@@ -37,6 +37,14 @@ public class AssetService {
             final UUID id
     ) {
         return assetRepository.findById(id).orElseThrow(() -> new JynxProException(ErrorCode.ASSET_NOT_FOUND));
+    }
+
+    public Asset getByAddress(
+            final String assetAddress
+    ) {
+        return assetRepository.findByAddressAndType(assetAddress, AssetType.ERC20)
+                .stream().filter(a -> a.getStatus().equals(AssetStatus.ACTIVE))
+                .findFirst().orElseThrow(() -> new JynxProException(ErrorCode.ASSET_NOT_FOUND));
     }
 
     private void updateStatus(

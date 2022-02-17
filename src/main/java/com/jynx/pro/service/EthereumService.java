@@ -54,9 +54,11 @@ public class EthereumService {
     private Integer requiredConfirmations; // TODO - network parameter?
 
     @Autowired
+    private AccountService accountService;
+    @Autowired
     private StakeService stakeService;
     @Autowired
-    private EventRepository eventRepository;
+    private EventService eventService;
 
     private Address decodeAddress(
             final Log ethLog,
@@ -85,13 +87,13 @@ public class EthereumService {
     public void confirmEvents() {
         try {
             BigInteger blockNumber = getWeb3j().ethBlockNumber().send().getBlockNumber();
-            List<com.jynx.pro.entity.Event> events = eventRepository.findByConfirmed(false);
+            List<com.jynx.pro.entity.Event> events = eventService.getUnconfirmed();
             for(com.jynx.pro.entity.Event event : events) {
                 Optional<Transaction> transactionOptional = getWeb3j()
                         .ethGetTransactionByHash(event.getHash()).send().getTransaction();
                 long confirmations = blockNumber.longValue() - event.getBlockNumber();
                 if(transactionOptional.isPresent() && confirmations >= requiredConfirmations) {
-                    stakeService.confirmEvent(event);
+                    eventService.confirm(event);
                 }
             }
         } catch(Exception e) {
@@ -103,19 +105,20 @@ public class EthereumService {
         EthFilter bridgeFilter = new EthFilter(DefaultBlockParameterName.EARLIEST,
                 DefaultBlockParameterName.LATEST, bridgeAddress);
         final Event addStakeEvent = new Event("AddStake", Arrays.asList(
-                new TypeReference<Address>(true) {},
+                new TypeReference<Address>(false) {},
                 new TypeReference<Uint256>(true) {},
                 new TypeReference<Bytes32>(true) {}
         ));
         final Event removeStakeEvent = new Event("RemoveStake", Arrays.asList(
-                new TypeReference<Address>(true) {},
+                new TypeReference<Address>(false) {},
                 new TypeReference<Uint256>(true) {},
                 new TypeReference<Bytes32>(true) {}
         ));
         final Event depositAssetEvent = new Event("DepositAsset", Arrays.asList(
+                new TypeReference<Address>(false) {},
                 new TypeReference<Address>(true) {},
-                new TypeReference<Address>(true) {},
-                new TypeReference<Uint256>(true) {}
+                new TypeReference<Uint256>(true) {},
+                new TypeReference<Bytes32>(true) {}
         ));
         final String addStakeEventHash = EventEncoder.encode(addStakeEvent);
         final String removeStakeEventHash = EventEncoder.encode(removeStakeEvent);
@@ -125,22 +128,21 @@ public class EthereumService {
             String txHash = ethLog.getTransactionHash();
             BigInteger blockNumber = ethLog.getBlockNumber();
             if(eventHash.equals(addStakeEventHash)) {
-                Address user = decodeAddress(ethLog, 1);
-                Uint256 amount = decodeUint256(ethLog, 2);
-                Bytes32 jynxKey = decodeBytes32(ethLog, 3);
-                stakeService.add(user.getValue(), amount.getValue(), Hex.encodeHexString(jynxKey.getValue()),
+                Uint256 amount = decodeUint256(ethLog, 1);
+                Bytes32 jynxKey = decodeBytes32(ethLog, 2);
+                stakeService.add(amount.getValue(), Hex.encodeHexString(jynxKey.getValue()),
                         blockNumber.longValue(), txHash);
             } else if(eventHash.equals(removeStakeEventHash)) {
-                Address user = decodeAddress(ethLog, 1);
-                Uint256 amount = decodeUint256(ethLog, 2);
-                Bytes32 jynxKey = decodeBytes32(ethLog, 3);
-                stakeService.remove(user.getValue(), amount.getValue(), Hex.encodeHexString(jynxKey.getValue()),
+                Uint256 amount = decodeUint256(ethLog, 1);
+                Bytes32 jynxKey = decodeBytes32(ethLog, 2);
+                stakeService.remove(amount.getValue(), Hex.encodeHexString(jynxKey.getValue()),
                         blockNumber.longValue(), txHash);
             } else if(eventHash.equals(depositAssetEventHash)) {
-                Address user = decodeAddress(ethLog, 1);
-                Address asset = decodeAddress(ethLog, 2);
-                Uint256 amount = decodeUint256(ethLog, 3);
-                // TODO - process event
+                Address asset = decodeAddress(ethLog, 1);
+                Uint256 amount = decodeUint256(ethLog, 2);
+                Bytes32 jynxKey = decodeBytes32(ethLog, 3);
+                accountService.deposit(asset.getValue(), amount.getValue(), Hex.encodeHexString(jynxKey.getValue()),
+                        blockNumber.longValue(), txHash);
             }
         });
     }
