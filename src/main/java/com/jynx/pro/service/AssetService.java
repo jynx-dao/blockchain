@@ -15,7 +15,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.web3j.protocol.core.methods.response.TransactionReceipt;
 
 import java.util.List;
 import java.util.UUID;
@@ -65,7 +64,7 @@ public class AssetService {
     ) {
         proposalService.checkEnacted(proposal);
         Asset asset = get(proposal.getLinkedId());
-        TransactionReceipt transactionReceipt = ethereumService.addAsset(asset.getAddress());
+        ethereumService.addAsset(asset.getAddress());
         updateStatus(proposal, AssetStatus.ACTIVE);
     }
 

@@ -100,7 +100,7 @@ public class EthereumService {
             final int idx
     ) {
         return ((Address) FunctionReturnDecoder.decodeIndexedValue(ethLog.getTopics().get(idx),
-                new TypeReference<Address>() {})).getValue();
+                EthereumType.ADDRESS)).getValue();
     }
 
     /**
@@ -116,7 +116,7 @@ public class EthereumService {
             final int idx
     ) {
         return ((Uint256) FunctionReturnDecoder.decodeIndexedValue(ethLog.getTopics().get(idx),
-                new TypeReference<Uint256>() {})).getValue();
+                EthereumType.UINT256)).getValue();
     }
 
     /**
@@ -132,7 +132,7 @@ public class EthereumService {
             final int idx
     ) {
         return Hex.encodeHexString(((Bytes32) FunctionReturnDecoder.decodeIndexedValue(ethLog.getTopics().get(idx),
-                new TypeReference<Bytes32>() {})).getValue());
+                EthereumType.BYTES32)).getValue());
     }
 
     /**
