@@ -2,6 +2,7 @@ package com.jynx.pro.service;
 
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.ethereum.ERC20Detailed;
+import com.jynx.pro.ethereum.type.EthereumType;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.EventRepository;
 import lombok.Setter;
@@ -60,30 +61,57 @@ public class EthereumService {
     @Autowired
     private EventService eventService;
 
-    private Address decodeAddress(
+    /**
+     * Decode address event parameters from Ethereum
+     *
+     * @param ethLog the {@link Log} instance
+     * @param idx the parameter index
+     *
+     * @return the address as a string
+     */
+    private String decodeAddress(
             final Log ethLog,
             final int idx
     ) {
-        return (Address) FunctionReturnDecoder.decodeIndexedValue(ethLog.getTopics().get(idx),
-                new TypeReference<Address>() {});
+        return ((Address) FunctionReturnDecoder.decodeIndexedValue(ethLog.getTopics().get(idx),
+                new TypeReference<Address>() {})).getValue();
     }
 
-    private Uint256 decodeUint256(
+    /**
+     * Decode uint256 event parameters from Ethereum
+     *
+     * @param ethLog the {@link Log} instance
+     * @param idx the parameter index
+     *
+     * @return the numeric value
+     */
+    private BigInteger decodeUint256(
             final Log ethLog,
             final int idx
     ) {
-        return (Uint256) FunctionReturnDecoder.decodeIndexedValue(ethLog.getTopics().get(idx),
-                new TypeReference<Uint256>() {});
+        return ((Uint256) FunctionReturnDecoder.decodeIndexedValue(ethLog.getTopics().get(idx),
+                new TypeReference<Uint256>() {})).getValue();
     }
 
-    private Bytes32 decodeBytes32(
+    /**
+     * Decode bytes32 event parameters from Ethereum
+     *
+     * @param ethLog the {@link Log} instance
+     * @param idx the parameter index
+     *
+     * @return the Hex string
+     */
+    private String decodeBytes32(
             final Log ethLog,
             final int idx
     ) {
-        return (Bytes32) FunctionReturnDecoder.decodeIndexedValue(ethLog.getTopics().get(idx),
-                new TypeReference<Bytes32>() {});
+        return Hex.encodeHexString(((Bytes32) FunctionReturnDecoder.decodeIndexedValue(ethLog.getTopics().get(idx),
+                new TypeReference<Bytes32>() {})).getValue());
     }
 
+    /**
+     * Processes confirmed events (i.e. after sufficient Ethereum blocks have been mined)
+     */
     public void confirmEvents() {
         try {
             BigInteger blockNumber = getWeb3j().ethBlockNumber().send().getBlockNumber();
@@ -94,6 +122,8 @@ public class EthereumService {
                 long confirmations = blockNumber.longValue() - event.getBlockNumber();
                 if(transactionOptional.isPresent() && confirmations >= requiredConfirmations) {
                     eventService.confirm(event);
+                } else if(transactionOptional.isEmpty() && confirmations >= requiredConfirmations) {
+                    // TODO - the TX has been dropped after sufficient blocks were mined
                 }
             }
         } catch(Exception e) {
@@ -101,24 +131,27 @@ public class EthereumService {
         }
     }
 
+    /**
+     * Initialize the Ethereum event filters
+     */
     public void initializeFilters() {
         EthFilter bridgeFilter = new EthFilter(DefaultBlockParameterName.EARLIEST,
                 DefaultBlockParameterName.LATEST, bridgeAddress);
         final Event addStakeEvent = new Event("AddStake", Arrays.asList(
-                new TypeReference<Address>(false) {},
-                new TypeReference<Uint256>(true) {},
-                new TypeReference<Bytes32>(true) {}
+                EthereumType.ADDRESS,
+                EthereumType.UINT256_INDEXED,
+                EthereumType.BYTES32_INDEXED
         ));
         final Event removeStakeEvent = new Event("RemoveStake", Arrays.asList(
-                new TypeReference<Address>(false) {},
-                new TypeReference<Uint256>(true) {},
-                new TypeReference<Bytes32>(true) {}
+                EthereumType.ADDRESS,
+                EthereumType.UINT256_INDEXED,
+                EthereumType.BYTES32_INDEXED
         ));
         final Event depositAssetEvent = new Event("DepositAsset", Arrays.asList(
-                new TypeReference<Address>(false) {},
-                new TypeReference<Address>(true) {},
-                new TypeReference<Uint256>(true) {},
-                new TypeReference<Bytes32>(true) {}
+                EthereumType.ADDRESS,
+                EthereumType.ADDRESS_INDEXED,
+                EthereumType.UINT256_INDEXED,
+                EthereumType.BYTES32_INDEXED
         ));
         final String addStakeEventHash = EventEncoder.encode(addStakeEvent);
         final String removeStakeEventHash = EventEncoder.encode(removeStakeEvent);
@@ -128,30 +161,39 @@ public class EthereumService {
             String txHash = ethLog.getTransactionHash();
             BigInteger blockNumber = ethLog.getBlockNumber();
             if(eventHash.equals(addStakeEventHash)) {
-                Uint256 amount = decodeUint256(ethLog, 1);
-                Bytes32 jynxKey = decodeBytes32(ethLog, 2);
-                stakeService.add(amount.getValue(), Hex.encodeHexString(jynxKey.getValue()),
-                        blockNumber.longValue(), txHash);
+                BigInteger amount = decodeUint256(ethLog, 1);
+                String jynxKey = decodeBytes32(ethLog, 2);
+                stakeService.add(amount, jynxKey, blockNumber.longValue(), txHash);
             } else if(eventHash.equals(removeStakeEventHash)) {
-                Uint256 amount = decodeUint256(ethLog, 1);
-                Bytes32 jynxKey = decodeBytes32(ethLog, 2);
-                stakeService.remove(amount.getValue(), Hex.encodeHexString(jynxKey.getValue()),
-                        blockNumber.longValue(), txHash);
+                BigInteger amount = decodeUint256(ethLog, 1);
+                String jynxKey = decodeBytes32(ethLog, 2);
+                stakeService.remove(amount, jynxKey, blockNumber.longValue(), txHash);
             } else if(eventHash.equals(depositAssetEventHash)) {
-                Address asset = decodeAddress(ethLog, 1);
-                Uint256 amount = decodeUint256(ethLog, 2);
-                Bytes32 jynxKey = decodeBytes32(ethLog, 3);
-                accountService.deposit(asset.getValue(), amount.getValue(), Hex.encodeHexString(jynxKey.getValue()),
-                        blockNumber.longValue(), txHash);
+                String asset = decodeAddress(ethLog, 1);
+                BigInteger amount = decodeUint256(ethLog, 2);
+                String jynxKey = decodeBytes32(ethLog, 3);
+                accountService.deposit(asset, amount, jynxKey, blockNumber.longValue(), txHash);
             }
         });
     }
 
+    /**
+     * Gets an instance of the {@link Web3j} interface
+     *
+     * @return {@link Web3j} interface
+     */
     private Web3j getWeb3j() {
         String provider = String.format("http://%s:%s", rpcHost, rpcPort);
         return Web3j.build(new HttpService(provider));
     }
 
+    /**
+     * Gets an instance of the deployed {@link ERC20Detailed} contract
+     *
+     * @param erc20contractAddress contract address
+     *
+     * @return {@link ERC20Detailed} contract
+     */
     private ERC20Detailed getERC20Contract(
             final String erc20contractAddress
     ) {
@@ -159,6 +201,13 @@ public class EthereumService {
                 Credentials.create(privateKey), new DefaultGasProvider());
     }
 
+    /**
+     * Gets the total supply of an ERC20 token
+     *
+     * @param contractAddress contract address
+     *
+     * @return the total supply
+     */
     public BigDecimal totalSupply(
             final String contractAddress
     ) {
