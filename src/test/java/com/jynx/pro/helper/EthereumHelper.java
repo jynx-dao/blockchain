@@ -106,7 +106,6 @@ public class EthereumHelper {
             jynxProBridge = deployJynxBridge(ganacheHost, ganachePort, privateKey);
             String address = Credentials.create(privateKey).getAddress();
             BigInteger amount = priceUtils.toBigInteger(BigDecimal.valueOf(100000));
-            daiToken.approve(address, amount).send();
             daiToken.issue(address, amount).send();
         } catch(Exception e) {
             log.error("Failed to deploy contracts", e);

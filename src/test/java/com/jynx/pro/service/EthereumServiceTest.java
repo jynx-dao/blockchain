@@ -1,10 +1,7 @@
 package com.jynx.pro.service;
 
 import com.jynx.pro.Application;
-import com.jynx.pro.entity.Asset;
-import com.jynx.pro.entity.Event;
-import com.jynx.pro.entity.Stake;
-import com.jynx.pro.entity.User;
+import com.jynx.pro.entity.*;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -27,6 +24,8 @@ import java.util.Optional;
 @SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
 public class EthereumServiceTest extends IntegrationTest {
 
+    private static final String JYNX_KEY = "02d47b3068c9ff8e25eec7c83b74eb2c61073a1862f925b644b4b234c21e83dd";
+
     @BeforeEach
     public void setup() {
         initializeState();
@@ -47,20 +46,19 @@ public class EthereumServiceTest extends IntegrationTest {
     }
 
     private void stakeTokens(double expectedStake, boolean unstake) throws InterruptedException {
-        String jynxKey = "02d47b3068c9ff8e25eec7c83b74eb2c61073a1862f925b644b4b234c21e83dd";
         long modifier = (long) Math.pow(10, 18);
         BigInteger amount = BigInteger.valueOf(100).multiply(BigInteger.valueOf(modifier));
         ethereumHelper.approveJynx(ethereumHelper.getJynxProBridge().getContractAddress(), amount);
         if(unstake) {
-            ethereumHelper.removeTokens(jynxKey, amount);
+            ethereumHelper.removeTokens(JYNX_KEY, amount);
         } else {
-            ethereumHelper.stakeTokens(jynxKey, amount);
+            ethereumHelper.stakeTokens(JYNX_KEY, amount);
         }
         Thread.sleep(30000L);
         ethereumService.confirmEvents();
         List<Event> events = eventRepository.findByConfirmed(false);
         Assertions.assertEquals(events.size(), 0);
-        Optional<User> user = userRepository.findByPublicKey(jynxKey);
+        Optional<User> user = userRepository.findByPublicKey(JYNX_KEY);
         Assertions.assertTrue(user.isPresent());
         Optional<Stake> stake = stakeRepository.findByUser(user.get());
         Assertions.assertTrue(stake.isPresent());
@@ -75,8 +73,26 @@ public class EthereumServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testDepositAsset() throws InterruptedException {
-//        Asset asset = createAndEnactAsset(true);
-        ethereumService.addAsset("0x301049cbAd43E4c11291260bc41955119947E107");
+    public void testDepositAsset() throws Exception {
+        Asset asset = createAndEnactAsset(true);
+        boolean assetActive = ethereumHelper.getJynxProBridge().assets(asset.getAddress()).send();
+        Assertions.assertTrue(assetActive);
+        BigInteger amount = priceUtils.toBigInteger(BigDecimal.TEN);
+        ethereumHelper.approveDai(ethereumHelper.getJynxProBridge().getContractAddress(), amount);
+        ethereumHelper.depositAsset(asset.getAddress(), amount, JYNX_KEY);
+        Thread.sleep(30000L);
+        ethereumService.confirmEvents();
+        List<Event> events = eventRepository.findByConfirmed(false);
+        Assertions.assertEquals(events.size(), 0);
+        Optional<User> user = userRepository.findByPublicKey(JYNX_KEY);
+        Assertions.assertTrue(user.isPresent());
+        Optional<Account> account = accountRepository.findByUserAndAsset(user.get(), asset);
+        Assertions.assertTrue(account.isPresent());
+        Assertions.assertEquals(account.get().getBalance().setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.TEN.setScale(2, RoundingMode.HALF_UP));
+        Assertions.assertEquals(account.get().getAvailableBalance().setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.TEN.setScale(2, RoundingMode.HALF_UP));
+        Assertions.assertEquals(account.get().getMarginBalance().setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
     }
 }

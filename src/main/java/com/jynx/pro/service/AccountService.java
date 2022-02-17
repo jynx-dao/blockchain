@@ -92,7 +92,7 @@ public class AccountService {
     ) {
         User user = userService.getAndCreateUser(publicKey);
         Event event = eventService.save(user, blockNumber,
-                txHash, amount, EventType.DEPOSIT_ASSET);
+                txHash, amount, EventType.DEPOSIT_ASSET, assetAddress);
         Asset asset = assetService.getByAddress(assetAddress);
         Deposit deposit = new Deposit()
                 .setAmount(priceUtils.fromBigInteger(amount, asset.getDecimalPlaces()))

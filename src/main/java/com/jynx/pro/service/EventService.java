@@ -41,7 +41,8 @@ public class EventService {
             final Long blockNumber,
             final String txHash,
             final BigInteger amount,
-            final EventType type
+            final EventType type,
+            final String asset
     ) {
         double modifier = Math.pow(10, 18);
         Event event = new Event()
@@ -54,7 +55,20 @@ public class EventService {
                 .setType(type)
                 .setAmount(BigDecimal.valueOf(amount.doubleValue())
                         .divide(BigDecimal.valueOf(modifier), 4, RoundingMode.HALF_DOWN));
+        if(asset != null) {
+            event.setAsset(asset);
+        }
         return eventRepository.save(event);
+    }
+
+    public Event save(
+            final User user,
+            final Long blockNumber,
+            final String txHash,
+            final BigInteger amount,
+            final EventType type
+    ) {
+        return save(user, blockNumber, txHash, amount, type, null);
     }
 
     public void confirm(

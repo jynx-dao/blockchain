@@ -9,6 +9,7 @@ import com.jynx.pro.helper.EthereumHelper;
 import com.jynx.pro.repository.*;
 import com.jynx.pro.request.AddAssetRequest;
 import com.jynx.pro.request.AddMarketRequest;
+import com.jynx.pro.utils.PriceUtils;
 import com.jynx.pro.utils.UUIDUtils;
 import org.junit.jupiter.api.Assertions;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -59,6 +60,10 @@ public abstract class IntegrationTest {
     protected MarketService marketService;
     @Autowired
     protected EventRepository eventRepository;
+    @Autowired
+    protected PriceUtils priceUtils;
+    @Autowired
+    protected DepositRepository depositRepository;
 
     protected static final String PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
     private static final String GANACHE_CMD = String
@@ -169,6 +174,7 @@ public abstract class IntegrationTest {
         orderRepository.deleteAll();
         marketRepository.deleteAll();
         accountRepository.deleteAll();
+        depositRepository.deleteAll();
         assetRepository.deleteAll();
         voteRepository.deleteAll();
         proposalRepository.deleteAll();
