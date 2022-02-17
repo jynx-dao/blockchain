@@ -40,4 +40,28 @@ public class PriceUtils {
         return value.multiply(BigDecimal.valueOf(modifier)).toBigInteger();
     }
 
+    public BigDecimal fromBigInteger(
+            final BigInteger value
+    ) {
+        return fromBigInteger(value, 18);
+    }
+
+    public BigDecimal fromLong(
+            final long value
+    ) {
+        return fromLong(value, 18);
+    }
+
+    public long toLong(
+            final BigDecimal value
+    ) {
+        return toLong(value, 18);
+    }
+
+    public BigInteger toBigInteger(
+            final BigDecimal value
+    ) {
+        return toBigInteger(value, 18);
+    }
+
 }

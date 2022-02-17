@@ -4,6 +4,7 @@ import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.ethereum.ERC20Detailed;
 import com.jynx.pro.ethereum.type.EthereumType;
 import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.utils.PriceUtils;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Hex;
@@ -22,12 +23,13 @@ import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.request.EthFilter;
 import org.web3j.protocol.core.methods.response.Log;
-import org.web3j.protocol.core.methods.response.Transaction;
+import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.protocol.http.HttpService;
 import org.web3j.tx.gas.DefaultGasProvider;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.math.RoundingMode;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -53,6 +55,31 @@ public class EthereumService {
     private EventService eventService;
     @Autowired
     private ConfigService configService;
+    @Autowired
+    private PriceUtils priceUtils;
+
+    private final Event ADD_STAKE = new Event("AddStake", Arrays.asList(
+            EthereumType.ADDRESS,
+            EthereumType.UINT256_INDEXED,
+            EthereumType.BYTES32_INDEXED
+    ));
+
+    private final Event REMOVE_STAKE = new Event("RemoveStake", Arrays.asList(
+            EthereumType.ADDRESS,
+            EthereumType.UINT256_INDEXED,
+            EthereumType.BYTES32_INDEXED
+    ));
+
+    private final Event DEPOSIT_ASSET = new Event("DepositAsset", Arrays.asList(
+            EthereumType.ADDRESS,
+            EthereumType.ADDRESS_INDEXED,
+            EthereumType.UINT256_INDEXED,
+            EthereumType.BYTES32_INDEXED
+    ));
+
+    private final String ADD_STAKE_HASH = EventEncoder.encode(ADD_STAKE);
+    private final String REMOVE_STAKE_HASH = EventEncoder.encode(REMOVE_STAKE);
+    private final String DEPOSIT_ASSET_HASH = EventEncoder.encode(DEPOSIT_ASSET);
 
     /**
      * Decode address event parameters from Ethereum
@@ -110,14 +137,19 @@ public class EthereumService {
             BigInteger blockNumber = getWeb3j().ethBlockNumber().send().getBlockNumber();
             List<com.jynx.pro.entity.Event> events = eventService.getUnconfirmed();
             for(com.jynx.pro.entity.Event event : events) {
-                Optional<Transaction> transactionOptional = getWeb3j()
-                        .ethGetTransactionByHash(event.getHash()).send().getTransaction();
+                Optional<TransactionReceipt> transactionOptional = getWeb3j()
+                        .ethGetTransactionReceipt(event.getHash()).send().getTransactionReceipt();
                 long confirmations = blockNumber.longValue() - event.getBlockNumber();
                 if(transactionOptional.isPresent() && confirmations >= configService.get().getEthConfirmations()) {
-                    eventService.confirm(event);
+                    if(matchEvent(transactionOptional.get().getLogs(), event)) {
+                        // TODO - this should be propagated via deliverTx [or at the end of a block (??)]
+                        eventService.confirm(event);
+                    } else {
+                        log.warn("Cannot reconcile the event !!");
+                    }
                 } else if(transactionOptional.isEmpty() && confirmations >= configService.get().getEthConfirmations()) {
-                    log.warn("This event cannot be processed: {}", event);
                     // TODO - the TX has been dropped after sufficient blocks were mined
+                    log.warn("This event cannot be processed: {}", event);
                 }
             }
         } catch(Exception e) {
@@ -126,43 +158,70 @@ public class EthereumService {
     }
 
     /**
+     * Match a pending {@link Event} with the Ethereum {@link Log}s
+     *
+     * @param logs {@link Log}s from Ethereum tx
+     * @param event unconfirmed {@link Event}
+     *
+     * @return true if event is valid
+     */
+    private boolean matchEvent(
+            final List<Log> logs,
+            final com.jynx.pro.entity.Event event
+    ) {
+        for(Log ethLog : logs) {
+            String eventHash = ethLog.getTopics().get(0);
+            if (eventHash.equals(ADD_STAKE_HASH)) {
+                BigInteger amount = decodeUint256(ethLog, 1);
+                String jynxKey = decodeBytes32(ethLog, 2);
+                if(event.getAmount().setScale(10, RoundingMode.HALF_UP)
+                        .equals(priceUtils.fromBigInteger(amount).setScale(10, RoundingMode.HALF_UP)) &&
+                        event.getUser().getPublicKey().equals(jynxKey)) {
+                    return true;
+                }
+            } else if (eventHash.equals(REMOVE_STAKE_HASH)) {
+                BigInteger amount = decodeUint256(ethLog, 1);
+                String jynxKey = decodeBytes32(ethLog, 2);
+                if(event.getAmount().setScale(10, RoundingMode.HALF_UP)
+                        .equals(priceUtils.fromBigInteger(amount).setScale(10, RoundingMode.HALF_UP)) &&
+                        event.getUser().getPublicKey().equals(jynxKey)) {
+                    return true;
+                }
+            } else if (eventHash.equals(DEPOSIT_ASSET_HASH)) {
+                String asset = decodeAddress(ethLog, 1);
+                BigInteger amount = decodeUint256(ethLog, 2);
+                String jynxKey = decodeBytes32(ethLog, 3);
+                if(event.getAmount().setScale(10, RoundingMode.HALF_UP)
+                        .equals(priceUtils.fromBigInteger(amount).setScale(10, RoundingMode.HALF_UP)) &&
+                        event.getUser().getPublicKey().equals(jynxKey) &&
+                        event.getAsset().equals(asset)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * Initialize the Ethereum event filters
      */
     public void initializeFilters() {
         EthFilter bridgeFilter = new EthFilter(DefaultBlockParameterName.EARLIEST,
                 DefaultBlockParameterName.LATEST, configService.get().getBridgeAddress());
-        final Event addStakeEvent = new Event("AddStake", Arrays.asList(
-                EthereumType.ADDRESS,
-                EthereumType.UINT256_INDEXED,
-                EthereumType.BYTES32_INDEXED
-        ));
-        final Event removeStakeEvent = new Event("RemoveStake", Arrays.asList(
-                EthereumType.ADDRESS,
-                EthereumType.UINT256_INDEXED,
-                EthereumType.BYTES32_INDEXED
-        ));
-        final Event depositAssetEvent = new Event("DepositAsset", Arrays.asList(
-                EthereumType.ADDRESS,
-                EthereumType.ADDRESS_INDEXED,
-                EthereumType.UINT256_INDEXED,
-                EthereumType.BYTES32_INDEXED
-        ));
-        final String addStakeEventHash = EventEncoder.encode(addStakeEvent);
-        final String removeStakeEventHash = EventEncoder.encode(removeStakeEvent);
-        final String depositAssetEventHash = EventEncoder.encode(depositAssetEvent);
+        // TODO - these events should be propagated via deliverTx when Tendermint is added
         getWeb3j().ethLogFlowable(bridgeFilter).subscribe(ethLog -> {
             String eventHash = ethLog.getTopics().get(0);
             String txHash = ethLog.getTransactionHash();
             BigInteger blockNumber = ethLog.getBlockNumber();
-            if(eventHash.equals(addStakeEventHash)) {
+            if(eventHash.equals(ADD_STAKE_HASH)) {
                 BigInteger amount = decodeUint256(ethLog, 1);
                 String jynxKey = decodeBytes32(ethLog, 2);
                 stakeService.add(amount, jynxKey, blockNumber.longValue(), txHash);
-            } else if(eventHash.equals(removeStakeEventHash)) {
+            } else if(eventHash.equals(REMOVE_STAKE_HASH)) {
                 BigInteger amount = decodeUint256(ethLog, 1);
                 String jynxKey = decodeBytes32(ethLog, 2);
                 stakeService.remove(amount, jynxKey, blockNumber.longValue(), txHash);
-            } else if(eventHash.equals(depositAssetEventHash)) {
+            } else if(eventHash.equals(DEPOSIT_ASSET_HASH)) {
                 String asset = decodeAddress(ethLog, 1);
                 BigInteger amount = decodeUint256(ethLog, 2);
                 String jynxKey = decodeBytes32(ethLog, 3);

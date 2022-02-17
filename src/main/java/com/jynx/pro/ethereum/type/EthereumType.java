@@ -10,6 +10,4 @@ public class EthereumType {
     public static final TypeReference<?> UINT256_INDEXED = new TypeReference<Uint256>(true) {};
     public static final TypeReference<?> BYTES32_INDEXED = new TypeReference<Bytes32>(true) {};
     public static final TypeReference<?> ADDRESS = new TypeReference<Address>(false) {};
-    public static final TypeReference<?> UINT256 = new TypeReference<Uint256>(false) {};
-    public static final TypeReference<?> BYTES32 = new TypeReference<Bytes32>(false) {};
 }
