@@ -14,7 +14,7 @@ public class ErrorCode {
     public static final String INSUFFICIENT_PROPOSER_STAKE = "You do not have enough stake to make a proposal.";
     public static final String MARKET_NOT_FOUND = "The market was not found.";
     public static final String ORACLE_NOT_DEFINED = "Oracles must be defined to add a market.";
-    public static final String CANNOT_GET_JYNX_SUPPLY = "An error occurred whilst trying to get the supply of JYNX tokens.";
+    public static final String CANNOT_GET_SUPPLY = "An error occurred whilst trying to get the total supply.";
     public static final String ASSET_NOT_SUSPENDED = "You can only unsuspend a suspended asset.";
     public static final String ASSET_NOT_ACTIVE = "This asset is not active.";
     public static final String UNKNOWN_MARKET_SIDE = "Market side must be buy or sell.";

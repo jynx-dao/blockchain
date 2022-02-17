@@ -182,9 +182,6 @@ public abstract class IntegrationTest {
         ethereumHelper.deploy(ganache.getHost(), ganache.getFirstMappedPort(), PRIVATE_KEY);
         ethereumService.setRpcHost(ganache.getHost());
         ethereumService.setRpcPort(ganache.getFirstMappedPort());
-        ethereumService.setBridgeAddress(ethereumHelper.getJynxProBridge().getContractAddress());
-        ethereumService.setRequiredConfirmations(0);
-        ethereumService.initializeFilters();
         Config config = new Config()
                 .setId(1L)
                 .setGovernanceTokenAddress(ethereumHelper.getJynxToken().getContractAddress())
@@ -194,9 +191,12 @@ public abstract class IntegrationTest {
                 .setMinProposerStake(1L)
                 .setNetworkFee(BigDecimal.valueOf(0.001))
                 .setParticipationThreshold(BigDecimal.valueOf(0.66))
-                .setUuidSeed(1L);
+                .setUuidSeed(1L)
+                .setEthConfirmations(0)
+                .setBridgeAddress(ethereumHelper.getJynxProBridge().getContractAddress());
         configRepository.save(config);
         configService.setTimestamp(nowAsMillis());
+        ethereumService.initializeFilters();
         takerUser = new User()
                 .setId(uuidUtils.next())
                 .setPublicKey("11111111111111111111111111111111")

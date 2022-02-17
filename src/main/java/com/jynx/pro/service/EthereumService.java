@@ -4,7 +4,6 @@ import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.ethereum.ERC20Detailed;
 import com.jynx.pro.ethereum.type.EthereumType;
 import com.jynx.pro.exception.JynxProException;
-import com.jynx.pro.repository.EventRepository;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Hex;
@@ -37,8 +36,6 @@ import java.util.Optional;
 @Service
 public class EthereumService {
 
-    private final int REQUIRED_BLOCKS = 5;
-
     @Setter
     @Value("${ethereum.rpc.host}")
     private String rpcHost;
@@ -47,12 +44,6 @@ public class EthereumService {
     private Integer rpcPort;
     @Value("${ethereum.private.key}")
     private String privateKey;
-    @Setter
-    @Value("${jynx.pro.bridge.address}")
-    private String bridgeAddress;
-    @Setter
-    @Value("${eth.required.confirmations}")
-    private Integer requiredConfirmations; // TODO - network parameter?
 
     @Autowired
     private AccountService accountService;
@@ -60,6 +51,8 @@ public class EthereumService {
     private StakeService stakeService;
     @Autowired
     private EventService eventService;
+    @Autowired
+    private ConfigService configService;
 
     /**
      * Decode address event parameters from Ethereum
@@ -120,9 +113,10 @@ public class EthereumService {
                 Optional<Transaction> transactionOptional = getWeb3j()
                         .ethGetTransactionByHash(event.getHash()).send().getTransaction();
                 long confirmations = blockNumber.longValue() - event.getBlockNumber();
-                if(transactionOptional.isPresent() && confirmations >= requiredConfirmations) {
+                if(transactionOptional.isPresent() && confirmations >= configService.get().getEthConfirmations()) {
                     eventService.confirm(event);
-                } else if(transactionOptional.isEmpty() && confirmations >= requiredConfirmations) {
+                } else if(transactionOptional.isEmpty() && confirmations >= configService.get().getEthConfirmations()) {
+                    log.warn("This event cannot be processed: {}", event);
                     // TODO - the TX has been dropped after sufficient blocks were mined
                 }
             }
@@ -136,7 +130,7 @@ public class EthereumService {
      */
     public void initializeFilters() {
         EthFilter bridgeFilter = new EthFilter(DefaultBlockParameterName.EARLIEST,
-                DefaultBlockParameterName.LATEST, bridgeAddress);
+                DefaultBlockParameterName.LATEST, configService.get().getBridgeAddress());
         final Event addStakeEvent = new Event("AddStake", Arrays.asList(
                 EthereumType.ADDRESS,
                 EthereumType.UINT256_INDEXED,
@@ -217,7 +211,7 @@ public class EthereumService {
             return BigDecimal.valueOf(erc20contract.totalSupply().send().doubleValue() / modifier);
         } catch (Exception e) {
             log.error(e.getMessage(), e);
-            throw new JynxProException(ErrorCode.CANNOT_GET_JYNX_SUPPLY);
+            throw new JynxProException(ErrorCode.CANNOT_GET_SUPPLY);
         }
     }
 }
