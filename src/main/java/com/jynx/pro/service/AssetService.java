@@ -31,6 +31,8 @@ public class AssetService {
     @Autowired
     private StakeService stakeService;
     @Autowired
+    private EthereumService ethereumService;
+    @Autowired
     private UUIDUtils uuidUtils;
 
     public Asset get(
@@ -61,7 +63,8 @@ public class AssetService {
             final Proposal proposal
     ) {
         proposalService.checkEnacted(proposal);
-        // TODO - the asset should be added to the ERC20 bridge
+        Asset asset = get(proposal.getLinkedId());
+        ethereumService.addAsset(asset.getAddress());
         updateStatus(proposal, AssetStatus.ACTIVE);
     }
 

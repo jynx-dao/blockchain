@@ -60,7 +60,7 @@ public abstract class IntegrationTest {
     @Autowired
     protected EventRepository eventRepository;
 
-    protected static final String PRIVATE_KEY = "0x4b077050dd12f33bb78773d957d87b0b477f6470017d9d6f0539c3c0683b6eb3";
+    protected static final String PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
     private static final String GANACHE_CMD = String
             .format("ganache-cli --gasLimit 100000000 --account=\"%s,1000000000000000000000\"", PRIVATE_KEY);
     @Container
@@ -118,10 +118,10 @@ public abstract class IntegrationTest {
     ) {
         long[] times = proposalTimes();
         AddAssetRequest request = new AddAssetRequest()
-                .setName("USD")
-                .setAddress("0x0")
+                .setName("DAI")
+                .setAddress(ethereumHelper.getDaiToken().getContractAddress())
                 .setType(AssetType.ERC20)
-                .setDecimalPlaces(4);
+                .setDecimalPlaces(18);
         request.setUser(user);
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);

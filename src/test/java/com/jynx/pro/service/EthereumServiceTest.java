@@ -1,6 +1,7 @@
 package com.jynx.pro.service;
 
 import com.jynx.pro.Application;
+import com.jynx.pro.entity.Asset;
 import com.jynx.pro.entity.Event;
 import com.jynx.pro.entity.Stake;
 import com.jynx.pro.entity.User;
@@ -71,5 +72,11 @@ public class EthereumServiceTest extends IntegrationTest {
     public void testStakeAndRemoveTokens() throws InterruptedException {
         stakeTokens(100, false);
         stakeTokens(0, true);
+    }
+
+    @Test
+    public void testDepositAsset() throws InterruptedException {
+//        Asset asset = createAndEnactAsset(true);
+        ethereumService.addAsset("0x301049cbAd43E4c11291260bc41955119947E107");
     }
 }

@@ -2,23 +2,27 @@ package com.jynx.pro.service;
 
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.ethereum.ERC20Detailed;
+import com.jynx.pro.ethereum.JynxPro_Bridge;
 import com.jynx.pro.ethereum.type.EthereumType;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.utils.PriceUtils;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Hex;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.web3j.abi.EventEncoder;
+import org.web3j.abi.FunctionEncoder;
 import org.web3j.abi.FunctionReturnDecoder;
 import org.web3j.abi.TypeReference;
-import org.web3j.abi.datatypes.Address;
-import org.web3j.abi.datatypes.Event;
+import org.web3j.abi.datatypes.*;
 import org.web3j.abi.datatypes.generated.Bytes32;
 import org.web3j.abi.datatypes.generated.Uint256;
 import org.web3j.crypto.Credentials;
+import org.web3j.crypto.ECKeyPair;
+import org.web3j.crypto.Sign;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.request.EthFilter;
@@ -30,7 +34,9 @@ import org.web3j.tx.gas.DefaultGasProvider;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
+import java.security.SecureRandom;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -272,5 +278,75 @@ public class EthereumService {
             log.error(e.getMessage(), e);
             throw new JynxProException(ErrorCode.CANNOT_GET_SUPPLY);
         }
+    }
+
+    /**
+     * Add an asset to the Jynx bridge
+     *
+     * @param asset the ERC20 contract address
+     *
+     * @return {@link TransactionReceipt} from Ethereum
+     */
+    public TransactionReceipt addAsset(
+            final String asset
+    ) {
+        try {
+            Credentials credentials = Credentials.create(privateKey);
+            JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.get().getBridgeAddress(), getWeb3j(),
+                    credentials, new DefaultGasProvider());
+            BigInteger nonce = getNonce();
+            List<Type> args = Arrays.asList(new Address(asset), new Uint256(nonce), new Utf8String("add_asset"));
+            byte[] signature = getSignature(args, credentials);
+            return jynxProBridge.add_asset(asset, nonce, signature).send();
+        } catch(Exception e) {
+            log.error(e.getMessage(), e);
+            throw new JynxProException(ErrorCode.CANNOT_ADD_ASSET);
+        }
+    }
+
+    /**
+     * Get a signature for use with the Jynx bridge
+     *
+     * @param args the function arguments
+     * @param credentials {@link Credentials} containing the signing key
+     *
+     * @return signature in byte-array format
+     */
+    private byte[] getSignature(
+            final List<Type> args,
+            final Credentials credentials
+    ) throws DecoderException {
+        Function function = new Function("", args, Collections.emptyList());
+        String encodedArgs = FunctionEncoder.encode(function).substring(10);
+        List<Type> args2 = Arrays.asList(new DynamicBytes(Hex.decodeHex(encodedArgs)), new Address(credentials.getAddress()));
+        function = new Function("", args2, Collections.emptyList());
+        encodedArgs = FunctionEncoder.encode(function).substring(10);
+        Sign.SignatureData signatureData = Sign.signMessage(Hex.decodeHex(encodedArgs),
+                ECKeyPair.create(Hex.decodeHex(privateKey.substring(2))));
+        String signatureString = toSignatureString(signatureData).substring(2);
+        return Hex.decodeHex(signatureString);
+    }
+
+    /**
+     * Convert Ethereum signature data to a Hex string
+     *
+     * @param sig {@link org.web3j.crypto.Sign.SignatureData}
+     *
+     * @return the Hex string
+     */
+    private String toSignatureString(
+            final Sign.SignatureData sig
+    ) {
+        return String.format("0x%s%s%s", Hex.encodeHexString(sig.getR()),
+                Hex.encodeHexString(sig.getS()), Hex.encodeHexString(sig.getV()));
+    }
+
+    /**
+     * Generates a secure random 256-bit nonce
+     *
+     * @return the nonce as {@link BigInteger}
+     */
+    private BigInteger getNonce() {
+        return new BigInteger(256, new SecureRandom());
     }
 }
