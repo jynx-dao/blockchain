@@ -79,7 +79,8 @@ public class AssetService {
     ) {
         // TODO - need to suspend all markets that are using this asset
         proposalService.checkEnacted(proposal);
-        // TODO - the asset should be suspended on the ERC20 bridge
+        Asset asset = get(proposal.getLinkedId());
+        ethereumService.removeAsset(asset.getAddress());
         updateStatus(proposal, AssetStatus.SUSPENDED);
     }
 
@@ -88,7 +89,8 @@ public class AssetService {
     ) {
         // TODO - need to suspend all markets that are using this asset
         proposalService.checkEnacted(proposal);
-        // TODO - the asset should be enabled on the ERC20 bridge
+        Asset asset = get(proposal.getLinkedId());
+        ethereumService.addAsset(asset.getAddress());
         updateStatus(proposal, AssetStatus.ACTIVE);
     }
 

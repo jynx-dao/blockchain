@@ -2,7 +2,6 @@ package com.jynx.pro.service;
 
 import com.jynx.pro.constant.AssetStatus;
 import com.jynx.pro.constant.MarketStatus;
-import com.jynx.pro.constant.ProposalStatus;
 import com.jynx.pro.constant.ProposalType;
 import com.jynx.pro.entity.Asset;
 import com.jynx.pro.entity.Market;
@@ -21,11 +20,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Objects;
 import java.util.UUID;
-
-/**
- * TODO:
- * 1 - market cannot have more decimals than asset
- */
 
 @Slf4j
 @Service

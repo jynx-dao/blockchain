@@ -29,4 +29,5 @@ public class ErrorCode {
     public static final String USER_NOT_FOUND = "The user was not found.";
     public static final String DEPOSIT_NOT_FOUND = "The deposit was not found.";
     public static final String CANNOT_ADD_ASSET = "Cannot add asset to bridge.";
+    public static final String CANNOT_REMOVE_ASSET = "Cannot remove asset from bridge.";
 }

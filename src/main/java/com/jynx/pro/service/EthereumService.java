@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.web3j.abi.EventEncoder;
 import org.web3j.abi.FunctionEncoder;
 import org.web3j.abi.FunctionReturnDecoder;
-import org.web3j.abi.TypeReference;
 import org.web3j.abi.datatypes.*;
 import org.web3j.abi.datatypes.generated.Bytes32;
 import org.web3j.abi.datatypes.generated.Uint256;
@@ -277,6 +276,30 @@ public class EthereumService {
         } catch (Exception e) {
             log.error(e.getMessage(), e);
             throw new JynxProException(ErrorCode.CANNOT_GET_SUPPLY);
+        }
+    }
+
+    /**
+     * Remove an asset to the Jynx bridge
+     *
+     * @param asset the ERC20 contract address
+     *
+     * @return {@link TransactionReceipt} from Ethereum
+     */
+    public TransactionReceipt removeAsset(
+            final String asset
+    ) {
+        try {
+            Credentials credentials = Credentials.create(privateKey);
+            JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.get().getBridgeAddress(), getWeb3j(),
+                    credentials, new DefaultGasProvider());
+            BigInteger nonce = getNonce();
+            List<Type> args = Arrays.asList(new Address(asset), new Uint256(nonce), new Utf8String("remove_asset"));
+            byte[] signature = getSignature(args, credentials);
+            return jynxProBridge.remove_asset(asset, nonce, signature).send();
+        } catch(Exception e) {
+            log.error(e.getMessage(), e);
+            throw new JynxProException(ErrorCode.CANNOT_REMOVE_ASSET);
         }
     }
 
