@@ -19,11 +19,11 @@ Then you can install the dependencies and build the target JAR file with the com
 
 This project is mostly tested with Spring Boot integration tests. There are virtually no unit tests at this time, so running the entire test suite can be quite time consuming. In any case, if you wish to do so, you can execute the command below:
 
-* `mvn clean test`
+* `mvn clean install`
 
 A code coverage report will be generated and be available at the following location:
 
-* `target/xxx`
+* `target/site/jacoco/com.jynx.pro.service/index.html`
 
 ## License
 
