@@ -9,6 +9,8 @@ You will need the following dependencies:
 * `Java 11`
 * `Maven 3.6`
 
+Before you can build this project, you need to checkout the [Ethereum smart contracts](https://github.com/jynx-dao/ethereum-contracts) that it is dependent upon. Once you have done so, you can build the latest Java clases from the smart contracts using [this script](https://github.com/jynx-dao/blockchain/blob/main/scripts/gen-contracts.sh).
+
 Then you can install the dependencies and build the target JAR file with the command below:
 
 * `mvn clean install -DskipTests`
