@@ -23,7 +23,7 @@ This project is mostly tested with Spring Boot integration tests. There are virt
 
 A code coverage report will be generated and be available at the following location:
 
-* `target/site/jacoco/com.jynx.pro.service/index.html`
+* `target/site/jacoco/index.html`
 
 ## License
 
