@@ -24,6 +24,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -68,8 +70,12 @@ public class OrderServiceTest extends IntegrationTest {
         int dps = market.getSettlementAsset().getDecimalPlaces();
         Order sellOrder = orderService.create(getCreateOrderRequest(market.getId(),
                 BigDecimal.valueOf(45590), BigDecimal.ONE, MarketSide.BUY));
+        long before = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
         Order buyOrder = orderService.create(getCreateOrderRequest(market.getId(),
                 BigDecimal.valueOf(45610), BigDecimal.ONE, MarketSide.SELL));
+        long after = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
+        long duration = after - before;
+        log.info("Created order in {}ms", duration);
         Assertions.assertEquals(sellOrder.getStatus(), OrderStatus.OPEN);
         Assertions.assertEquals(buyOrder.getStatus(), OrderStatus.OPEN);
         OrderBook orderBook = orderService.getOrderBook(market);

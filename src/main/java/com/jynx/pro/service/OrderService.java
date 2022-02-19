@@ -162,7 +162,6 @@ public class OrderService {
                 passiveOrder.setStatus(OrderStatus.FILLED);
                 tradeService.save(market, passiveOrder, order, passiveOrder.getPrice(),
                         passiveOrder.getRemainingSize(), side);
-                // TODO - deduct fees
                 // TODO - update positions
                 // TODO - update mark price
             } else if(passiveOrder.getRemainingSize().doubleValue() > order.getRemainingSize().doubleValue()) {
@@ -174,7 +173,6 @@ public class OrderService {
                 order.setStatus(OrderStatus.FILLED);
                 tradeService.save(market, passiveOrder, order, passiveOrder.getPrice(),
                         order.getSize(), side);
-                // TODO - deduct fees
                 // TODO - update positions
                 // TODO - update mark price
             }
@@ -211,6 +209,7 @@ public class OrderService {
         }
         order.setRemainingSize(BigDecimal.ZERO);
         order = orderRepository.save(order);
+        // TODO - allocate margin
         return matchOrders(passiveOrders, order, market, request.getSide());
     }
 
@@ -238,6 +237,7 @@ public class OrderService {
                 .setSize(request.getSize())
                 .setRemainingSize(request.getSize())
                 .setPrice(request.getPrice());
+        // TODO - allocate margin
         return matchOrders(passiveOrders, order, market, request.getSide());
     }
 
