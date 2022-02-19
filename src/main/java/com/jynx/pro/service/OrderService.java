@@ -154,6 +154,8 @@ public class OrderService {
     ) {
         for(Order passiveOrder : passiveOrders) {
             if(passiveOrder.getRemainingSize().doubleValue() <= order.getRemainingSize().doubleValue()) {
+                accountService.processFees(passiveOrder.getRemainingSize(), passiveOrder.getPrice(),
+                        passiveOrder.getUser(), order.getUser(), market);
                 order.setRemainingSize(order.getRemainingSize().subtract(passiveOrder.getRemainingSize()));
                 order.setStatus(OrderStatus.PARTIALLY_FILLED);
                 passiveOrder.setRemainingSize(BigDecimal.ZERO);
@@ -164,6 +166,8 @@ public class OrderService {
                 // TODO - update positions
                 // TODO - update mark price
             } else if(passiveOrder.getRemainingSize().doubleValue() > order.getRemainingSize().doubleValue()) {
+                accountService.processFees(order.getRemainingSize(), passiveOrder.getPrice(),
+                        passiveOrder.getUser(), order.getUser(), market);
                 passiveOrder.setRemainingSize(passiveOrder.getRemainingSize().subtract(order.getRemainingSize()));
                 passiveOrder.setStatus(OrderStatus.PARTIALLY_FILLED);
                 order.setRemainingSize(BigDecimal.ZERO);

@@ -2,11 +2,14 @@ package com.jynx.pro.service;
 
 import com.jynx.pro.constant.DepositStatus;
 import com.jynx.pro.constant.EventType;
+import com.jynx.pro.constant.TransactionType;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.AccountRepository;
+import com.jynx.pro.repository.AssetRepository;
 import com.jynx.pro.repository.DepositRepository;
+import com.jynx.pro.repository.TransactionRepository;
 import com.jynx.pro.utils.PriceUtils;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -25,6 +28,10 @@ public class AccountService {
     private AccountRepository accountRepository;
     @Autowired
     private DepositRepository depositRepository;
+    @Autowired
+    private TransactionRepository transactionRepository;
+    @Autowired
+    private AssetRepository assetRepository;
     @Autowired
     private EventService eventService;
     @Autowired
@@ -111,8 +118,53 @@ public class AccountService {
         Account account = getAndCreate(deposit.getUser(), deposit.getAsset());
         account.setBalance(account.getBalance().add(deposit.getAmount()));
         account.setAvailableBalance(account.getAvailableBalance().add(deposit.getAmount()));
+        Transaction transaction = new Transaction()
+                .setId(uuidUtils.next())
+                .setType(TransactionType.DEPOSIT)
+                .setAmount(deposit.getAmount())
+                .setUser(deposit.getUser())
+                .setAsset(deposit.getAsset())
+                .setTimestamp(configService.getTimestamp());
+        transactionRepository.save(transaction);
         accountRepository.save(account);
         deposit.setStatus(DepositStatus.CREDITED);
         depositRepository.save(deposit);
+    }
+
+    public void processFees(
+            final BigDecimal size,
+            final BigDecimal price,
+            final User maker,
+            final User taker,
+            final Market market
+    ) {
+        BigDecimal takerAmount = size.multiply(price).multiply(market.getTakerFee());
+        BigDecimal makerAmount = size.multiply(price).multiply(market.getMakerFee());
+        Account takerAccount = getAndCreate(taker, market.getSettlementAsset());
+        Account makerAccount = getAndCreate(maker, market.getSettlementAsset());
+        takerAccount.setBalance(takerAccount.getBalance().subtract(takerAmount));
+        makerAccount.setBalance(makerAccount.getBalance().add(makerAmount));
+        BigDecimal treasuryAmount = takerAmount.subtract(makerAmount);
+        market.getSettlementAsset().setTreasuryBalance(
+                market.getSettlementAsset().getTreasuryBalance().add(treasuryAmount));
+        accountRepository.save(takerAccount);
+        accountRepository.save(makerAccount);
+        assetRepository.save(market.getSettlementAsset());
+        Transaction takerTx = new Transaction()
+                .setId(uuidUtils.next())
+                .setType(TransactionType.FEE)
+                .setAmount(takerAmount.multiply(BigDecimal.valueOf(-1)))
+                .setUser(taker)
+                .setAsset(market.getSettlementAsset())
+                .setTimestamp(configService.getTimestamp());
+        Transaction makerTx = new Transaction()
+                .setId(uuidUtils.next())
+                .setType(TransactionType.FEE)
+                .setAmount(makerAmount)
+                .setUser(maker)
+                .setAsset(market.getSettlementAsset())
+                .setTimestamp(configService.getTimestamp());
+        transactionRepository.save(takerTx);
+        transactionRepository.save(makerTx);
     }
 }

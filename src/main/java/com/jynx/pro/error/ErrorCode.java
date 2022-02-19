@@ -32,4 +32,5 @@ public class ErrorCode {
     public static final String CANNOT_REMOVE_ASSET = "Cannot remove asset from bridge.";
     public static final String INSUFFICIENT_PASSIVE_VOLUME = "There is insufficient passive volume on the order book.";
     public static final String POST_ONLY_FAILED = "Order would immediately execute.";
+    public static final String INVALID_TAKER_FEE = "Taker fee must be greater than maker fee.";
 }

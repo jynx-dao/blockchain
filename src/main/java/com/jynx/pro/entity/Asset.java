@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.experimental.Accessors;
 
 import javax.persistence.*;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Data
@@ -27,4 +28,6 @@ public class Asset {
     private AssetStatus status;
     @Column(name = "decimal_places", nullable = false)
     private Integer decimalPlaces;
+    @Column(name = "treasury_balance", nullable = false)
+    private BigDecimal treasuryBalance = BigDecimal.ZERO;
 }

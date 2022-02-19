@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Objects;
 import java.util.UUID;
 
@@ -61,6 +62,9 @@ public class MarketService {
         if(request.getOracles().size() == 0) {
             throw new JynxProException(ErrorCode.ORACLE_NOT_DEFINED);
         }
+        if(request.getTakerFee().doubleValue() < request.getMakerFee().doubleValue()) {
+            throw new JynxProException(ErrorCode.INVALID_TAKER_FEE);
+        }
         Market market = new Market()
                 .setName(request.getName())
                 .setSettlementAsset(settlementAsset)
@@ -86,6 +90,11 @@ public class MarketService {
         stakeService.checkProposerStake(request.getUser());
         proposalService.checkProposalTimes(request.getOpenTime(), request.getClosingTime(), request.getEnactmentTime());
         Market market = get(request.getId());
+        BigDecimal makerFee = Objects.isNull(request.getMakerFee()) ? market.getMakerFee() : request.getMakerFee();
+        BigDecimal takerFee = Objects.isNull(request.getTakerFee()) ? market.getTakerFee() : request.getTakerFee();
+        if(takerFee.doubleValue() < makerFee.doubleValue()) {
+            throw new JynxProException(ErrorCode.INVALID_TAKER_FEE);
+        }
         if(!market.getStatus().equals(MarketStatus.ACTIVE)) {
             throw new JynxProException(ErrorCode.MARKET_NOT_ACTIVE);
         }
