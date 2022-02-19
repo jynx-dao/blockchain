@@ -13,6 +13,7 @@ import org.apache.commons.codec.binary.Hex;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.web3j.abi.EventEncoder;
 import org.web3j.abi.FunctionEncoder;
 import org.web3j.abi.FunctionReturnDecoder;
@@ -41,6 +42,7 @@ import java.util.Optional;
 
 @Slf4j
 @Service
+@Transactional
 public class EthereumService {
 
     @Setter

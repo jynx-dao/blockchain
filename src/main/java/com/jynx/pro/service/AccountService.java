@@ -15,6 +15,7 @@ import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -22,6 +23,7 @@ import java.util.Optional;
 
 @Slf4j
 @Service
+@Transactional
 public class AccountService {
 
     @Autowired
@@ -64,8 +66,7 @@ public class AccountService {
                     .setAvailableBalance(BigDecimal.ZERO)
                     .setMarginBalance(BigDecimal.ZERO)
                     .setBalance(BigDecimal.ZERO));
-        account = accountRepository.save(account);
-        return account;
+        return accountRepository.save(account);
     }
 
     public void allocateMargin(
@@ -97,7 +98,7 @@ public class AccountService {
             final Long blockNumber,
             final String txHash
     ) {
-        User user = userService.getAndCreateUser(publicKey);
+        User user = userService.getAndCreate(publicKey);
         Event event = eventService.save(user, blockNumber,
                 txHash, amount, EventType.DEPOSIT_ASSET, assetAddress);
         Asset asset = assetService.getByAddress(assetAddress);
@@ -166,5 +167,25 @@ public class AccountService {
                 .setTimestamp(configService.getTimestamp());
         transactionRepository.save(takerTx);
         transactionRepository.save(makerTx);
+    }
+
+    public void bookProfit(
+            final User user,
+            final Market market,
+            final BigDecimal realisedProfit
+    ) {
+        Account account = getAndCreate(user, market.getSettlementAsset());
+        account.setBalance(account.getBalance().add(realisedProfit));
+        account.setAvailableBalance(account.getAvailableBalance().add(realisedProfit));
+        account.setMarginBalance(account.getMarginBalance().subtract(realisedProfit));
+        accountRepository.save(account);
+        Transaction tx = new Transaction()
+                .setId(uuidUtils.next())
+                .setType(TransactionType.SETTLEMENT)
+                .setAmount(realisedProfit)
+                .setUser(user)
+                .setAsset(market.getSettlementAsset())
+                .setTimestamp(configService.getTimestamp());
+        transactionRepository.save(tx);
     }
 }

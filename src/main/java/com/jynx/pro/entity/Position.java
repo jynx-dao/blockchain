@@ -24,7 +24,7 @@ public class Position {
     @Column(name = "average_entry_price", nullable = false, scale = 8, precision = 18)
     private BigDecimal averageEntryPrice;
     @Enumerated(EnumType.STRING)
-    @Column(name = "side", nullable = false)
+    @Column(name = "side")
     private MarketSide side;
     @Column(name = "size", nullable = false, scale = 8, precision = 18)
     private BigDecimal size;

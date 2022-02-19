@@ -2,7 +2,10 @@ package com.jynx.pro.service;
 
 import com.jynx.pro.constant.Blockchain;
 import com.jynx.pro.constant.EventType;
-import com.jynx.pro.entity.*;
+import com.jynx.pro.entity.Deposit;
+import com.jynx.pro.entity.Event;
+import com.jynx.pro.entity.Stake;
+import com.jynx.pro.entity.User;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.DepositRepository;
@@ -12,15 +15,16 @@ import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.util.List;
-import java.util.Optional;
 
 @Slf4j
 @Service
+@Transactional
 public class EventService {
 
     @Autowired
@@ -77,7 +81,7 @@ public class EventService {
         List<EventType> stakeEvents = List.of(EventType.ADD_STAKE, EventType.REMOVE_STAKE);
         List<EventType> assetEvents = List.of(EventType.DEPOSIT_ASSET);
         if(stakeEvents.contains(event.getType())) {
-            Stake stake = stakeService.getAndCreateStake(event.getUser());
+            Stake stake = stakeService.getAndCreate(event.getUser());
             if(event.getType().equals(EventType.ADD_STAKE)) {
                 stake.setAmount(stake.getAmount().add(event.getAmount()));
             } else {

@@ -19,6 +19,7 @@ import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -29,6 +30,7 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
+@Transactional
 public class OrderService {
 
     @Autowired
@@ -39,6 +41,8 @@ public class OrderService {
     private MarketService marketService;
     @Autowired
     private AccountService accountService;
+    @Autowired
+    private PositionService positionService;
     @Autowired
     private UUIDUtils uuidUtils;
 
@@ -153,29 +157,26 @@ public class OrderService {
             final MarketSide side
     ) {
         for(Order passiveOrder : passiveOrders) {
+            BigDecimal price = passiveOrder.getPrice();
+            User taker = order.getUser();
+            User maker = passiveOrder.getUser();
+            Order partialOrder = passiveOrder;
+            Order fullOrder = order;
             if(passiveOrder.getRemainingSize().doubleValue() <= order.getRemainingSize().doubleValue()) {
-                accountService.processFees(passiveOrder.getRemainingSize(), passiveOrder.getPrice(),
-                        passiveOrder.getUser(), order.getUser(), market);
-                order.setRemainingSize(order.getRemainingSize().subtract(passiveOrder.getRemainingSize()));
-                order.setStatus(OrderStatus.PARTIALLY_FILLED);
-                passiveOrder.setRemainingSize(BigDecimal.ZERO);
-                passiveOrder.setStatus(OrderStatus.FILLED);
-                tradeService.save(market, passiveOrder, order, passiveOrder.getPrice(),
-                        passiveOrder.getRemainingSize(), side);
-                // TODO - update positions
-                // TODO - update mark price
-            } else if(passiveOrder.getRemainingSize().doubleValue() > order.getRemainingSize().doubleValue()) {
-                accountService.processFees(order.getRemainingSize(), passiveOrder.getPrice(),
-                        passiveOrder.getUser(), order.getUser(), market);
-                passiveOrder.setRemainingSize(passiveOrder.getRemainingSize().subtract(order.getRemainingSize()));
-                passiveOrder.setStatus(OrderStatus.PARTIALLY_FILLED);
-                order.setRemainingSize(BigDecimal.ZERO);
-                order.setStatus(OrderStatus.FILLED);
-                tradeService.save(market, passiveOrder, order, passiveOrder.getPrice(),
-                        order.getSize(), side);
-                // TODO - update positions
-                // TODO - update mark price
+                partialOrder = order;
+                fullOrder = passiveOrder;
             }
+            BigDecimal size = partialOrder.getRemainingSize();
+            accountService.processFees(size, price, maker, taker, market);
+            partialOrder.setRemainingSize(partialOrder.getRemainingSize().subtract(size));
+            partialOrder.setStatus(OrderStatus.PARTIALLY_FILLED);
+            fullOrder.setRemainingSize(BigDecimal.ZERO);
+            fullOrder.setStatus(OrderStatus.FILLED);
+            tradeService.save(market, passiveOrder, order, price, size, side);
+            positionService.update(market, price, size, maker, getOtherSide(side));
+            positionService.update(market, price, size, taker, side);
+            // TODO - update positions
+            // TODO - update mark price
             if(order.getRemainingSize().equals(BigDecimal.ZERO)) {
                 order.setStatus(OrderStatus.FILLED);
                 break;

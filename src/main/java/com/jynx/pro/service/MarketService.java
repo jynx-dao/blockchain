@@ -235,4 +235,8 @@ public class MarketService {
         // TODO - the market can only be unsuspended if it was settled, so when it opens again nobody will have any positions and all orders will be cancelled
         updateStatus(proposal, MarketStatus.ACTIVE);
     }
+
+    public void updateMarkPrice() {
+        // TODO - update the mark price, open volume, etc
+    }
 }

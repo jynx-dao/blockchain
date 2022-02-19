@@ -1,26 +1,23 @@
 package com.jynx.pro.service;
 
-import com.jynx.pro.constant.Blockchain;
 import com.jynx.pro.constant.EventType;
-import com.jynx.pro.entity.Event;
 import com.jynx.pro.entity.Stake;
 import com.jynx.pro.entity.User;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
-import com.jynx.pro.repository.EventRepository;
 import com.jynx.pro.repository.StakeRepository;
-import com.jynx.pro.repository.UserRepository;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
-import java.math.RoundingMode;
 
 @Slf4j
 @Service
+@Transactional
 public class StakeService {
 
     @Autowired
@@ -60,7 +57,7 @@ public class StakeService {
         }
     }
 
-    public Stake getAndCreateStake(
+    public Stake getAndCreate(
             final User user
     ) {
         return stakeRepository.findByUser(user)
@@ -76,7 +73,7 @@ public class StakeService {
             final Long blockNumber,
             final String txHash
     ) {
-        eventService.save(userService.getAndCreateUser(publicKey), blockNumber,
+        eventService.save(userService.getAndCreate(publicKey), blockNumber,
                 txHash, amount, EventType.REMOVE_STAKE);
     }
 
@@ -86,7 +83,7 @@ public class StakeService {
             final Long blockNumber,
             final String txHash
     ) {
-        eventService.save(userService.getAndCreateUser(publicKey), blockNumber,
+        eventService.save(userService.getAndCreate(publicKey), blockNumber,
                 txHash, amount, EventType.ADD_STAKE);
     }
 }
