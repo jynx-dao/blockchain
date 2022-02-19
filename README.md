@@ -1,7 +1,8 @@
 # Blockchain
 
 [![Build Status](https://app.travis-ci.com/jynx-dao/blockchain.svg?branch=main)](https://app.travis-ci.com/jynx-dao/blockchain) 
-[![License](https://img.shields.io/github/license/jynx-dao/blockchain.svg)](https://img.shields.io/github/license/jynx-dao/blockchain.svg)
+[![License](https://img.shields.io/github/license/jynx-dao/blockchain.svg)](https://github.com/jynx-dao/blockchain/blob/main/LICENSE)
+[![Coverage](https://codecov.io/gh/jynx-dao/blockchain/branch/main/graph/badge.svg)](https://app.codecov.io/gh/jynx-dao/blockchain)
 
 This repository contains the Tendermint Core implementation of the Jynx Pro blockchain. This implementation is written in Java and depends heavily on Spring Boot and H2DB.
 
