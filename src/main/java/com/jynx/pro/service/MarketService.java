@@ -243,7 +243,8 @@ public class MarketService {
             final Market market
     ) {
         market.setLastPrice(lastPrice);
-        marketRepository.save(market);
         positionService.updateUnrealisedProfit(market);
+        market.setOpenVolume(positionService.calculateOpenVolume(market));
+        marketRepository.save(market);
     }
 }

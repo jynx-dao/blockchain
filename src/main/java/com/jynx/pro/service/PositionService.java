@@ -121,6 +121,14 @@ public class PositionService {
         return gain;
     }
 
+    public BigDecimal calculateOpenVolume(
+            final Market market
+    ) {
+        List<Position> positions = positionRepository.findByMarket(market).stream()
+                .filter(p -> p.getSize().doubleValue() > 0).collect(Collectors.toList());
+        return BigDecimal.valueOf(positions.stream().mapToDouble(p -> p.getSize().doubleValue()).sum());
+    }
+
     public void updateUnrealisedProfit(
             final Market market
     ) {

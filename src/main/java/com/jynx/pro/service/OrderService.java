@@ -175,7 +175,7 @@ public class OrderService {
             tradeService.save(market, passiveOrder, order, price, size, side);
             positionService.update(market, price, size, maker, getOtherSide(side));
             positionService.update(market, price, size, taker, side);
-            // TODO - update mark price
+            marketService.updateLastPrice(price, market);
             if(order.getRemainingSize().equals(BigDecimal.ZERO)) {
                 order.setStatus(OrderStatus.FILLED);
                 break;
