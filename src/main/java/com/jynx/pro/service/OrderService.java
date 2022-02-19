@@ -183,6 +183,7 @@ public class OrderService {
         }
         orderRepository.saveAll(passiveOrders);
         // TODO - closeout distressed positions
+        // TODO - update LP orders
         return orderRepository.save(order);
     }
 
