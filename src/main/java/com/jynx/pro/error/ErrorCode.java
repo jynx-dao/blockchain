@@ -30,4 +30,6 @@ public class ErrorCode {
     public static final String DEPOSIT_NOT_FOUND = "The deposit was not found.";
     public static final String CANNOT_ADD_ASSET = "Cannot add asset to bridge.";
     public static final String CANNOT_REMOVE_ASSET = "Cannot remove asset from bridge.";
+    public static final String INSUFFICIENT_PASSIVE_VOLUME = "There is insufficient passive volume on the order book.";
+    public static final String POST_ONLY_FAILED = "Order would immediately execute.";
 }

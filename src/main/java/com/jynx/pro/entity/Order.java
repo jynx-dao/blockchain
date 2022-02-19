@@ -40,4 +40,10 @@ public class Order {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private OrderStatus status;
+    @Column(name = "rejected_reason")
+    private String rejectedReason;
+    @Column(name = "post_only")
+    private Boolean postOnly = false;
+    @Column(name = "reduce_only")
+    private Boolean reduceOnly = false;
 }

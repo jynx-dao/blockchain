@@ -1,11 +1,11 @@
 package com.jynx.pro.entity;
 
+import com.jynx.pro.constant.MarketSide;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.Table;
+import javax.persistence.*;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Data
@@ -15,4 +15,22 @@ import java.util.UUID;
 public class Trade {
     @Id
     private UUID id;
+    @Column(name = "size", nullable = false, scale = 8, precision = 18)
+    private BigDecimal size;
+    @Column(name = "price", nullable = false, scale = 8, precision = 18)
+    private BigDecimal price;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "market_id", nullable = false)
+    private Market market;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "maker_order_id", nullable = false)
+    private Order makerOrder;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "taker_order_id", nullable = false)
+    private Order takerOrder;
+    @Column(name = "executed", nullable = false)
+    private Long executed;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "side", nullable = false)
+    private MarketSide side;
 }

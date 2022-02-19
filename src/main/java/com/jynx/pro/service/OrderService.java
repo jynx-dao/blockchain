@@ -34,6 +34,8 @@ public class OrderService {
     @Autowired
     private OrderRepository orderRepository;
     @Autowired
+    private TradeService tradeService;
+    @Autowired
     private MarketService marketService;
     @Autowired
     private AccountService accountService;
@@ -43,10 +45,30 @@ public class OrderService {
     private static final int MAX_BULK = 25;
     private static final int ORDER_BOOK_LIMIT = 100;
 
+    public MarketSide getOtherSide(
+            final MarketSide side
+    ) {
+        return side.equals(MarketSide.SELL) ? MarketSide.BUY : MarketSide.SELL;
+    }
+
     public OrderBook getOrderBook(
             final Market market
     ) {
         return getOrderBook(market, ORDER_BOOK_LIMIT);
+    }
+
+    private List<Order> getSideOfBook(
+            final Market market,
+            final MarketSide side
+    ) {
+        List<Order> orders = getOpenLimitOrders(market).stream()
+                .filter(o -> o.getSide().equals(side))
+                .sorted(Comparator.comparing(Order::getPrice))
+                .collect(Collectors.toList());
+        if(side.equals(MarketSide.BUY)) {
+            orders.sort(Comparator.comparing(Order::getPrice).reversed());
+        }
+        return orders;
     }
 
     public OrderBook getOrderBook(
@@ -54,16 +76,13 @@ public class OrderService {
             final Integer limit
     ) {
         OrderBook orderBook = new OrderBook();
-        List<Order> openOrders = getOpenLimitOrders(market);
-        List<OrderBookItem> bids = openOrders.stream()
-                .filter(o -> o.getSide().equals(MarketSide.BUY))
-                .sorted(Comparator.comparing(Order::getPrice).reversed())
+        List<OrderBookItem> bids = getSideOfBook(market, MarketSide.BUY)
+                .stream()
                 .map(o -> new OrderBookItem().setSize(o.getRemainingSize()).setPrice(o.getPrice()))
                 .limit(limit)
                 .collect(Collectors.toList());
-        List<OrderBookItem> asks = openOrders.stream()
-                .filter(o -> o.getSide().equals(MarketSide.SELL))
-                .sorted(Comparator.comparing(Order::getPrice))
+        List<OrderBookItem> asks = getSideOfBook(market, MarketSide.SELL)
+                .stream()
                 .map(o -> new OrderBookItem().setSize(o.getRemainingSize()).setPrice(o.getPrice()))
                 .limit(limit)
                 .collect(Collectors.toList());
@@ -127,12 +146,95 @@ public class OrderService {
         return orderRepository.save(order);
     }
 
+    private Order matchOrders(
+            final List<Order> passiveOrders,
+            final Order order,
+            final Market market,
+            final MarketSide side
+    ) {
+        for(Order passiveOrder : passiveOrders) {
+            if(passiveOrder.getRemainingSize().doubleValue() <= order.getRemainingSize().doubleValue()) {
+                order.setRemainingSize(order.getRemainingSize().subtract(passiveOrder.getRemainingSize()));
+                order.setStatus(OrderStatus.PARTIALLY_FILLED);
+                passiveOrder.setRemainingSize(BigDecimal.ZERO);
+                passiveOrder.setStatus(OrderStatus.FILLED);
+                tradeService.save(market, passiveOrder, order, passiveOrder.getPrice(),
+                        passiveOrder.getRemainingSize(), side);
+                // TODO - deduct fees
+                // TODO - update positions
+                // TODO - update mark price
+            } else if(passiveOrder.getRemainingSize().doubleValue() > order.getRemainingSize().doubleValue()) {
+                passiveOrder.setRemainingSize(passiveOrder.getRemainingSize().subtract(order.getRemainingSize()));
+                passiveOrder.setStatus(OrderStatus.PARTIALLY_FILLED);
+                order.setRemainingSize(BigDecimal.ZERO);
+                order.setStatus(OrderStatus.FILLED);
+                tradeService.save(market, passiveOrder, order, passiveOrder.getPrice(),
+                        order.getSize(), side);
+                // TODO - deduct fees
+                // TODO - update positions
+                // TODO - update mark price
+            }
+            if(order.getRemainingSize().equals(BigDecimal.ZERO)) {
+                order.setStatus(OrderStatus.FILLED);
+                break;
+            }
+        }
+        orderRepository.saveAll(passiveOrders);
+        // TODO - closeout distressed positions
+        return orderRepository.save(order);
+    }
+
     private Order createMarketOrder(
             final CreateOrderRequest request,
             final Market market
     ) {
-        // TODO - eat up anything that's on the book
-        return null;
+        List<Order> passiveOrders = getSideOfBook(market, getOtherSide(request.getSide()));
+        double passiveVolume = passiveOrders.stream().mapToDouble(o -> o.getRemainingSize().doubleValue()).sum();
+        Order order = new Order()
+                .setType(OrderType.MARKET)
+                .setSide(request.getSide())
+                .setMarket(market)
+                .setStatus(OrderStatus.FILLED)
+                .setSize(request.getSize())
+                .setRemainingSize(request.getSize())
+                .setId(uuidUtils.next())
+                .setUser(request.getUser());
+        if(request.getSize().doubleValue() > passiveVolume) {
+            order.setStatus(OrderStatus.REJECTED);
+            order.setRejectedReason(ErrorCode.INSUFFICIENT_PASSIVE_VOLUME);
+            orderRepository.save(order);
+            throw new JynxProException(ErrorCode.INSUFFICIENT_PASSIVE_VOLUME);
+        }
+        order.setRemainingSize(BigDecimal.ZERO);
+        order = orderRepository.save(order);
+        return matchOrders(passiveOrders, order, market, request.getSide());
+    }
+
+    private Order handleCrossingLimitOrder(
+            final CreateOrderRequest request,
+            final Market market
+    ) {
+        if(request.getPostOnly()) {
+            throw new JynxProException(ErrorCode.POST_ONLY_FAILED);
+        }
+        List<Order> passiveOrders = getSideOfBook(market, getOtherSide(request.getSide())).stream().filter(o -> {
+            if(request.getSide().equals(MarketSide.BUY)) {
+                return o.getPrice().doubleValue() <= request.getPrice().doubleValue();
+            } else {
+                return o.getPrice().doubleValue() >= request.getPrice().doubleValue();
+            }
+        }).collect(Collectors.toList());
+        Order order = new Order()
+                .setUser(request.getUser())
+                .setId(uuidUtils.next())
+                .setStatus(OrderStatus.OPEN)
+                .setType(OrderType.LIMIT)
+                .setSide(request.getSide())
+                .setMarket(market)
+                .setSize(request.getSize())
+                .setRemainingSize(request.getSize())
+                .setPrice(request.getPrice());
+        return matchOrders(passiveOrders, order, market, request.getSide());
     }
 
     private Order handleLimitOrder(
@@ -146,8 +248,7 @@ public class OrderService {
             if(bestOffer.isEmpty() || request.getPrice().doubleValue() < bestOffer.get().getPrice().doubleValue()) {
                 return createLimitOrder(request, market);
             } else {
-                throw new JynxProException("Cannot place limit order that crosses");
-                // TODO - handle crossing limit order
+                return handleCrossingLimitOrder(request, market);
             }
         } else if(request.getSide().equals(MarketSide.SELL)) {
             Optional<Order> bestBid = openLimitOrders.stream()
@@ -155,8 +256,7 @@ public class OrderService {
             if(bestBid.isEmpty() || request.getPrice().doubleValue() > bestBid.get().getPrice().doubleValue()) {
                 return createLimitOrder(request, market);
             } else {
-                throw new JynxProException("Cannot place limit order that crosses");
-                // TODO - handle crossing limit order
+                return handleCrossingLimitOrder(request, market);
             }
         }
         throw new JynxProException(ErrorCode.UNKNOWN_MARKET_SIDE);
@@ -220,6 +320,7 @@ public class OrderService {
             final BigDecimal size,
             final BigDecimal price
     ) {
+        // TODO - the margin requirement will be different if it doesn't increase exposure and trader has open position
         if(type.equals(OrderType.LIMIT)) {
             BigDecimal notionalSize = price.multiply(size);
             return notionalSize.multiply(market.getInitialMargin());

@@ -18,4 +18,6 @@ public class CreateOrderRequest extends SignedRequest {
     private BigDecimal size;
     private UUID marketId;
     private MarketSide side;
+    private Boolean postOnly;
+    private Boolean reduceOnly;
 }
