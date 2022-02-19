@@ -13,7 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -74,14 +76,7 @@ public class PositionService {
             BigDecimal closingSize = sizeDelta.abs().min(position.getSize()).multiply(price);
             BigDecimal gain = price.subtract(position.getAverageEntryPrice()).abs()
                     .divide(position.getAverageEntryPrice(), 5, RoundingMode.HALF_UP);
-            if(position.getSide().equals(MarketSide.BUY) &&
-                    price.doubleValue() < position.getAverageEntryPrice().doubleValue()) {
-                gain = gain.multiply(BigDecimal.valueOf(-1));
-            }
-            if(position.getSide().equals(MarketSide.SELL) &&
-                    price.doubleValue() > position.getAverageEntryPrice().doubleValue()) {
-                gain = gain.multiply(BigDecimal.valueOf(-1));
-            }
+            gain = flipGain(position, gain, price);
             realisedProfit = gain.multiply(closingSize);
         }
         position.setSize(position.getSize().add(sizeDelta));
@@ -108,5 +103,36 @@ public class PositionService {
         BigDecimal product2 = price2.multiply(size2);
         BigDecimal sumProduct = product1.add(product2);
         return sumProduct.divide(size1.add(size2), 4, RoundingMode.HALF_UP);
+    }
+
+    private BigDecimal flipGain(
+            final Position position,
+            final BigDecimal gain,
+            final BigDecimal price
+    ) {
+        if(position.getSide().equals(MarketSide.BUY) &&
+                price.doubleValue() < position.getAverageEntryPrice().doubleValue()) {
+            return gain.multiply(BigDecimal.valueOf(-1));
+        }
+        if(position.getSide().equals(MarketSide.SELL) &&
+                price.doubleValue() > position.getAverageEntryPrice().doubleValue()) {
+            return gain.multiply(BigDecimal.valueOf(-1));
+        }
+        return gain;
+    }
+
+    public void updateUnrealisedProfit(
+            final Market market
+    ) {
+        List<Position> positions = positionRepository.findByMarket(market).stream()
+                .filter(p -> p.getSize().doubleValue() > 0).collect(Collectors.toList());
+        for(Position position : positions) {
+            BigDecimal gain = position.getAverageEntryPrice().subtract(market.getLastPrice())
+                    .divide(position.getAverageEntryPrice(), 4, RoundingMode.HALF_UP);
+            gain = flipGain(position, gain, market.getLastPrice());
+            BigDecimal unrealisedProfit = gain.multiply(position.getSize());
+            position.setUnrealisedPnl(unrealisedProfit);
+        }
+        positionRepository.saveAll(positions);
     }
 }

@@ -39,6 +39,8 @@ public class MarketService {
     private StakeService stakeService;
     @Autowired
     private OracleService oracleService;
+    @Autowired
+    private PositionService positionService;
 
     public Market get(
             final UUID id
@@ -236,7 +238,12 @@ public class MarketService {
         updateStatus(proposal, MarketStatus.ACTIVE);
     }
 
-    public void updateMarkPrice() {
-        // TODO - update the mark price, open volume, etc
+    public void updateLastPrice(
+            final BigDecimal lastPrice,
+            final Market market
+    ) {
+        market.setLastPrice(lastPrice);
+        marketRepository.save(market);
+        positionService.updateUnrealisedProfit(market);
     }
 }
