@@ -1,5 +1,7 @@
 # Blockchain
 
+[![Build Status](https://app.travis-ci.com/jynx-dao/blockchain.svg?branch=main)](https://app.travis-ci.com/jynx-dao/blockchain)
+
 This repository contains the Tendermint Core implementation of the Jynx Pro blockchain. This implementation is written in Java and depends heavily on Spring Boot and H2DB.
 
 ## Installation
