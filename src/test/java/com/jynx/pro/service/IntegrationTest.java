@@ -64,6 +64,8 @@ public abstract class IntegrationTest {
     protected PriceUtils priceUtils;
     @Autowired
     protected DepositRepository depositRepository;
+    @Autowired
+    protected TransactionRepository transactionRepository;
 
     protected static final String PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
     private static final String GANACHE_CMD = String
@@ -175,6 +177,7 @@ public abstract class IntegrationTest {
         marketRepository.deleteAll();
         accountRepository.deleteAll();
         depositRepository.deleteAll();
+        transactionRepository.deleteAll();
         assetRepository.deleteAll();
         voteRepository.deleteAll();
         proposalRepository.deleteAll();

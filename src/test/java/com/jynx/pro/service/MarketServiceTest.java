@@ -235,7 +235,7 @@ public class MarketServiceTest extends IntegrationTest {
         long[] times = proposalTimes();
         AmendMarketRequest request = new AmendMarketRequest()
                 .setId(market.getId())
-                .setMakerFee(BigDecimal.valueOf(0.002));
+                .setMakerFee(BigDecimal.valueOf(0.0005));
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
@@ -248,8 +248,8 @@ public class MarketServiceTest extends IntegrationTest {
         proposalService.enact();
         proposalService.reject();
         market = marketRepository.findById(market.getId()).orElse(new Market());
-        Assertions.assertEquals(market.getMakerFee().setScale(3, RoundingMode.HALF_UP),
-                BigDecimal.valueOf(0.002).setScale(3, RoundingMode.HALF_UP));
+        Assertions.assertEquals(market.getMakerFee().setScale(4, RoundingMode.HALF_UP),
+                BigDecimal.valueOf(0.0005).setScale(4, RoundingMode.HALF_UP));
     }
 
     @Test
