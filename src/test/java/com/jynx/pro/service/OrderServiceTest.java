@@ -214,17 +214,17 @@ public class OrderServiceTest extends IntegrationTest {
                 null, BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.MARKET, takerUser));
         validateMarketState(market.getId(), BigDecimal.valueOf(0.5), BigDecimal.valueOf(45610),
                 BigDecimal.valueOf(45590), BigDecimal.valueOf(45610), BigDecimal.valueOf(1),
-                BigDecimal.valueOf(0.5), MarketSide.SELL, MarketSide.BUY, 1, List.of(midPrice));
+                BigDecimal.valueOf(0.5), 1, 1, MarketSide.SELL, MarketSide.BUY, 1, List.of(midPrice));
     }
 
     @Test
     public void createCrossingLimitOrderBuy() throws InterruptedException {
-        Market market = createOrderBook(1, 1);
+        Market market = createOrderBook(3, 3);
         orderService.create(getCreateOrderRequest(market.getId(),
                 BigDecimal.valueOf(45611), BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.LIMIT, takerUser));
         validateMarketState(market.getId(), BigDecimal.valueOf(0.5), BigDecimal.valueOf(45610),
                 BigDecimal.valueOf(45590), BigDecimal.valueOf(45610), BigDecimal.valueOf(1),
-                BigDecimal.valueOf(0.5), MarketSide.SELL, MarketSide.BUY, 1, List.of(BigDecimal.valueOf(45611)));
+                BigDecimal.valueOf(0.5), 3, 3, MarketSide.SELL, MarketSide.BUY, 1, List.of(BigDecimal.valueOf(45611)));
     }
 
     @Test
@@ -235,7 +235,41 @@ public class OrderServiceTest extends IntegrationTest {
                 null, BigDecimal.valueOf(0.5), MarketSide.SELL, OrderType.MARKET, takerUser));
         validateMarketState(market.getId(), BigDecimal.valueOf(0.5), BigDecimal.valueOf(45590),
                 BigDecimal.valueOf(45590), BigDecimal.valueOf(45610), BigDecimal.valueOf(0.5),
-                BigDecimal.valueOf(1), MarketSide.BUY, MarketSide.SELL, 1, List.of(midPrice));
+                BigDecimal.valueOf(1), 1, 1, MarketSide.BUY, MarketSide.SELL, 1, List.of(midPrice));
+    }
+
+    @Test
+    public void createCrossingLimitOrderSell() throws InterruptedException {
+        Market market = createOrderBook(3, 3);
+        orderService.create(getCreateOrderRequest(market.getId(),
+                BigDecimal.valueOf(45589), BigDecimal.valueOf(0.5), MarketSide.SELL, OrderType.LIMIT, takerUser));
+        validateMarketState(market.getId(), BigDecimal.valueOf(0.5), BigDecimal.valueOf(45590),
+                BigDecimal.valueOf(45590), BigDecimal.valueOf(45610), BigDecimal.valueOf(0.5),
+                BigDecimal.valueOf(1), 3, 3, MarketSide.BUY, MarketSide.SELL, 1, List.of(BigDecimal.valueOf(45589)));
+    }
+
+    @Test
+    public void createCrossingLimitOrderFailsWithPostOnlyTrue() throws InterruptedException {
+        Market market = createOrderBook(3, 3);
+        try {
+            orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45589), BigDecimal.valueOf(0.5),
+                    MarketSide.SELL, OrderType.LIMIT, takerUser).setPostOnly(true));
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.POST_ONLY_FAILED);
+        }
+    }
+
+    @Test
+    public void createMarketOrderFailsWithInsufficientPassiveVolume() throws InterruptedException {
+        Market market = createOrderBook(3, 3);
+        try {
+            orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(4),
+                    MarketSide.SELL, OrderType.MARKET, takerUser));
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.INSUFFICIENT_PASSIVE_VOLUME);
+        }
     }
 
     @Test
@@ -376,6 +410,8 @@ public class OrderServiceTest extends IntegrationTest {
             final BigDecimal askPrice,
             final BigDecimal bidSize,
             final BigDecimal askSize,
+            final int bidCount,
+            final int askCount,
             final MarketSide makerSide,
             final MarketSide takerSide,
             final int tradeCount,
@@ -423,8 +459,8 @@ public class OrderServiceTest extends IntegrationTest {
         Assertions.assertEquals(assetOptional.get().getTreasuryBalance().setScale(dps, RoundingMode.HALF_UP),
                 treasuryFee.setScale(dps, RoundingMode.HALF_UP));
         OrderBook orderBook = orderService.getOrderBook(market);
-        Assertions.assertEquals(orderBook.getBids().size(), 1);
-        Assertions.assertEquals(orderBook.getAsks().size(), 1);
+        Assertions.assertEquals(orderBook.getBids().size(), bidCount);
+        Assertions.assertEquals(orderBook.getAsks().size(), askCount);
         Assertions.assertEquals(orderBook.getBids().get(0).getSize().setScale(dps, RoundingMode.HALF_UP),
                 bidSize.setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(orderBook.getAsks().get(0).getSize().setScale(dps, RoundingMode.HALF_UP),
