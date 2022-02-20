@@ -207,9 +207,22 @@ public class OrderServiceTest extends IntegrationTest {
         BigDecimal midPrice = orderService.getMidPrice(market);
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.MARKET, takerUser));
-        validateMarketState(market.getId(), BigDecimal.valueOf(0.5), BigDecimal.valueOf(45610), BigDecimal.valueOf(45610),
-                BigDecimal.valueOf(45590), BigDecimal.valueOf(45610), BigDecimal.valueOf(1),
-                BigDecimal.valueOf(0.5), 1, 1, MarketSide.SELL, MarketSide.BUY, 1, List.of(midPrice));
+        validateMarketState(
+                market.getId(),
+                BigDecimal.valueOf(0.5),
+                BigDecimal.valueOf(45610),
+                BigDecimal.valueOf(45610),
+                BigDecimal.valueOf(45590),
+                BigDecimal.valueOf(45610),
+                BigDecimal.valueOf(1),
+                BigDecimal.valueOf(0.5),
+                1,
+                1,
+                MarketSide.SELL,
+                MarketSide.BUY,
+                1,
+                List.of(midPrice)
+        );
     }
 
     @Test
@@ -217,9 +230,21 @@ public class OrderServiceTest extends IntegrationTest {
         Market market = createOrderBook(3, 3);
         orderService.create(getCreateOrderRequest(market.getId(),
                 BigDecimal.valueOf(45611), BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.LIMIT, takerUser));
-        validateMarketState(market.getId(), BigDecimal.valueOf(0.5), BigDecimal.valueOf(45610), BigDecimal.valueOf(45610),
-                BigDecimal.valueOf(45590), BigDecimal.valueOf(45610), BigDecimal.valueOf(1),
-                BigDecimal.valueOf(0.5), 3, 3, MarketSide.SELL, MarketSide.BUY, 1, List.of(BigDecimal.valueOf(45611)));
+        validateMarketState(
+                market.getId(),
+                BigDecimal.valueOf(0.5),
+                BigDecimal.valueOf(45610),
+                BigDecimal.valueOf(45610),
+                BigDecimal.valueOf(45590),
+                BigDecimal.valueOf(45610), BigDecimal.valueOf(1),
+                BigDecimal.valueOf(0.5),
+                3,
+                3,
+                MarketSide.SELL,
+                MarketSide.BUY,
+                1,
+                List.of(BigDecimal.valueOf(45611))
+        );
         List<Order> orders = orderService.getOpenLimitOrders(market).stream()
                 .filter(o -> o.getUser().getId().equals(takerUser.getId())).collect(Collectors.toList());
         Assertions.assertEquals(orders.size(), 0);
@@ -265,9 +290,22 @@ public class OrderServiceTest extends IntegrationTest {
         BigDecimal midPrice = orderService.getMidPrice(market);
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.valueOf(0.5), MarketSide.SELL, OrderType.MARKET, takerUser));
-        validateMarketState(market.getId(), BigDecimal.valueOf(0.5), BigDecimal.valueOf(45590), BigDecimal.valueOf(45590),
-                BigDecimal.valueOf(45590), BigDecimal.valueOf(45610), BigDecimal.valueOf(0.5),
-                BigDecimal.valueOf(1), 1, 1, MarketSide.BUY, MarketSide.SELL, 1, List.of(midPrice));
+        validateMarketState(
+                market.getId(),
+                BigDecimal.valueOf(0.5),
+                BigDecimal.valueOf(45590),
+                BigDecimal.valueOf(45590),
+                BigDecimal.valueOf(45590),
+                BigDecimal.valueOf(45610),
+                BigDecimal.valueOf(0.5),
+                BigDecimal.valueOf(1),
+                1,
+                1,
+                MarketSide.BUY,
+                MarketSide.SELL,
+                1,
+                List.of(midPrice)
+        );
     }
 
     @Test
@@ -275,9 +313,22 @@ public class OrderServiceTest extends IntegrationTest {
         Market market = createOrderBook(3, 3);
         orderService.create(getCreateOrderRequest(market.getId(),
                 BigDecimal.valueOf(45589), BigDecimal.valueOf(0.5), MarketSide.SELL, OrderType.LIMIT, takerUser));
-        validateMarketState(market.getId(), BigDecimal.valueOf(0.5), BigDecimal.valueOf(45590), BigDecimal.valueOf(45590),
-                BigDecimal.valueOf(45590), BigDecimal.valueOf(45610), BigDecimal.valueOf(0.5),
-                BigDecimal.valueOf(1), 3, 3, MarketSide.BUY, MarketSide.SELL, 1, List.of(BigDecimal.valueOf(45589)));
+        validateMarketState(
+                market.getId(),
+                BigDecimal.valueOf(0.5),
+                BigDecimal.valueOf(45590),
+                BigDecimal.valueOf(45590),
+                BigDecimal.valueOf(45590),
+                BigDecimal.valueOf(45610),
+                BigDecimal.valueOf(0.5),
+                BigDecimal.valueOf(1),
+                3,
+                3,
+                MarketSide.BUY,
+                MarketSide.SELL,
+                1,
+                List.of(BigDecimal.valueOf(45589))
+        );
         List<Order> orders = orderService.getOpenLimitOrders(market).stream()
                 .filter(o -> o.getUser().getId().equals(takerUser.getId())).collect(Collectors.toList());
         Assertions.assertEquals(orders.size(), 0);
@@ -644,6 +695,7 @@ public class OrderServiceTest extends IntegrationTest {
         Assertions.assertEquals(takerUnrealisedProfit.setScale(dps, RoundingMode.HALF_UP),
                 positionTaker.getUnrealisedPnl().setScale(dps, RoundingMode.HALF_UP));
         // TODO - balance and availableBalance should be adjusted to account for unrealised PNL
+        // TODO - need to check realised PNL is correct
         Assertions.assertEquals(makerAccountOptional.get().getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
                 makerAvailableBalance.setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(makerAccountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
