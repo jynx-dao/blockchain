@@ -4,6 +4,7 @@ import com.jynx.pro.Application;
 import com.jynx.pro.constant.MarketSide;
 import com.jynx.pro.constant.OrderStatus;
 import com.jynx.pro.constant.OrderType;
+import com.jynx.pro.constant.TransactionType;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
@@ -29,6 +30,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Testcontainers
@@ -70,10 +72,10 @@ public class OrderServiceTest extends IntegrationTest {
     private Market createOrderBook() throws InterruptedException {
         Market market = createAndEnactMarket(true);
         int dps = market.getSettlementAsset().getDecimalPlaces();
-        Order sellOrder = orderService.create(getCreateOrderRequest(market.getId(),
+        Order buyOrder = orderService.create(getCreateOrderRequest(market.getId(),
                 BigDecimal.valueOf(45590), BigDecimal.ONE, MarketSide.BUY, OrderType.LIMIT, makerUser));
         long before = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
-        Order buyOrder = orderService.create(getCreateOrderRequest(market.getId(),
+        Order sellOrder = orderService.create(getCreateOrderRequest(market.getId(),
                 BigDecimal.valueOf(45610), BigDecimal.ONE, MarketSide.SELL, OrderType.LIMIT, makerUser));
         long after = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
         long duration = after - before;
@@ -165,21 +167,24 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    @Ignore
     public void createMarketOrder() throws InterruptedException {
-        // TODO - test market order
         Market market = createOrderBook();
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.MARKET, takerUser));
-        validateMarketState(market.getId(), BigDecimal.valueOf(0.5));
+        validateMarketState(market.getId(), BigDecimal.valueOf(0.5), BigDecimal.valueOf(45610),
+                BigDecimal.valueOf(45590), BigDecimal.valueOf(45610), BigDecimal.valueOf(1),
+                BigDecimal.valueOf(0.5));
     }
 
     private void validateMarketState(
             final UUID marketId,
-            final BigDecimal size
+            final BigDecimal size,
+            final BigDecimal price,
+            final BigDecimal bidPrice,
+            final BigDecimal askPrice,
+            final BigDecimal bidSize,
+            final BigDecimal askSize
     ) {
-        // TODO - generic method to ensure the entire state is correct
-        // positions, accounts, market, order book, trades, transactions
         Market market = marketRepository.getOne(marketId);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         Optional<Position> positionOptionalMaker = positionRepository.findByUserAndMarket(makerUser, market);
@@ -194,5 +199,44 @@ public class OrderServiceTest extends IntegrationTest {
                 size.setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(market.getOpenVolume().setScale(dps, RoundingMode.HALF_UP),
                 size.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(market.getLastPrice().setScale(dps, RoundingMode.HALF_UP),
+                price.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(positionMaker.getAverageEntryPrice().setScale(dps, RoundingMode.HALF_UP),
+                price.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(positionTaker.getAverageEntryPrice().setScale(dps, RoundingMode.HALF_UP),
+                price.setScale(dps, RoundingMode.HALF_UP));
+        List<Transaction> makerTxns = transactionRepository.findByUserAndAsset(makerUser, market.getSettlementAsset())
+                .stream().filter(t -> t.getType().equals(TransactionType.FEE)).collect(Collectors.toList());
+        List<Transaction> takerTxns = transactionRepository.findByUserAndAsset(takerUser, market.getSettlementAsset())
+                .stream().filter(t -> t.getType().equals(TransactionType.FEE)).collect(Collectors.toList());
+        Assertions.assertEquals(makerTxns.size(), 1);
+        Assertions.assertEquals(takerTxns.size(), 1);
+        BigDecimal makerFee = price.multiply(size).multiply(market.getMakerFee());
+        BigDecimal takerFee = price.multiply(size).multiply(market.getTakerFee()).multiply(BigDecimal.valueOf(-1));
+        BigDecimal treasuryFee = (market.getTakerFee().subtract(market.getMakerFee())).multiply(price).multiply(size);
+        Assertions.assertEquals(makerTxns.get(0).getAmount().setScale(dps, RoundingMode.HALF_UP),
+                makerFee.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(makerTxns.get(0).getType(), TransactionType.FEE);
+        Assertions.assertEquals(takerTxns.get(0).getAmount().setScale(dps, RoundingMode.HALF_UP),
+                takerFee.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(takerTxns.get(0).getType(), TransactionType.FEE);
+        Optional<Asset> assetOptional = assetRepository.findById(market.getSettlementAsset().getId());
+        Assertions.assertTrue(assetOptional.isPresent());
+        Assertions.assertEquals(assetOptional.get().getTreasuryBalance().setScale(dps, RoundingMode.HALF_UP),
+                treasuryFee.setScale(dps, RoundingMode.HALF_UP));
+        OrderBook orderBook = orderService.getOrderBook(market);
+        Assertions.assertEquals(orderBook.getBids().size(), 1);
+        Assertions.assertEquals(orderBook.getAsks().size(), 1);
+        Assertions.assertEquals(orderBook.getBids().get(0).getSize().setScale(dps, RoundingMode.HALF_UP),
+                bidSize.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(orderBook.getAsks().get(0).getSize().setScale(dps, RoundingMode.HALF_UP),
+                askSize.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(orderBook.getBids().get(0).getPrice().setScale(dps, RoundingMode.HALF_UP),
+                bidPrice.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(orderBook.getAsks().get(0).getPrice().setScale(dps, RoundingMode.HALF_UP),
+                askPrice.setScale(dps, RoundingMode.HALF_UP));
+        // TODO - accounts
+        // TODO - trades
+        // TODO - unrealised PNL
     }
 }
