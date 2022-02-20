@@ -568,6 +568,14 @@ public class OrderServiceTest extends IntegrationTest {
         }
     }
 
+    @Test
+    public void testAmendOrder() throws InterruptedException {
+        Market market = createOrderBook(1, 1);
+        Order order = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45600), BigDecimal.ONE,
+                MarketSide.BUY, OrderType.LIMIT, takerUser));
+        Assertions.assertEquals(order.getStatus(), OrderStatus.OPEN);
+    }
+
     private void validateMarketState(
             final UUID marketId,
             final BigDecimal size,

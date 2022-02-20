@@ -3,10 +3,8 @@ package com.jynx.pro.service;
 import com.jynx.pro.Application;
 import com.jynx.pro.entity.*;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.Ignore;
+import org.junit.jupiter.api.*;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -19,6 +17,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Slf4j
+@Disabled
 @Testcontainers
 @ActiveProfiles("test")
 @SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
