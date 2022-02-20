@@ -46,4 +46,6 @@ public class Order {
     private Boolean postOnly = false;
     @Column(name = "reduce_only")
     private Boolean reduceOnly = false;
+    @Column(name = "updated", nullable = false)
+    private Long updated;
 }

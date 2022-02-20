@@ -36,4 +36,5 @@ public class ErrorCode {
     public static final String EMPTY_ORDER_BOOK = "The order book is empty on at least one side.";
     public static final String TOO_MANY_DECIMAL_PLACES = "The maximum precision is 8 decimal places.";
     public static final String CANNOT_GET_DECIMAL_PLACES = "Failed to get the decimal places for the ERC20 token.";
+    public static final String CANNOT_AMEND_WOULD_EXECUTE = "Cannot amend order as would immediately execute.";
 }

@@ -13,6 +13,7 @@ import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.model.OrderBook;
 import com.jynx.pro.model.OrderBookItem;
 import com.jynx.pro.repository.OrderRepository;
+import com.jynx.pro.request.AmendOrderRequest;
 import com.jynx.pro.request.CancelOrderRequest;
 import com.jynx.pro.request.CreateOrderRequest;
 import com.jynx.pro.utils.UUIDUtils;
@@ -21,10 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -41,6 +39,8 @@ public class OrderService {
     private AccountService accountService;
     @Autowired
     private PositionService positionService;
+    @Autowired
+    private ConfigService configService;
     @Autowired
     private UUIDUtils uuidUtils;
 
@@ -76,10 +76,10 @@ public class OrderService {
     ) {
         List<Order> orders = getOpenLimitOrders(market).stream()
                 .filter(o -> o.getSide().equals(side))
-                .sorted(Comparator.comparing(Order::getPrice))
+                .sorted(Comparator.comparing(Order::getPrice).thenComparing(Order::getUpdated))
                 .collect(Collectors.toList());
         if(side.equals(MarketSide.BUY)) {
-            orders.sort(Comparator.comparing(Order::getPrice).reversed());
+            orders.sort(Comparator.comparing(Order::getPrice).reversed().thenComparing(Order::getUpdated));
         }
         return orders;
     }
@@ -153,7 +153,8 @@ public class OrderService {
                 .setSize(request.getSize())
                 .setRemainingSize(request.getSize())
                 .setStatus(OrderStatus.OPEN)
-                .setType(request.getType());
+                .setType(request.getType())
+                .setUpdated(configService.getTimestamp());
         BigDecimal margin = getInitialMarginRequirement(market, order.getType(), request.getSize(), request.getPrice());
         accountService.allocateMargin(margin, request.getUser(), market.getSettlementAsset());
         return orderRepository.save(order);
@@ -165,6 +166,7 @@ public class OrderService {
             final Market market,
             final MarketSide side
     ) {
+        // TODO - passive orders at the same price should be sorted by when they were last updated
         for(Order passiveOrder : passiveOrders) {
             BigDecimal price = passiveOrder.getPrice();
             User taker = order.getUser();
@@ -191,7 +193,7 @@ public class OrderService {
             }
         }
         orderRepository.saveAll(passiveOrders);
-        // TODO - closeout distressed positions
+        // TODO - closeout distressed positions (incl. executing stop losses)
         // TODO - update LP orders
         return orderRepository.save(order);
     }
@@ -210,7 +212,8 @@ public class OrderService {
                 .setSize(request.getSize())
                 .setRemainingSize(request.getSize())
                 .setId(uuidUtils.next())
-                .setUser(request.getUser());
+                .setUser(request.getUser())
+                .setUpdated(configService.getTimestamp());
         if(request.getSize().doubleValue() > passiveVolume) {
             order.setStatus(OrderStatus.REJECTED);
             order.setRejectedReason(ErrorCode.INSUFFICIENT_PASSIVE_VOLUME);
@@ -249,7 +252,8 @@ public class OrderService {
                 .setMarket(market)
                 .setSize(request.getSize())
                 .setRemainingSize(request.getSize())
-                .setPrice(request.getPrice());
+                .setPrice(request.getPrice())
+                .setUpdated(configService.getTimestamp());
         order = orderRepository.save(order);
         // TODO - can we calculate the effective execution price for the purpose of the margin calculation??
         BigDecimal margin = getInitialMarginRequirement(market, order.getType(), request.getSize(), request.getPrice());
@@ -312,10 +316,56 @@ public class OrderService {
     }
 
     public Order amend(
-            final Order order
+            final AmendOrderRequest request
     ) {
-        // TODO - amend order
-        return null;
+        Order order = orderRepository.findById(request.getId())
+                .orElseThrow(() -> new JynxProException(ErrorCode.ORDER_NOT_FOUND));
+        BigDecimal originalSize = order.getSize();
+        BigDecimal originalRemainingSize = order.getRemainingSize();
+        BigDecimal originalPrice = order.getPrice();
+        if(!order.getUser().getId().equals(request.getUser().getId())) {
+            throw new JynxProException(ErrorCode.PERMISSION_DENIED);
+        }
+        if(order.getType().equals(OrderType.MARKET)) {
+            throw new JynxProException(ErrorCode.INVALID_ORDER_TYPE);
+        }
+        List<OrderStatus> statusList = Arrays.asList(OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED);
+        if(!statusList.contains(order.getStatus())) {
+            throw new JynxProException(ErrorCode.INVALID_ORDER_STATUS);
+        }
+        // TODO - order amend history should be saved
+        if(!Objects.isNull(request.getSize()) && !request.getSize().equals(order.getSize())) {
+            order.setSize(request.getSize());
+            order.setRemainingSize(order.getSize());
+            if(request.getSize().doubleValue() > originalSize.doubleValue()) {
+                order.setUpdated(configService.getTimestamp());
+            }
+        }
+        if(Objects.isNull(request.getPrice())) {
+            OrderBook orderBook = getOrderBook(order.getMarket(), 1);
+            if(orderBook.getAsks().size() > 0 &&
+                    orderBook.getAsks().get(0).getPrice().doubleValue() < request.getPrice().doubleValue()) {
+                throw new JynxProException(ErrorCode.CANNOT_AMEND_WOULD_EXECUTE);
+            }
+            if(orderBook.getBids().size() > 0 &&
+                    orderBook.getBids().get(0).getPrice().doubleValue() > request.getPrice().doubleValue()) {
+                throw new JynxProException(ErrorCode.CANNOT_AMEND_WOULD_EXECUTE);
+            }
+            order.setPrice(request.getPrice());
+        }
+        BigDecimal marginToRelease = getInitialMarginRequirement(order.getMarket(), order.getType(),
+                originalRemainingSize, originalPrice);
+        BigDecimal marginToAllocate = getInitialMarginRequirement(order.getMarket(), order.getType(),
+                order.getRemainingSize(), order.getPrice());
+        accountService.releaseMargin(marginToRelease, order.getUser(), order.getMarket().getSettlementAsset());
+        try {
+            performMarginCheck(order.getMarket(), order.getType(), order.getSize(), order.getPrice(), order.getUser());
+            accountService.allocateMargin(marginToAllocate, order.getUser(), order.getMarket().getSettlementAsset());
+        } catch(JynxProException e) {
+            accountService.allocateMargin(marginToRelease, order.getUser(), order.getMarket().getSettlementAsset());
+            throw e;
+        }
+        return orderRepository.save(order);
     }
 
     public List<Order> createMany(
@@ -328,7 +378,7 @@ public class OrderService {
     }
 
     public List<Order> amendMany(
-            final List<Order> orders
+            final List<AmendOrderRequest> orders
     ) {
         if(orders.size() > MAX_BULK) {
             throw new JynxProException(ErrorCode.MAX_BULK_EXCEEDED);
