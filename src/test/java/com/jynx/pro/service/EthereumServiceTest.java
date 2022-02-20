@@ -17,7 +17,6 @@ import java.util.List;
 import java.util.Optional;
 
 @Slf4j
-@Disabled
 @Testcontainers
 @ActiveProfiles("test")
 @SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)

@@ -11,6 +11,7 @@ import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.model.OrderBook;
 import com.jynx.pro.model.OrderBookItem;
+import com.jynx.pro.request.AmendOrderRequest;
 import com.jynx.pro.request.CancelOrderRequest;
 import com.jynx.pro.request.CreateOrderRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -458,11 +459,21 @@ public class OrderServiceTest extends IntegrationTest {
     @Test
     public void testBulkInstructions() throws InterruptedException {
         Market market = createOrderBook(1, 1);
+        int dps = market.getSettlementAsset().getDecimalPlaces();
         CreateOrderRequest createOrderRequest = getCreateOrderRequest(market.getId(), BigDecimal.valueOf(5),
                 BigDecimal.ONE, MarketSide.BUY, OrderType.LIMIT, makerUser);
         List<CreateOrderRequest> bulkCreateRequest = Arrays.asList(createOrderRequest, createOrderRequest);
         List<Order> orders = orderService.createMany(bulkCreateRequest);
         orders.forEach(o -> Assertions.assertEquals(o.getStatus(), OrderStatus.OPEN));
+        List<AmendOrderRequest> bulkAmendRequest = Arrays.asList(new AmendOrderRequest(), new AmendOrderRequest());
+        for(int i=0; i< orders.size(); i++) {
+            bulkAmendRequest.get(i).setId(orders.get(i).getId());
+            bulkAmendRequest.get(i).setSize(BigDecimal.valueOf(2));
+            bulkAmendRequest.get(i).setUser(makerUser);
+        }
+        orders = orderService.amendMany(bulkAmendRequest);
+        orders.forEach(o -> Assertions.assertEquals(o.getSize().setScale(dps, RoundingMode.HALF_UP),
+                BigDecimal.valueOf(2).setScale(dps, RoundingMode.HALF_UP)));
         List<CancelOrderRequest> bulkCancelRequest = Arrays.asList(new CancelOrderRequest(), new CancelOrderRequest());
         for(int i=0; i< orders.size(); i++) {
             bulkCancelRequest.get(i).setId(orders.get(i).getId());
@@ -480,6 +491,16 @@ public class OrderServiceTest extends IntegrationTest {
                 request.add(new CreateOrderRequest());
             }
             orderService.createMany(request);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.MAX_BULK_EXCEEDED);
+        }
+        try {
+            List<AmendOrderRequest> request = new ArrayList<>();
+            for(int i=0; i<30; i++) {
+                request.add(new AmendOrderRequest());
+            }
+            orderService.amendMany(request);
             Assertions.fail();
         } catch(JynxProException e) {
             Assertions.assertEquals(e.getMessage(), ErrorCode.MAX_BULK_EXCEEDED);
@@ -568,12 +589,254 @@ public class OrderServiceTest extends IntegrationTest {
         }
     }
 
+    private void amendOrder(
+            final MarketSide side,
+            final BigDecimal createPrice,
+            final BigDecimal amendPrice,
+            final BigDecimal createSize,
+            final BigDecimal amendSize
+    ) throws InterruptedException {
+        Market market = createOrderBook(1, 1);
+        int dps = market.getSettlementAsset().getDecimalPlaces();
+        Order order = orderService.create(getCreateOrderRequest(market.getId(), createPrice, createSize,
+                side, OrderType.LIMIT, takerUser));
+        Optional<Account> accountOptional = accountRepository.findByUserAndAsset(takerUser, market.getSettlementAsset());
+        Assertions.assertTrue(accountOptional.isPresent());
+        BigDecimal startingBalance = BigDecimal.valueOf(1000000);
+        BigDecimal marginBalance = order.getPrice().multiply(order.getSize()).multiply(market.getInitialMargin());
+        BigDecimal availableBalance = startingBalance.subtract(marginBalance);
+        Assertions.assertEquals(accountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
+                marginBalance.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(accountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
+                startingBalance.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(accountOptional.get().getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
+                availableBalance.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(order.getStatus(), OrderStatus.OPEN);
+        AmendOrderRequest amendOrderRequest = new AmendOrderRequest();
+        amendOrderRequest.setId(order.getId());
+        amendOrderRequest.setUser(takerUser);
+        amendOrderRequest.setPrice(amendPrice);
+        amendOrderRequest.setSize(amendSize);
+        orderService.amend(amendOrderRequest);
+        order = orderRepository.getOne(order.getId());
+        accountOptional = accountRepository.findByUserAndAsset(takerUser, market.getSettlementAsset());
+        Assertions.assertTrue(accountOptional.isPresent());
+        if(amendSize == null) {
+            Assertions.assertEquals(order.getSize().setScale(dps, RoundingMode.HALF_UP),
+                    createSize.setScale(dps, RoundingMode.HALF_UP));
+        } else {
+            Assertions.assertEquals(order.getSize().setScale(dps, RoundingMode.HALF_UP),
+                    amendSize.setScale(dps, RoundingMode.HALF_UP));
+        }
+        if(amendPrice == null) {
+            Assertions.assertEquals(order.getPrice().setScale(dps, RoundingMode.HALF_UP),
+                    createPrice.setScale(dps, RoundingMode.HALF_UP));
+        } else {
+            Assertions.assertEquals(order.getPrice().setScale(dps, RoundingMode.HALF_UP),
+                    amendPrice.setScale(dps, RoundingMode.HALF_UP));
+        }
+        startingBalance = BigDecimal.valueOf(1000000);
+        marginBalance = order.getPrice().multiply(order.getSize()).multiply(market.getInitialMargin());
+        availableBalance = startingBalance.subtract(marginBalance);
+        Assertions.assertEquals(accountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
+                marginBalance.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(accountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
+                startingBalance.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(accountOptional.get().getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
+                availableBalance.setScale(dps, RoundingMode.HALF_UP));
+    }
+
     @Test
-    public void testAmendOrder() throws InterruptedException {
+    public void testAmendBuyOrderChangePrice() throws InterruptedException {
+        amendOrder(MarketSide.BUY, BigDecimal.valueOf(45600), BigDecimal.valueOf(45100), BigDecimal.ONE, BigDecimal.ONE);
+    }
+
+    @Test
+    public void testAmendBuyOrderChangeSize() throws InterruptedException {
+        amendOrder(MarketSide.BUY, BigDecimal.valueOf(45600), BigDecimal.valueOf(45600), BigDecimal.ONE, BigDecimal.valueOf(0.9));
+    }
+
+    @Test
+    public void testAmendSellOrderChangePrice() throws InterruptedException {
+        amendOrder(MarketSide.SELL, BigDecimal.valueOf(45600), BigDecimal.valueOf(46500), BigDecimal.ONE, null);
+    }
+
+    @Test
+    public void testAmendSellOrderChangeSize() throws InterruptedException {
+        amendOrder(MarketSide.SELL, BigDecimal.valueOf(45600), null, BigDecimal.ONE, BigDecimal.valueOf(1.1));
+    }
+
+    @Test
+    public void testAmendOrderFailsWithInsufficientMargin() throws InterruptedException {
+        Market market = createOrderBook(1, 1);
+        int dps = market.getSettlementAsset().getDecimalPlaces();
+        Order order = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45600), BigDecimal.ONE,
+                MarketSide.BUY, OrderType.LIMIT, takerUser));
+        AmendOrderRequest amendOrderRequest = new AmendOrderRequest();
+        amendOrderRequest.setId(order.getId());
+        amendOrderRequest.setUser(takerUser);
+        amendOrderRequest.setPrice(BigDecimal.valueOf(45600));
+        amendOrderRequest.setSize(BigDecimal.valueOf(1000));
+        try {
+            orderService.amend(amendOrderRequest);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.INSUFFICIENT_MARGIN);
+        }
+        Optional<Account> accountOptional = accountRepository.findByUserAndAsset(takerUser, market.getSettlementAsset());
+        Assertions.assertTrue(accountOptional.isPresent());
+        BigDecimal startingBalance = BigDecimal.valueOf(1000000);
+        BigDecimal marginBalance = order.getPrice().multiply(order.getSize()).multiply(market.getInitialMargin());
+        BigDecimal availableBalance = startingBalance.subtract(marginBalance);
+        Assertions.assertEquals(accountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
+                marginBalance.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(accountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
+                startingBalance.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(accountOptional.get().getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
+                availableBalance.setScale(dps, RoundingMode.HALF_UP));
+    }
+
+    @Test
+    public void testAmendOrderFailsWithImmediateExecutionBuy() throws InterruptedException {
         Market market = createOrderBook(1, 1);
         Order order = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45600), BigDecimal.ONE,
                 MarketSide.BUY, OrderType.LIMIT, takerUser));
-        Assertions.assertEquals(order.getStatus(), OrderStatus.OPEN);
+        AmendOrderRequest amendOrderRequest = new AmendOrderRequest();
+        amendOrderRequest.setId(order.getId());
+        amendOrderRequest.setUser(takerUser);
+        amendOrderRequest.setPrice(BigDecimal.valueOf(45620));
+        amendOrderRequest.setSize(BigDecimal.ONE);
+        try {
+            orderService.amend(amendOrderRequest);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.CANNOT_AMEND_WOULD_EXECUTE);
+        }
+    }
+
+    @Test
+    public void testAmendOrderFreelyWhenAskEmpty() throws InterruptedException {
+        Market market = createOrderBook(1, 0);
+        int dps = market.getSettlementAsset().getDecimalPlaces();
+        Order order = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45600), BigDecimal.ONE,
+                MarketSide.BUY, OrderType.LIMIT, takerUser));
+        AmendOrderRequest amendOrderRequest = new AmendOrderRequest();
+        amendOrderRequest.setId(order.getId());
+        amendOrderRequest.setUser(takerUser);
+        amendOrderRequest.setPrice(BigDecimal.valueOf(45620));
+        amendOrderRequest.setSize(BigDecimal.ONE);
+        order = orderService.amend(amendOrderRequest);
+        order = orderRepository.getOne(order.getId());
+        Assertions.assertEquals(order.getPrice().setScale(dps, RoundingMode.HALF_UP),
+                amendOrderRequest.getPrice().setScale(dps, RoundingMode.HALF_UP));
+    }
+
+    @Test
+    public void testAmendOrderFreelyWhenBidEmpty() throws InterruptedException {
+        Market market = createOrderBook(0, 1);
+        int dps = market.getSettlementAsset().getDecimalPlaces();
+        Order order = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45600), BigDecimal.ONE,
+                MarketSide.SELL, OrderType.LIMIT, takerUser));
+        AmendOrderRequest amendOrderRequest = new AmendOrderRequest();
+        amendOrderRequest.setId(order.getId());
+        amendOrderRequest.setUser(takerUser);
+        amendOrderRequest.setPrice(BigDecimal.valueOf(45580));
+        amendOrderRequest.setSize(BigDecimal.ONE);
+        order = orderService.amend(amendOrderRequest);
+        order = orderRepository.getOne(order.getId());
+        Assertions.assertEquals(order.getPrice().setScale(dps, RoundingMode.HALF_UP),
+                amendOrderRequest.getPrice().setScale(dps, RoundingMode.HALF_UP));
+    }
+
+    @Test
+    public void testAmendOrderFailsWithImmediateExecutionSell() throws InterruptedException {
+        Market market = createOrderBook(1, 1);
+        Order order = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45600), BigDecimal.ONE,
+                MarketSide.SELL, OrderType.LIMIT, takerUser));
+        AmendOrderRequest amendOrderRequest = new AmendOrderRequest();
+        amendOrderRequest.setId(order.getId());
+        amendOrderRequest.setUser(takerUser);
+        amendOrderRequest.setPrice(BigDecimal.valueOf(45580));
+        amendOrderRequest.setSize(BigDecimal.ONE);
+        try {
+            orderService.amend(amendOrderRequest);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.CANNOT_AMEND_WOULD_EXECUTE);
+        }
+    }
+
+    @Test
+    public void testAmendOrderFailsWhenPermissionDenied() throws InterruptedException {
+        Market market = createOrderBook(1, 1);
+        Order order = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45600), BigDecimal.ONE,
+                MarketSide.SELL, OrderType.LIMIT, takerUser));
+        AmendOrderRequest amendOrderRequest = new AmendOrderRequest();
+        amendOrderRequest.setId(order.getId());
+        amendOrderRequest.setUser(makerUser);
+        amendOrderRequest.setPrice(BigDecimal.valueOf(45602));
+        amendOrderRequest.setSize(BigDecimal.ONE);
+        try {
+            orderService.amend(amendOrderRequest);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.PERMISSION_DENIED);
+        }
+    }
+
+    @Test
+    public void testAmendOrderFailsWhenOrderNotFound() {
+        AmendOrderRequest amendOrderRequest = new AmendOrderRequest();
+        amendOrderRequest.setId(UUID.randomUUID());
+        amendOrderRequest.setUser(takerUser);
+        amendOrderRequest.setPrice(BigDecimal.valueOf(45602));
+        amendOrderRequest.setSize(BigDecimal.ONE);
+        try {
+            orderService.amend(amendOrderRequest);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.ORDER_NOT_FOUND);
+        }
+    }
+
+    @Test
+    public void testAmendOrderFailsWithInvalidType() throws InterruptedException {
+        Market market = createOrderBook(1, 1);
+        Order order = orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(0.1),
+                MarketSide.SELL, OrderType.MARKET, takerUser));
+        AmendOrderRequest amendOrderRequest = new AmendOrderRequest();
+        amendOrderRequest.setId(order.getId());
+        amendOrderRequest.setUser(takerUser);
+        amendOrderRequest.setPrice(BigDecimal.valueOf(45602));
+        amendOrderRequest.setSize(BigDecimal.ONE);
+        try {
+            orderService.amend(amendOrderRequest);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.INVALID_ORDER_TYPE);
+        }
+    }
+
+    @Test
+    public void testAmendOrderFailsWithInvalidStatus() throws InterruptedException {
+        Market market = createOrderBook(1, 1);
+        List<Order> openOrders = orderService.getOpenLimitOrders(market).stream()
+                .filter(o -> o.getSide().equals(MarketSide.BUY)).collect(Collectors.toList());
+        Assertions.assertEquals(openOrders.size(), 1);
+        Order buyOrder = openOrders.get(0);
+        orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1),
+                MarketSide.SELL, OrderType.MARKET, takerUser));
+        AmendOrderRequest amendOrderRequest = new AmendOrderRequest();
+        amendOrderRequest.setId(buyOrder.getId());
+        amendOrderRequest.setUser(makerUser);
+        amendOrderRequest.setPrice(BigDecimal.valueOf(45602));
+        amendOrderRequest.setSize(BigDecimal.ONE);
+        try {
+            orderService.amend(amendOrderRequest);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.INVALID_ORDER_STATUS);
+        }
     }
 
     private void validateMarketState(

@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -408,6 +409,7 @@ public class OrderService {
     ) {
         Order order = orderRepository.findById(request.getId())
                 .orElseThrow(() -> new JynxProException(ErrorCode.ORDER_NOT_FOUND));
+        int dps = order.getMarket().getSettlementAsset().getDecimalPlaces();
         BigDecimal originalSize = order.getSize();
         BigDecimal originalRemainingSize = order.getRemainingSize();
         BigDecimal originalPrice = order.getPrice();
@@ -422,20 +424,21 @@ public class OrderService {
             throw new JynxProException(ErrorCode.INVALID_ORDER_STATUS);
         }
         // TODO - order amend history should be saved
-        if(!Objects.isNull(request.getSize()) && !request.getSize().equals(order.getSize())) {
+        if(!Objects.isNull(request.getSize()) && !request.getSize().setScale(dps, RoundingMode.HALF_UP)
+                .equals(order.getSize().setScale(dps, RoundingMode.HALF_UP))) {
             order.setSize(request.getSize());
             order.setRemainingSize(order.getSize());
             if(request.getSize().doubleValue() > originalSize.doubleValue()) {
                 order.setUpdated(configService.getTimestamp());
             }
         }
-        if(Objects.isNull(request.getPrice())) {
+        if(!Objects.isNull(request.getPrice())) {
             OrderBook orderBook = getOrderBook(order.getMarket());
-            if(orderBook.getAsks().size() > 0 &&
+            if(order.getSide().equals(MarketSide.BUY) && orderBook.getAsks().size() > 0 &&
                     orderBook.getAsks().get(0).getPrice().doubleValue() < request.getPrice().doubleValue()) {
                 throw new JynxProException(ErrorCode.CANNOT_AMEND_WOULD_EXECUTE);
             }
-            if(orderBook.getBids().size() > 0 &&
+            if(order.getSide().equals(MarketSide.SELL) && orderBook.getBids().size() > 0 &&
                     orderBook.getBids().get(0).getPrice().doubleValue() > request.getPrice().doubleValue()) {
                 throw new JynxProException(ErrorCode.CANNOT_AMEND_WOULD_EXECUTE);
             }
