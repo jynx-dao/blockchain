@@ -54,7 +54,7 @@ public class AccountService {
         return accountRepository.findByUserAndAsset(user, asset);
     }
 
-    private Account getAndCreate(
+    public Account getAndCreate(
             final User user,
             final Asset asset
     ) {

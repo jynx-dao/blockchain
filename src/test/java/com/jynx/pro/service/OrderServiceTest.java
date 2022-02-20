@@ -9,10 +9,10 @@ import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.model.OrderBook;
+import com.jynx.pro.model.OrderBookItem;
 import com.jynx.pro.request.CancelOrderRequest;
 import com.jynx.pro.request.CreateOrderRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.Ignore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,11 +22,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
-import javax.persistence.Id;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -69,41 +66,86 @@ public class OrderServiceTest extends IntegrationTest {
         return request;
     }
 
-    private Market createOrderBook() throws InterruptedException {
+    private Market createOrderBook(
+            final int bids,
+            final int asks
+    ) throws InterruptedException {
         Market market = createAndEnactMarket(true);
         int dps = market.getSettlementAsset().getDecimalPlaces();
-        Order buyOrder = orderService.create(getCreateOrderRequest(market.getId(),
-                BigDecimal.valueOf(45590), BigDecimal.ONE, MarketSide.BUY, OrderType.LIMIT, makerUser));
-        long before = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
-        Order sellOrder = orderService.create(getCreateOrderRequest(market.getId(),
-                BigDecimal.valueOf(45610), BigDecimal.ONE, MarketSide.SELL, OrderType.LIMIT, makerUser));
-        long after = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
-        long duration = after - before;
-        log.info("Created order in {}ms", duration);
-        Assertions.assertEquals(sellOrder.getStatus(), OrderStatus.OPEN);
-        Assertions.assertEquals(buyOrder.getStatus(), OrderStatus.OPEN);
+        for(int i=0; i<bids; i++) {
+            Order buyOrder = orderService.create(getCreateOrderRequest(market.getId(),
+                    BigDecimal.valueOf(45590-i), BigDecimal.ONE, MarketSide.BUY, OrderType.LIMIT, makerUser));
+            Assertions.assertEquals(buyOrder.getStatus(), OrderStatus.OPEN);
+        }
+        for(int i=0; i<asks; i++) {
+            Order sellOrder = orderService.create(getCreateOrderRequest(market.getId(),
+                    BigDecimal.valueOf(45610+i), BigDecimal.ONE, MarketSide.SELL, OrderType.LIMIT, makerUser));
+            Assertions.assertEquals(sellOrder.getStatus(), OrderStatus.OPEN);
+        }
+
         OrderBook orderBook = orderService.getOrderBook(market);
-        Assertions.assertEquals(orderBook.getAsks().size(), 1);
-        Assertions.assertEquals(orderBook.getBids().size(), 1);
-        Assertions.assertEquals(orderBook.getAsks().get(0).getPrice().setScale(dps, RoundingMode.HALF_UP),
-                BigDecimal.valueOf(45610).setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(orderBook.getBids().get(0).getPrice().setScale(dps, RoundingMode.HALF_UP),
-                BigDecimal.valueOf(45590).setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(orderBook.getAsks().size(), asks);
+        Assertions.assertEquals(orderBook.getBids().size(), bids);
+        BigDecimal bidMargin = BigDecimal.ZERO;
+        BigDecimal askMargin = BigDecimal.ZERO;
+        for(int i=0; i<bids; i++) {
+            OrderBookItem item = orderBook.getBids().get(i);
+            Assertions.assertEquals(orderBook.getBids().get(i).getPrice().setScale(dps, RoundingMode.HALF_UP),
+                    BigDecimal.valueOf(45590-i).setScale(dps, RoundingMode.HALF_UP));
+            bidMargin = bidMargin.add(orderService
+                    .getInitialMarginRequirement(market, OrderType.LIMIT, item.getSize(), item.getPrice()));
+        }
+        for(int i=0; i<asks; i++) {
+            OrderBookItem item = orderBook.getAsks().get(i);
+            Assertions.assertEquals(orderBook.getAsks().get(i).getPrice().setScale(dps, RoundingMode.HALF_UP),
+                    BigDecimal.valueOf(45610+i).setScale(dps, RoundingMode.HALF_UP));
+            askMargin = askMargin.add(orderService
+                    .getInitialMarginRequirement(market, OrderType.LIMIT, item.getSize(), item.getPrice()));
+        }
+        BigDecimal marginBalance = bidMargin.add(askMargin);
+        BigDecimal startingBalance = BigDecimal.valueOf(1000000);
+        BigDecimal availableBalance = startingBalance.subtract(marginBalance);
         Optional<Account> accountOptional = accountRepository
                 .findByUserAndAsset(makerUser, market.getSettlementAsset());
         Assertions.assertTrue(accountOptional.isPresent());
         Assertions.assertEquals(accountOptional.get().getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
-                BigDecimal.valueOf(990880).setScale(dps, RoundingMode.HALF_UP));
+                availableBalance.setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(accountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
-                BigDecimal.valueOf(9120).setScale(dps, RoundingMode.HALF_UP));
+                marginBalance.setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(accountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
-                BigDecimal.valueOf(1000000).setScale(dps, RoundingMode.HALF_UP));
+                startingBalance.setScale(dps, RoundingMode.HALF_UP));
         return market;
     }
 
     @Test
+    public void cannotGetMidPriceWithEmptyAsk() throws InterruptedException {
+        Market market = createAndEnactMarket(true);
+        orderService.create(getCreateOrderRequest(market.getId(),
+                BigDecimal.valueOf(45590), BigDecimal.ONE, MarketSide.BUY, OrderType.LIMIT, makerUser));
+        try {
+            orderService.getMidPrice(market);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.EMPTY_ORDER_BOOK);
+        }
+    }
+
+    @Test
+    public void cannotGetMidPriceWithEmptyBid() throws InterruptedException {
+        Market market = createAndEnactMarket(true);
+        orderService.create(getCreateOrderRequest(market.getId(),
+                BigDecimal.valueOf(45610), BigDecimal.ONE, MarketSide.SELL, OrderType.LIMIT, makerUser));
+        try {
+            orderService.getMidPrice(market);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.EMPTY_ORDER_BOOK);
+        }
+    }
+
+    @Test
     public void createLimitOrder() throws InterruptedException {
-        createOrderBook();
+        createOrderBook(2, 2);
     }
 
     @Test
@@ -144,7 +186,7 @@ public class OrderServiceTest extends IntegrationTest {
 
     @Test
     public void cancelOrder() throws InterruptedException {
-        Market market = createOrderBook();
+        Market market = createOrderBook(1, 1);
         List<Order> orders = orderService.getOpenLimitOrders(market);
         for(Order order : orders) {
             CancelOrderRequest request = new CancelOrderRequest();
@@ -167,13 +209,67 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void createMarketOrder() throws InterruptedException {
-        Market market = createOrderBook();
+    public void createMarketOrderBuy() throws InterruptedException {
+        Market market = createOrderBook(1, 1);
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.MARKET, takerUser));
         validateMarketState(market.getId(), BigDecimal.valueOf(0.5), BigDecimal.valueOf(45610),
                 BigDecimal.valueOf(45590), BigDecimal.valueOf(45610), BigDecimal.valueOf(1),
-                BigDecimal.valueOf(0.5));
+                BigDecimal.valueOf(0.5), MarketSide.SELL, MarketSide.BUY);
+    }
+
+    @Test
+    public void createMarketOrderSell() throws InterruptedException {
+        Market market = createOrderBook(1, 1);
+        orderService.create(getCreateOrderRequest(market.getId(),
+                null, BigDecimal.valueOf(0.5), MarketSide.SELL, OrderType.MARKET, takerUser));
+        validateMarketState(market.getId(), BigDecimal.valueOf(0.5), BigDecimal.valueOf(45610),
+                BigDecimal.valueOf(45590), BigDecimal.valueOf(45610), BigDecimal.valueOf(0.5),
+                BigDecimal.valueOf(1), MarketSide.BUY, MarketSide.SELL);
+    }
+
+    @Test
+    public void cancelOrderFailsWithUnsupportedType() throws InterruptedException {
+        Market market = createOrderBook(1, 1);
+        Order order = orderService.create(getCreateOrderRequest(market.getId(),
+                BigDecimal.ONE, BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.MARKET, takerUser));
+        try {
+            CancelOrderRequest request = new CancelOrderRequest();
+            request.setUser(takerUser);
+            request.setId(order.getId());
+            orderService.cancel(request);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.INVALID_ORDER_TYPE);
+        }
+    }
+
+    @Test
+    public void cancelOrderFailsWithInvalidPermission() throws InterruptedException {
+        Market market = createOrderBook(1, 1);
+        Order order = orderService.create(getCreateOrderRequest(market.getId(),
+                null, BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.MARKET, takerUser));
+        try {
+            CancelOrderRequest request = new CancelOrderRequest();
+            request.setUser(makerUser);
+            request.setId(order.getId());
+            orderService.cancel(request);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.PERMISSION_DENIED);
+        }
+    }
+
+    @Test
+    public void createOrderFailsWithInvalidType() throws InterruptedException {
+        Market market = createOrderBook(1, 1);
+        try {
+            orderService.create(getCreateOrderRequest(market.getId(),
+                    null, BigDecimal.valueOf(0.5), MarketSide.BUY, null, takerUser));
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.INVALID_ORDER_TYPE);
+        }
     }
 
     private void validateMarketState(
@@ -183,7 +279,9 @@ public class OrderServiceTest extends IntegrationTest {
             final BigDecimal bidPrice,
             final BigDecimal askPrice,
             final BigDecimal bidSize,
-            final BigDecimal askSize
+            final BigDecimal askSize,
+            final MarketSide makerSide,
+            final MarketSide takerSide
     ) {
         Market market = marketRepository.getOne(marketId);
         int dps = market.getSettlementAsset().getDecimalPlaces();
@@ -197,13 +295,15 @@ public class OrderServiceTest extends IntegrationTest {
                 size.setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(positionTaker.getSize().setScale(dps, RoundingMode.HALF_UP),
                 size.setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(market.getOpenVolume().setScale(dps, RoundingMode.HALF_UP),
-                size.setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(market.getLastPrice().setScale(dps, RoundingMode.HALF_UP),
-                price.setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(positionMaker.getAverageEntryPrice().setScale(dps, RoundingMode.HALF_UP),
                 price.setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(positionTaker.getAverageEntryPrice().setScale(dps, RoundingMode.HALF_UP),
+                price.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(positionMaker.getSide(), makerSide);
+        Assertions.assertEquals(positionTaker.getSide(), takerSide);
+        Assertions.assertEquals(market.getOpenVolume().setScale(dps, RoundingMode.HALF_UP),
+                size.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(market.getLastPrice().setScale(dps, RoundingMode.HALF_UP),
                 price.setScale(dps, RoundingMode.HALF_UP));
         List<Transaction> makerTxns = transactionRepository.findByUserAndAsset(makerUser, market.getSettlementAsset())
                 .stream().filter(t -> t.getType().equals(TransactionType.FEE)).collect(Collectors.toList());

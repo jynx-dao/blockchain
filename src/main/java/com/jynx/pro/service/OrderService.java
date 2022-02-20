@@ -22,7 +22,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -125,12 +128,12 @@ public class OrderService {
         if(!order.getUser().getId().equals(request.getUser().getId())) {
             throw new JynxProException(ErrorCode.PERMISSION_DENIED);
         }
+        if(order.getType().equals(OrderType.MARKET)) {
+            throw new JynxProException(ErrorCode.INVALID_ORDER_TYPE);
+        }
         List<OrderStatus> statusList = Arrays.asList(OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED);
         if(!statusList.contains(order.getStatus())) {
             throw new JynxProException(ErrorCode.INVALID_ORDER_STATUS);
-        }
-        if(order.getType().equals(OrderType.MARKET)) {
-            throw new JynxProException(ErrorCode.INVALID_ORDER_TYPE);
         }
         order.setStatus(OrderStatus.CANCELLED);
         BigDecimal margin = getInitialMarginRequirement(order.getMarket(), order.getType(),
@@ -283,21 +286,20 @@ public class OrderService {
             throw new JynxProException(ErrorCode.MARKET_NOT_ACTIVE);
         }
         validateRequest(request);
-        if(request.getType().equals(OrderType.LIMIT)) {
+        if(OrderType.LIMIT.equals(request.getType())) {
             return handleLimitOrder(request, market);
-        } else if(request.getType().equals(OrderType.STOP_MARKET)) {
+        } else if(OrderType.STOP_MARKET.equals(request.getType())) {
             // TODO - handle stop market
-        } else if(request.getType().equals(OrderType.MARKET)) {
-            return createMarketOrder(request, market);
+            return null;
         }
-        throw new JynxProException(ErrorCode.INVALID_ORDER_TYPE);
+        return createMarketOrder(request, market);
     }
 
     private void validateRequest(
             final CreateOrderRequest request
     ) {
         // TODO - check mandatory fields
-        if(request.getType().equals(OrderType.MARKET) && !Objects.isNull(request.getPrice())) {
+        if(request.getType().equals(OrderType.MARKET)) {
             request.setPrice(null);
             request.setPostOnly(null);
             request.setReduceOnly(null);
@@ -338,7 +340,7 @@ public class OrderService {
         return ids.stream().map(this::cancel).collect(Collectors.toList());
     }
 
-    private BigDecimal getInitialMarginRequirement(
+    public BigDecimal getInitialMarginRequirement(
             final Market market,
             final OrderType type,
             final BigDecimal size,
@@ -365,8 +367,7 @@ public class OrderService {
             final BigDecimal price,
             final User user
     ) {
-        Account account = accountService.get(user, market.getSettlementAsset())
-                .orElseThrow(() -> new JynxProException(ErrorCode.INSUFFICIENT_MARGIN));
+        Account account = accountService.getAndCreate(user, market.getSettlementAsset());
         BigDecimal margin = getInitialMarginRequirement(market, type, size, price);
         if(account.getAvailableBalance().doubleValue() < margin.doubleValue()) {
             throw new JynxProException(ErrorCode.INSUFFICIENT_MARGIN);
