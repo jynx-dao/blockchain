@@ -20,13 +20,6 @@ public class UserService {
     @Autowired
     private UUIDUtils uuidUtils;
 
-    public User get(
-            final UUID id
-    ) {
-        return userRepository.findById(id)
-                .orElseThrow(() -> new JynxProException(ErrorCode.USER_NOT_FOUND));
-    }
-
     public User getAndCreate(
             final String publicKey
     ) {
