@@ -125,7 +125,8 @@ public class PositionService {
             final Market market
     ) {
         List<Position> positions = positionRepository.findByMarket(market).stream()
-                .filter(p -> p.getSize().doubleValue() > 0).collect(Collectors.toList());
+                .filter(p -> p.getSize().doubleValue() > 0 && p.getSide().equals(MarketSide.BUY))
+                .collect(Collectors.toList());
         return BigDecimal.valueOf(positions.stream().mapToDouble(p -> p.getSize().doubleValue()).sum());
     }
 

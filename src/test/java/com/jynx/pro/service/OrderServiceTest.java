@@ -4,15 +4,14 @@ import com.jynx.pro.Application;
 import com.jynx.pro.constant.MarketSide;
 import com.jynx.pro.constant.OrderStatus;
 import com.jynx.pro.constant.OrderType;
-import com.jynx.pro.entity.Account;
-import com.jynx.pro.entity.Market;
-import com.jynx.pro.entity.Order;
+import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.model.OrderBook;
 import com.jynx.pro.request.CancelOrderRequest;
 import com.jynx.pro.request.CreateOrderRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.junit.Ignore;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -22,6 +21,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import javax.persistence.Id;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
@@ -54,13 +54,14 @@ public class OrderServiceTest extends IntegrationTest {
             final BigDecimal price,
             final BigDecimal size,
             final MarketSide side,
-            final OrderType type
+            final OrderType type,
+            final User user
     ) {
         CreateOrderRequest request = new CreateOrderRequest();
         request.setPrice(price);
         request.setSide(side);
         request.setSize(size);
-        request.setUser(takerUser);
+        request.setUser(user);
         request.setMarketId(marketId);
         request.setType(type);
         return request;
@@ -70,10 +71,10 @@ public class OrderServiceTest extends IntegrationTest {
         Market market = createAndEnactMarket(true);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         Order sellOrder = orderService.create(getCreateOrderRequest(market.getId(),
-                BigDecimal.valueOf(45590), BigDecimal.ONE, MarketSide.BUY, OrderType.LIMIT));
+                BigDecimal.valueOf(45590), BigDecimal.ONE, MarketSide.BUY, OrderType.LIMIT, makerUser));
         long before = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
         Order buyOrder = orderService.create(getCreateOrderRequest(market.getId(),
-                BigDecimal.valueOf(45610), BigDecimal.ONE, MarketSide.SELL, OrderType.LIMIT));
+                BigDecimal.valueOf(45610), BigDecimal.ONE, MarketSide.SELL, OrderType.LIMIT, makerUser));
         long after = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
         long duration = after - before;
         log.info("Created order in {}ms", duration);
@@ -87,7 +88,7 @@ public class OrderServiceTest extends IntegrationTest {
         Assertions.assertEquals(orderBook.getBids().get(0).getPrice().setScale(dps, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(45590).setScale(dps, RoundingMode.HALF_UP));
         Optional<Account> accountOptional = accountRepository
-                .findByUserAndAsset(takerUser, market.getSettlementAsset());
+                .findByUserAndAsset(makerUser, market.getSettlementAsset());
         Assertions.assertTrue(accountOptional.isPresent());
         Assertions.assertEquals(accountOptional.get().getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(990880).setScale(dps, RoundingMode.HALF_UP));
@@ -108,7 +109,7 @@ public class OrderServiceTest extends IntegrationTest {
         Market market = createAndEnactMarket(true);
         try {
             orderService.create(getCreateOrderRequest(market.getId(),
-                    BigDecimal.valueOf(45590), BigDecimal.valueOf(1000), MarketSide.BUY, OrderType.LIMIT));
+                    BigDecimal.valueOf(45590), BigDecimal.valueOf(1000), MarketSide.BUY, OrderType.LIMIT, makerUser));
             Assertions.fail();
         } catch(JynxProException e) {
             Assertions.assertEquals(e.getMessage(), ErrorCode.INSUFFICIENT_MARGIN);
@@ -120,7 +121,7 @@ public class OrderServiceTest extends IntegrationTest {
         Market market = createAndEnactMarket(false);
         try {
             orderService.create(getCreateOrderRequest(market.getId(),
-                    BigDecimal.valueOf(45590), BigDecimal.valueOf(1), MarketSide.BUY, OrderType.LIMIT));
+                    BigDecimal.valueOf(45590), BigDecimal.valueOf(1), MarketSide.BUY, OrderType.LIMIT, makerUser));
             Assertions.fail();
         } catch(JynxProException e) {
             Assertions.assertEquals(e.getMessage(), ErrorCode.MARKET_NOT_ACTIVE);
@@ -132,7 +133,7 @@ public class OrderServiceTest extends IntegrationTest {
         Market market = createAndEnactMarket(true);
         try {
             orderService.create(getCreateOrderRequest(market.getId(),
-                    BigDecimal.valueOf(45590), BigDecimal.valueOf(1), MarketSide.BUY, null));
+                    BigDecimal.valueOf(45590), BigDecimal.valueOf(1), MarketSide.BUY, null, makerUser));
             Assertions.fail();
         } catch(JynxProException e) {
             Assertions.assertEquals(e.getMessage(), ErrorCode.INVALID_ORDER_TYPE);
@@ -145,7 +146,7 @@ public class OrderServiceTest extends IntegrationTest {
         List<Order> orders = orderService.getOpenLimitOrders(market);
         for(Order order : orders) {
             CancelOrderRequest request = new CancelOrderRequest();
-            request.setUser(takerUser);
+            request.setUser(makerUser);
             request.setId(order.getId());
             orderService.cancel(request);
             Order cancelledOrder = orderRepository.findById(order.getId()).orElse(new Order());
@@ -153,7 +154,7 @@ public class OrderServiceTest extends IntegrationTest {
         }
         int dps = market.getSettlementAsset().getDecimalPlaces();
         Optional<Account> accountOptional = accountRepository
-                .findByUserAndAsset(takerUser, market.getSettlementAsset());
+                .findByUserAndAsset(makerUser, market.getSettlementAsset());
         Assertions.assertTrue(accountOptional.isPresent());
         Assertions.assertEquals(accountOptional.get().getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(1000000).setScale(dps, RoundingMode.HALF_UP));
@@ -164,10 +165,34 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
+    @Ignore
     public void createMarketOrder() throws InterruptedException {
         // TODO - test market order
         Market market = createOrderBook();
         orderService.create(getCreateOrderRequest(market.getId(),
-                null, BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.MARKET));
+                null, BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.MARKET, takerUser));
+        validateMarketState(market.getId(), BigDecimal.valueOf(0.5));
+    }
+
+    private void validateMarketState(
+            final UUID marketId,
+            final BigDecimal size
+    ) {
+        // TODO - generic method to ensure the entire state is correct
+        // positions, accounts, market, order book, trades, transactions
+        Market market = marketRepository.getOne(marketId);
+        int dps = market.getSettlementAsset().getDecimalPlaces();
+        Optional<Position> positionOptionalMaker = positionRepository.findByUserAndMarket(makerUser, market);
+        Optional<Position> positionOptionalTaker = positionRepository.findByUserAndMarket(takerUser, market);
+        Assertions.assertTrue(positionOptionalMaker.isPresent());
+        Assertions.assertTrue(positionOptionalTaker.isPresent());
+        Position positionMaker = positionOptionalMaker.get();
+        Position positionTaker = positionOptionalTaker.get();
+        Assertions.assertEquals(positionMaker.getSize().setScale(dps, RoundingMode.HALF_UP),
+                size.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(positionTaker.getSize().setScale(dps, RoundingMode.HALF_UP),
+                size.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(market.getOpenVolume().setScale(dps, RoundingMode.HALF_UP),
+                size.setScale(dps, RoundingMode.HALF_UP));
     }
 }

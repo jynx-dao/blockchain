@@ -174,7 +174,7 @@ public class OrderService {
                 partialOrder = order;
                 fullOrder = passiveOrder;
             }
-            BigDecimal size = partialOrder.getRemainingSize();
+            BigDecimal size = fullOrder.getRemainingSize();
             accountService.processFees(size, price, maker, taker, market);
             partialOrder.setRemainingSize(partialOrder.getRemainingSize().subtract(size));
             partialOrder.setStatus(OrderStatus.PARTIALLY_FILLED);
@@ -216,7 +216,6 @@ public class OrderService {
             orderRepository.save(order);
             throw new JynxProException(ErrorCode.INSUFFICIENT_PASSIVE_VOLUME);
         }
-        order.setRemainingSize(BigDecimal.ZERO);
         order = orderRepository.save(order);
         // TODO - allocate margin
         return matchOrders(passiveOrders, order, market, request.getSide());
