@@ -17,7 +17,6 @@ public class ErrorCode {
     public static final String CANNOT_GET_SUPPLY = "An error occurred whilst trying to get the total supply.";
     public static final String ASSET_NOT_SUSPENDED = "You can only unsuspend a suspended asset.";
     public static final String ASSET_NOT_ACTIVE = "This asset is not active.";
-    public static final String UNKNOWN_MARKET_SIDE = "Market side must be buy or sell.";
     public static final String ORDER_NOT_FOUND = "The order was not found.";
     public static final String PERMISSION_DENIED = "You do not have permission to perform this action.";
     public static final String INVALID_ORDER_STATUS = "The order status is invalid.";
@@ -37,4 +36,10 @@ public class ErrorCode {
     public static final String TOO_MANY_DECIMAL_PLACES = "The maximum precision is 8 decimal places.";
     public static final String CANNOT_GET_DECIMAL_PLACES = "Failed to get the decimal places for the ERC20 token.";
     public static final String CANNOT_AMEND_WOULD_EXECUTE = "Cannot amend order as would immediately execute.";
+    public static final String STOP_ORDER_NOT_SUPPORTED = "Stop loss orders are not supported.";
+    public static final String ORDER_SIZE_MANDATORY = "Order size is mandatory.";
+    public static final String ORDER_TYPE_MANDATORY = "Order type is mandatory.";
+    public static final String ORDER_MARKET_MANDATORY = "Order market ID is mandatory.";
+    public static final String ORDER_SIDE_MANDATORY = "Order side is mandatory.";
+    public static final String ORDER_PRICE_MANDATORY = "Order price is mandatory when type is LIMIT.";
 }

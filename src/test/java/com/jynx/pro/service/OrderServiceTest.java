@@ -462,18 +462,6 @@ public class OrderServiceTest extends IntegrationTest {
         }
     }
 
-    @Test
-    public void testCreateOrderFailsWithMissingSide() throws InterruptedException {
-        Market market = createOrderBook(1, 1);
-        try {
-            orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(5),
-                    BigDecimal.ONE, null, OrderType.LIMIT, makerUser));
-            Assertions.fail();
-        } catch(JynxProException e) {
-            Assertions.assertEquals(e.getMessage(), ErrorCode.UNKNOWN_MARKET_SIDE);
-        }
-    }
-
     private void validateMarketState(
             final UUID marketId,
             final BigDecimal size,
