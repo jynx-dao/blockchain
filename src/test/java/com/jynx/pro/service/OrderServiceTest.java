@@ -24,6 +24,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -211,21 +212,23 @@ public class OrderServiceTest extends IntegrationTest {
     @Test
     public void createMarketOrderBuy() throws InterruptedException {
         Market market = createOrderBook(1, 1);
+        BigDecimal midPrice = orderService.getMidPrice(market);
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.MARKET, takerUser));
         validateMarketState(market.getId(), BigDecimal.valueOf(0.5), BigDecimal.valueOf(45610),
                 BigDecimal.valueOf(45590), BigDecimal.valueOf(45610), BigDecimal.valueOf(1),
-                BigDecimal.valueOf(0.5), MarketSide.SELL, MarketSide.BUY);
+                BigDecimal.valueOf(0.5), MarketSide.SELL, MarketSide.BUY, 1, List.of(midPrice));
     }
 
     @Test
     public void createMarketOrderSell() throws InterruptedException {
         Market market = createOrderBook(1, 1);
+        BigDecimal midPrice = orderService.getMidPrice(market);
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.valueOf(0.5), MarketSide.SELL, OrderType.MARKET, takerUser));
-        validateMarketState(market.getId(), BigDecimal.valueOf(0.5), BigDecimal.valueOf(45610),
+        validateMarketState(market.getId(), BigDecimal.valueOf(0.5), BigDecimal.valueOf(45590),
                 BigDecimal.valueOf(45590), BigDecimal.valueOf(45610), BigDecimal.valueOf(0.5),
-                BigDecimal.valueOf(1), MarketSide.BUY, MarketSide.SELL);
+                BigDecimal.valueOf(1), MarketSide.BUY, MarketSide.SELL, 1, List.of(midPrice));
     }
 
     @Test
@@ -281,7 +284,9 @@ public class OrderServiceTest extends IntegrationTest {
             final BigDecimal bidSize,
             final BigDecimal askSize,
             final MarketSide makerSide,
-            final MarketSide takerSide
+            final MarketSide takerSide,
+            final int tradeCount,
+            final List<BigDecimal> midPriceAtTrade
     ) {
         Market market = marketRepository.getOne(marketId);
         int dps = market.getSettlementAsset().getDecimalPlaces();
@@ -335,8 +340,55 @@ public class OrderServiceTest extends IntegrationTest {
                 bidPrice.setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(orderBook.getAsks().get(0).getPrice().setScale(dps, RoundingMode.HALF_UP),
                 askPrice.setScale(dps, RoundingMode.HALF_UP));
-        // TODO - accounts
-        // TODO - trades
+        List<Trade> makerTrades = tradeRepository.findByMakerOrderUserAndMarket(makerUser, market)
+                .stream().sorted(Comparator.comparing(Trade::getExecuted).reversed()).collect(Collectors.toList());
+        List<Trade> takerTrades = tradeRepository.findByTakerOrderUserAndMarket(takerUser, market)
+                .stream().sorted(Comparator.comparing(Trade::getExecuted).reversed()).collect(Collectors.toList());
+        Assertions.assertEquals(makerTrades.size(), takerTrades.size());
+        Assertions.assertEquals(makerTrades.size(), tradeCount);
+        Assertions.assertEquals(makerTrades.get(0).getId(), takerTrades.get(0).getId());
+        BigDecimal takerMarginBalance = BigDecimal.ZERO;
+        BigDecimal makerMarginBalance = BigDecimal.ZERO;
+        for(int i=0; i<tradeCount; i++) {
+            Trade trade = makerTrades.get(i);
+            takerMarginBalance = takerMarginBalance.add(orderService
+                    .getInitialMarginRequirement(market, OrderType.LIMIT, trade.getSize(), midPriceAtTrade.get(i)));
+        }
+        for(int i=0; i<tradeCount; i++) {
+            Trade trade = makerTrades.get(i);
+            makerMarginBalance = makerMarginBalance.add(orderService
+                    .getInitialMarginRequirement(market, OrderType.LIMIT, trade.getSize(), trade.getPrice()));
+        }
+        for(OrderBookItem item : orderBook.getBids()) {
+            makerMarginBalance = makerMarginBalance.add(orderService.getInitialMarginRequirement(
+                    market, OrderType.LIMIT, item.getSize(), item.getPrice()));
+        }
+        for(OrderBookItem item : orderBook.getAsks()) {
+            makerMarginBalance = makerMarginBalance.add(orderService.getInitialMarginRequirement(
+                    market, OrderType.LIMIT, item.getSize(), item.getPrice()));
+        }
+        BigDecimal takerStartingBalance = BigDecimal.valueOf(1000000).add(takerFee);
+        BigDecimal takerAvailableBalance = takerStartingBalance.subtract(takerMarginBalance);
+        BigDecimal makerStartingBalance = BigDecimal.valueOf(1000000).add(makerFee);
+        BigDecimal makerAvailableBalance = makerStartingBalance.subtract(makerMarginBalance);
+        Optional<Account> makerAccountOptional = accountRepository.findByUserAndAsset(
+                makerUser, market.getSettlementAsset());
+        Optional<Account> takerAccountOptional = accountRepository.findByUserAndAsset(
+                takerUser, market.getSettlementAsset());
+        Assertions.assertTrue(makerAccountOptional.isPresent());
+        Assertions.assertTrue(takerAccountOptional.isPresent());
+        Assertions.assertEquals(makerAccountOptional.get().getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
+                makerAvailableBalance.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(makerAccountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
+                makerMarginBalance.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(makerAccountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
+                makerStartingBalance.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(takerAccountOptional.get().getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
+                takerAvailableBalance.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(takerAccountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
+                takerMarginBalance.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(takerAccountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
+                takerStartingBalance.setScale(dps, RoundingMode.HALF_UP));
         // TODO - unrealised PNL
     }
 }

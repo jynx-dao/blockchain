@@ -145,6 +145,8 @@ public class AccountService {
         Account makerAccount = getAndCreate(maker, market.getSettlementAsset());
         takerAccount.setBalance(takerAccount.getBalance().subtract(takerAmount));
         makerAccount.setBalance(makerAccount.getBalance().add(makerAmount));
+        takerAccount.setAvailableBalance(takerAccount.getAvailableBalance().subtract(takerAmount));
+        makerAccount.setAvailableBalance(makerAccount.getAvailableBalance().add(makerAmount));
         BigDecimal treasuryAmount = takerAmount.subtract(makerAmount);
         market.getSettlementAsset().setTreasuryBalance(
                 market.getSettlementAsset().getTreasuryBalance().add(treasuryAmount));

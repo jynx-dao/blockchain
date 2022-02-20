@@ -220,7 +220,8 @@ public class OrderService {
             throw new JynxProException(ErrorCode.INSUFFICIENT_PASSIVE_VOLUME);
         }
         order = orderRepository.save(order);
-        // TODO - allocate margin
+        BigDecimal margin = getInitialMarginRequirement(market, order.getType(), request.getSize(), request.getPrice());
+        accountService.allocateMargin(margin, request.getUser(), market.getSettlementAsset());
         return matchOrders(passiveOrders, order, market, request.getSide());
     }
 
