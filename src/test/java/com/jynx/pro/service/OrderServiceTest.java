@@ -5,8 +5,8 @@ import com.jynx.pro.constant.MarketSide;
 import com.jynx.pro.constant.OrderStatus;
 import com.jynx.pro.constant.OrderType;
 import com.jynx.pro.constant.TransactionType;
-import com.jynx.pro.entity.*;
 import com.jynx.pro.entity.Order;
+import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.model.OrderBook;
@@ -22,8 +22,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -78,7 +76,6 @@ public class OrderServiceTest extends IntegrationTest {
             final int bids,
             final int asks
     ) throws InterruptedException {
-        long aa = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
         Market market = createAndEnactMarket(true);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         for(int i=0; i<bids; i++) {
@@ -91,8 +88,6 @@ public class OrderServiceTest extends IntegrationTest {
                     BigDecimal.valueOf(45610+i), BigDecimal.ONE, MarketSide.SELL, OrderType.LIMIT, makerUser));
             Assertions.assertEquals(sellOrder.getStatus(), OrderStatus.OPEN);
         }
-        long ab = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
-        log.info("Time to ab -> {}", ab-aa);
         OrderBook orderBook = orderService.getOrderBook(market);
         Assertions.assertEquals(orderBook.getAsks().size(), asks);
         Assertions.assertEquals(orderBook.getBids().size(), bids);
@@ -112,8 +107,6 @@ public class OrderServiceTest extends IntegrationTest {
             askMargin = askMargin.add(orderService
                     .getInitialMarginRequirement(market, OrderType.LIMIT, item.getSize(), item.getPrice()));
         }
-        long ac = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
-        log.info("Time to ac -> {}", ac-aa);
         BigDecimal marginBalance = bidMargin.add(askMargin);
         BigDecimal startingBalance = BigDecimal.valueOf(1000000);
         BigDecimal availableBalance = startingBalance.subtract(marginBalance);
@@ -126,8 +119,6 @@ public class OrderServiceTest extends IntegrationTest {
                 marginBalance.setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(accountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
                 startingBalance.setScale(dps, RoundingMode.HALF_UP));
-        long ad = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
-        log.info("Time to ad -> {}", ad-aa);
         return market;
     }
 
@@ -188,10 +179,7 @@ public class OrderServiceTest extends IntegrationTest {
 
     @Test
     public void cancelOrder() throws InterruptedException {
-        long a = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
         Market market = createOrderBook(1, 1);
-        long b = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
-        log.info("Time to b -> {}", b-a);
         List<Order> orders = orderService.getOpenLimitOrders(market);
         for(Order order : orders) {
             CancelOrderRequest request = new CancelOrderRequest();
@@ -201,8 +189,6 @@ public class OrderServiceTest extends IntegrationTest {
             Order cancelledOrder = orderRepository.findById(order.getId()).orElse(new Order());
             Assertions.assertEquals(cancelledOrder.getStatus(), OrderStatus.CANCELLED);
         }
-        long c = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
-        log.info("Time to c -> {}", c-a);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         Optional<Account> accountOptional = accountRepository
                 .findByUserAndAsset(makerUser, market.getSettlementAsset());
@@ -213,8 +199,6 @@ public class OrderServiceTest extends IntegrationTest {
                 BigDecimal.valueOf(0).setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(accountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(1000000).setScale(dps, RoundingMode.HALF_UP));
-        long d = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
-        log.info("Time to d -> {}", d-a);
     }
 
     @Test
