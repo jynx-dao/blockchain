@@ -389,10 +389,14 @@ public class OrderServiceTest extends IntegrationTest {
                 takerMarginBalance.setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(takerAccountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
                 takerStartingBalance.setScale(dps, RoundingMode.HALF_UP));
-        BigDecimal gain = market.getLastPrice().subtract(price).divide(price, dps, RoundingMode.HALF_UP);
+        BigDecimal gain = market.getMarkPrice().subtract(price).divide(price, dps, RoundingMode.HALF_UP);
         // TODO - check this, I think it's asserting zero because it currently uses last price (when it should use mid price)
-        BigDecimal makerUnrealisedProfit = gain.multiply(size).multiply(price).abs();
-        BigDecimal takerUnrealisedProfit = makerUnrealisedProfit.multiply(BigDecimal.valueOf(-1));
+        BigDecimal takerUnrealisedProfit = gain.multiply(size).multiply(price).abs();
+        BigDecimal makerUnrealisedProfit = takerUnrealisedProfit.multiply(BigDecimal.valueOf(-1));
+        if(takerSide.equals(MarketSide.BUY)) {
+            takerUnrealisedProfit = takerUnrealisedProfit.multiply(BigDecimal.valueOf(-1));
+            makerUnrealisedProfit = makerUnrealisedProfit.multiply(BigDecimal.valueOf(-1));
+        }
         Assertions.assertEquals(makerUnrealisedProfit.setScale(dps, RoundingMode.HALF_UP),
                 positionMaker.getUnrealisedPnl().setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(takerUnrealisedProfit.setScale(dps, RoundingMode.HALF_UP),

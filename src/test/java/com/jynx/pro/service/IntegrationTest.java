@@ -136,7 +136,7 @@ public abstract class IntegrationTest {
                 .setName("DAI")
                 .setAddress(ethereumHelper.getDaiToken().getContractAddress())
                 .setType(AssetType.ERC20)
-                .setDecimalPlaces(18);
+                .setDecimalPlaces(8);
         request.setUser(user);
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);

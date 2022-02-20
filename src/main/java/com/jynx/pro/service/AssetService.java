@@ -103,6 +103,9 @@ public class AssetService {
         if(assetCheck.stream().anyMatch(a -> !a.getStatus().equals(AssetStatus.REJECTED))) {
             throw new JynxProException(ErrorCode.ASSET_EXISTS_ALREADY);
         }
+        if(request.getDecimalPlaces() > 8) {
+            throw new JynxProException(ErrorCode.TOO_MANY_DECIMAL_PLACES);
+        }
         Asset asset = new Asset()
                 .setAddress(request.getAddress())
                 .setType(request.getType())

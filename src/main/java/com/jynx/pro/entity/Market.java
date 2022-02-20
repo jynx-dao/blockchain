@@ -40,6 +40,8 @@ public class Market {
     private BigDecimal volume24h = BigDecimal.ZERO;
     @Column(name = "last_price", nullable = false, scale = 8, precision = 18)
     private BigDecimal lastPrice = BigDecimal.ZERO;
+    @Column(name = "mark_price", nullable = false, scale = 8, precision = 18)
+    private BigDecimal markPrice = BigDecimal.ZERO;
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private MarketStatus status;

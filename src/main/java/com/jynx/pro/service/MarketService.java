@@ -41,6 +41,8 @@ public class MarketService {
     private OracleService oracleService;
     @Autowired
     private PositionService positionService;
+    @Autowired
+    private OrderService orderService;
 
     public Market get(
             final UUID id
@@ -243,6 +245,7 @@ public class MarketService {
             final Market market
     ) {
         market.setLastPrice(lastPrice);
+        market.setMarkPrice(orderService.getMidPrice(market));
         positionService.updateUnrealisedProfit(market);
         market.setOpenVolume(positionService.calculateOpenVolume(market));
         marketRepository.save(market);

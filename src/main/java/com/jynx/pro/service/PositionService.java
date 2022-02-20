@@ -136,10 +136,12 @@ public class PositionService {
         List<Position> positions = positionRepository.findByMarket(market).stream()
                 .filter(p -> p.getSize().doubleValue() > 0).collect(Collectors.toList());
         for(Position position : positions) {
-            BigDecimal gain = position.getAverageEntryPrice().subtract(market.getLastPrice())
-                    .divide(position.getAverageEntryPrice(), 4, RoundingMode.HALF_UP);
-            gain = flipGain(position, gain, market.getLastPrice());
-            BigDecimal unrealisedProfit = gain.multiply(position.getSize());
+            BigDecimal gain = position.getAverageEntryPrice().subtract(market.getMarkPrice())
+                    .divide(position.getAverageEntryPrice(),
+                            market.getSettlementAsset().getDecimalPlaces(), RoundingMode.HALF_UP);
+            gain = flipGain(position, gain, market.getMarkPrice());
+            BigDecimal unrealisedProfit = gain.multiply(position.getSize().multiply(position.getAverageEntryPrice()))
+                    .setScale(market.getSettlementAsset().getDecimalPlaces(), RoundingMode.HALF_UP);
             position.setUnrealisedPnl(unrealisedProfit);
         }
         positionRepository.saveAll(positions);
