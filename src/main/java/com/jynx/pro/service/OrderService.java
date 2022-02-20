@@ -22,10 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -59,6 +56,17 @@ public class OrderService {
             final Market market
     ) {
         return getOrderBook(market, ORDER_BOOK_LIMIT);
+    }
+
+    public BigDecimal getMidPrice(
+            final Market market
+    ) {
+        OrderBook orderBook = getOrderBook(market, 1);
+        if(orderBook.getAsks().size() == 0 || orderBook.getBids().size() == 0) {
+            throw new JynxProException(ErrorCode.EMPTY_ORDER_BOOK);
+        }
+        return (orderBook.getBids().get(0).getPrice().add(orderBook.getAsks().get(0).getPrice()))
+                .multiply(BigDecimal.valueOf(0.5));
     }
 
     private List<Order> getSideOfBook(
@@ -275,6 +283,7 @@ public class OrderService {
         if(!market.getStatus().equals(MarketStatus.ACTIVE)) {
             throw new JynxProException(ErrorCode.MARKET_NOT_ACTIVE);
         }
+        validateRequest(request);
         if(request.getType().equals(OrderType.LIMIT)) {
             return handleLimitOrder(request, market);
         } else if(request.getType().equals(OrderType.STOP_MARKET)) {
@@ -283,6 +292,17 @@ public class OrderService {
             return createMarketOrder(request, market);
         }
         throw new JynxProException(ErrorCode.INVALID_ORDER_TYPE);
+    }
+
+    private void validateRequest(
+            final CreateOrderRequest request
+    ) {
+        // TODO - check mandatory fields
+        if(request.getType().equals(OrderType.MARKET) && !Objects.isNull(request.getPrice())) {
+            request.setPrice(null);
+            request.setPostOnly(null);
+            request.setReduceOnly(null);
+        }
     }
 
     public Order amend(
@@ -326,13 +346,14 @@ public class OrderService {
             final BigDecimal price
     ) {
         // TODO - the margin requirement will be different if it doesn't increase exposure and trader has open position
-        if(type.equals(OrderType.LIMIT)) {
+        if(OrderType.LIMIT.equals(type)) {
             BigDecimal notionalSize = price.multiply(size);
             return notionalSize.multiply(market.getInitialMargin());
-        } else if(type.equals(OrderType.MARKET)) {
-            // TODO - need to estimate the price from the order book
-            throw new JynxProException("Cannot place market order");
-        } else if(type.equals(OrderType.STOP_MARKET)) {
+        } else if(OrderType.MARKET.equals(type)) {
+            BigDecimal midPrice = getMidPrice(market);
+            BigDecimal notionalSize = midPrice.multiply(size);
+            return notionalSize.multiply(market.getInitialMargin());
+        } else if(OrderType.STOP_MARKET.equals(type)) {
             throw new JynxProException("Cannot place stop market order");
         }
         throw new JynxProException(ErrorCode.INVALID_ORDER_TYPE);

@@ -79,12 +79,12 @@ public class MarketServiceTest extends IntegrationTest {
 
     @Test
     public void testAddMarketAndEnact() throws InterruptedException {
-        createAndEnactMarket();
+        createAndEnactMarket(true);
     }
 
     @Test
     public void testSuspendMarket() throws InterruptedException {
-        Market market = createAndEnactMarket();
+        Market market = createAndEnactMarket(true);
         long[] times = proposalTimes();
         SingleItemRequest request = new SingleItemRequest().setId(market.getId());
         request.setOpenTime(times[0]);
@@ -104,7 +104,7 @@ public class MarketServiceTest extends IntegrationTest {
 
     @Test
     public void testUnsuspendMarket() throws InterruptedException {
-        Market market = createAndEnactMarket();
+        Market market = createAndEnactMarket(true);
         long[] times = proposalTimes();
         SingleItemRequest request = new SingleItemRequest().setId(market.getId());
         request.setOpenTime(times[0]);
@@ -133,7 +133,7 @@ public class MarketServiceTest extends IntegrationTest {
 
     @Test
     public void testAmendInitialMargin() throws InterruptedException {
-        Market market = createAndEnactMarket();
+        Market market = createAndEnactMarket(true);
         Assertions.assertEquals(market.getInitialMargin().setScale(2, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(0.1).setScale(2, RoundingMode.HALF_UP));
         long[] times = proposalTimes();
@@ -158,7 +158,7 @@ public class MarketServiceTest extends IntegrationTest {
 
     @Test
     public void testAmendMaintenanceMargin() throws InterruptedException {
-        Market market = createAndEnactMarket();
+        Market market = createAndEnactMarket(true);
         Assertions.assertEquals(market.getMaintenanceMargin().setScale(2, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(0.15).setScale(2, RoundingMode.HALF_UP));
         long[] times = proposalTimes();
@@ -183,7 +183,7 @@ public class MarketServiceTest extends IntegrationTest {
 
     @Test
     public void testAmendTickSize() throws InterruptedException {
-        Market market = createAndEnactMarket();
+        Market market = createAndEnactMarket(true);
         Assertions.assertEquals(market.getTickSize(), 1);
         long[] times = proposalTimes();
         AmendMarketRequest request = new AmendMarketRequest()
@@ -206,7 +206,7 @@ public class MarketServiceTest extends IntegrationTest {
 
     @Test
     public void testAmendStepSize() throws InterruptedException {
-        Market market = createAndEnactMarket();
+        Market market = createAndEnactMarket(true);
         Assertions.assertEquals(market.getStepSize(), 1);
         long[] times = proposalTimes();
         AmendMarketRequest request = new AmendMarketRequest()
@@ -229,7 +229,7 @@ public class MarketServiceTest extends IntegrationTest {
 
     @Test
     public void testAmendMakerFee() throws InterruptedException {
-        Market market = createAndEnactMarket();
+        Market market = createAndEnactMarket(true);
         Assertions.assertEquals(market.getMakerFee().setScale(3, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(0.001).setScale(3, RoundingMode.HALF_UP));
         long[] times = proposalTimes();
@@ -254,7 +254,7 @@ public class MarketServiceTest extends IntegrationTest {
 
     @Test
     public void testAmendTakerFee() throws InterruptedException {
-        Market market = createAndEnactMarket();
+        Market market = createAndEnactMarket(true);
         Assertions.assertEquals(market.getTakerFee().setScale(3, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(0.001).setScale(3, RoundingMode.HALF_UP));
         long[] times = proposalTimes();
@@ -279,7 +279,7 @@ public class MarketServiceTest extends IntegrationTest {
 
     @Test
     public void testAmendSettlementFrequency() throws InterruptedException {
-        Market market = createAndEnactMarket();
+        Market market = createAndEnactMarket(true);
         Assertions.assertEquals(market.getSettlementFrequency(), 8);
         long[] times = proposalTimes();
         AmendMarketRequest request = new AmendMarketRequest()

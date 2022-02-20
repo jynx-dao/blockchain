@@ -28,7 +28,7 @@ public class Order {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
-    @Column(name = "price", nullable = false, scale = 8, precision = 18)
+    @Column(name = "price", scale = 8, precision = 18)
     private BigDecimal price;
     @Column(name = "size", nullable = false, scale = 8, precision = 18)
     private BigDecimal size;

@@ -39,8 +39,8 @@ public class TradeService {
                 .setMarket(market)
                 .setId(uuidUtils.next())
                 .setPrice(price)
-                .setExecuted(configService.getTimestamp()))
+                .setExecuted(configService.getTimestamp())
                 .setSize(size)
-                .setSide(side);
+                .setSide(side));
     }
 }

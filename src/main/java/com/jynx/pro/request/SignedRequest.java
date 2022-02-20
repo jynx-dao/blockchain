@@ -6,4 +6,6 @@ import lombok.Data;
 @Data
 public abstract class SignedRequest {
     public User user;
+    public String signature;
+    public String publicKey;
 }

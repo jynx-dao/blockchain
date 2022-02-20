@@ -26,6 +26,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -52,7 +53,8 @@ public class OrderServiceTest extends IntegrationTest {
             final UUID marketId,
             final BigDecimal price,
             final BigDecimal size,
-            final MarketSide side
+            final MarketSide side,
+            final OrderType type
     ) {
         CreateOrderRequest request = new CreateOrderRequest();
         request.setPrice(price);
@@ -60,19 +62,18 @@ public class OrderServiceTest extends IntegrationTest {
         request.setSize(size);
         request.setUser(takerUser);
         request.setMarketId(marketId);
-        request.setType(OrderType.LIMIT);
+        request.setType(type);
         return request;
     }
 
-    @Test
-    public void createOrder() throws InterruptedException {
-        Market market = createAndEnactMarket();
+    private Market createOrderBook() throws InterruptedException {
+        Market market = createAndEnactMarket(true);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         Order sellOrder = orderService.create(getCreateOrderRequest(market.getId(),
-                BigDecimal.valueOf(45590), BigDecimal.ONE, MarketSide.BUY));
+                BigDecimal.valueOf(45590), BigDecimal.ONE, MarketSide.BUY, OrderType.LIMIT));
         long before = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
         Order buyOrder = orderService.create(getCreateOrderRequest(market.getId(),
-                BigDecimal.valueOf(45610), BigDecimal.ONE, MarketSide.SELL));
+                BigDecimal.valueOf(45610), BigDecimal.ONE, MarketSide.SELL, OrderType.LIMIT));
         long after = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
         long duration = after - before;
         log.info("Created order in {}ms", duration);
@@ -94,14 +95,20 @@ public class OrderServiceTest extends IntegrationTest {
                 BigDecimal.valueOf(9120).setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(accountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(1000000).setScale(dps, RoundingMode.HALF_UP));
+        return market;
+    }
+
+    @Test
+    public void createLimitOrder() throws InterruptedException {
+        createOrderBook();
     }
 
     @Test
     public void createOrderFailedWithInsufficientMargin() throws InterruptedException {
-        Market market = createAndEnactMarket();
+        Market market = createAndEnactMarket(true);
         try {
             orderService.create(getCreateOrderRequest(market.getId(),
-                    BigDecimal.valueOf(45590), BigDecimal.valueOf(1000), MarketSide.BUY));
+                    BigDecimal.valueOf(45590), BigDecimal.valueOf(1000), MarketSide.BUY, OrderType.LIMIT));
             Assertions.fail();
         } catch(JynxProException e) {
             Assertions.assertEquals(e.getMessage(), ErrorCode.INSUFFICIENT_MARGIN);
@@ -109,33 +116,43 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
+    public void createOrderFailedWhenMarketInactive() throws InterruptedException {
+        Market market = createAndEnactMarket(false);
+        try {
+            orderService.create(getCreateOrderRequest(market.getId(),
+                    BigDecimal.valueOf(45590), BigDecimal.valueOf(1), MarketSide.BUY, OrderType.LIMIT));
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.MARKET_NOT_ACTIVE);
+        }
+    }
+
+    @Test
+    public void createOrderFailedWithInvalidType() throws InterruptedException {
+        Market market = createAndEnactMarket(true);
+        try {
+            orderService.create(getCreateOrderRequest(market.getId(),
+                    BigDecimal.valueOf(45590), BigDecimal.valueOf(1), MarketSide.BUY, null));
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.INVALID_ORDER_TYPE);
+        }
+    }
+
+    @Test
     public void cancelOrder() throws InterruptedException {
-        Market market = createAndEnactMarket();
+        Market market = createOrderBook();
+        List<Order> orders = orderService.getOpenLimitOrders(market);
+        for(Order order : orders) {
+            CancelOrderRequest request = new CancelOrderRequest();
+            request.setUser(takerUser);
+            request.setId(order.getId());
+            orderService.cancel(request);
+            Order cancelledOrder = orderRepository.findById(order.getId()).orElse(new Order());
+            Assertions.assertEquals(cancelledOrder.getStatus(), OrderStatus.CANCELLED);
+        }
         int dps = market.getSettlementAsset().getDecimalPlaces();
-        Order sellOrder = orderService.create(getCreateOrderRequest(market.getId(),
-                BigDecimal.valueOf(45610), BigDecimal.ONE, MarketSide.SELL));
-        Assertions.assertEquals(sellOrder.getStatus(), OrderStatus.OPEN);
-        OrderBook orderBook = orderService.getOrderBook(market);
-        Assertions.assertEquals(orderBook.getAsks().size(), 1);
-        Assertions.assertEquals(orderBook.getBids().size(), 0);
-        Assertions.assertEquals(orderBook.getAsks().get(0).getPrice().setScale(dps, RoundingMode.HALF_UP),
-                BigDecimal.valueOf(45610).setScale(dps, RoundingMode.HALF_UP));
         Optional<Account> accountOptional = accountRepository
-                .findByUserAndAsset(takerUser, market.getSettlementAsset());
-        Assertions.assertTrue(accountOptional.isPresent());
-        Assertions.assertEquals(accountOptional.get().getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
-                BigDecimal.valueOf(995439).setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(accountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
-                BigDecimal.valueOf(4561).setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(accountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
-                BigDecimal.valueOf(1000000).setScale(dps, RoundingMode.HALF_UP));
-        CancelOrderRequest request = new CancelOrderRequest();
-        request.setUser(takerUser);
-        request.setId(sellOrder.getId());
-        orderService.cancel(request);
-        Order cancelledOrder = orderRepository.findById(sellOrder.getId()).orElse(new Order());
-        Assertions.assertEquals(cancelledOrder.getStatus(), OrderStatus.CANCELLED);
-        accountOptional = accountRepository
                 .findByUserAndAsset(takerUser, market.getSettlementAsset());
         Assertions.assertTrue(accountOptional.isPresent());
         Assertions.assertEquals(accountOptional.get().getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
@@ -144,5 +161,13 @@ public class OrderServiceTest extends IntegrationTest {
                 BigDecimal.valueOf(0).setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(accountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(1000000).setScale(dps, RoundingMode.HALF_UP));
+    }
+
+    @Test
+    public void createMarketOrder() throws InterruptedException {
+        // TODO - test market order
+        Market market = createOrderBook();
+        orderService.create(getCreateOrderRequest(market.getId(),
+                null, BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.MARKET));
     }
 }

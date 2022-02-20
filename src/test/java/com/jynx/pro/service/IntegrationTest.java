@@ -66,6 +66,10 @@ public abstract class IntegrationTest {
     protected DepositRepository depositRepository;
     @Autowired
     protected TransactionRepository transactionRepository;
+    @Autowired
+    protected TradeRepository tradeRepository;
+    @Autowired
+    protected PositionRepository positionRepository;
 
     protected static final String PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
     private static final String GANACHE_CMD = String
@@ -104,19 +108,23 @@ public abstract class IntegrationTest {
         return asset;
     }
 
-    protected Market createAndEnactMarket() throws InterruptedException {
+    protected Market createAndEnactMarket(
+            final boolean activate
+    ) throws InterruptedException {
         Asset asset = createAndEnactAsset(true);
         List<Oracle> oracles = List.of(new Oracle().setType(OracleType.SIGNED_DATA).setIdentifier("price"));
         Market market = marketService.proposeToAdd(getAddMarketRequest(asset, oracles));
         Assertions.assertEquals(market.getStatus(), MarketStatus.PENDING);
         Thread.sleep(3000L);
-        configService.setTimestamp(nowAsMillis());
+        if(activate) {
+            configService.setTimestamp(nowAsMillis());
+        }
         proposalService.open();
         proposalService.approve();
         proposalService.enact();
         proposalService.reject();
         market = marketRepository.findById(market.getId()).orElse(new Market());
-        Assertions.assertEquals(market.getStatus(), MarketStatus.ACTIVE);
+        Assertions.assertEquals(market.getStatus(), activate ? MarketStatus.ACTIVE : MarketStatus.PENDING);
         return market;
     }
 
@@ -173,7 +181,9 @@ public abstract class IntegrationTest {
 
     protected void clearState() {
         oracleRepository.deleteAll();
+        tradeRepository.deleteAll();
         orderRepository.deleteAll();
+        positionRepository.deleteAll();
         marketRepository.deleteAll();
         accountRepository.deleteAll();
         depositRepository.deleteAll();
