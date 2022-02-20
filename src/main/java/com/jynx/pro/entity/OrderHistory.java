@@ -32,6 +32,6 @@ public class OrderHistory {
     private BigDecimal fromSize;
     @Column(name = "to_size", scale = 8, precision = 18)
     private BigDecimal toSize;
-    @Column(name = "action", nullable = false)
+    @Column(name = "updated", nullable = false)
     private Long updated;
 }

@@ -62,7 +62,7 @@ public class AssetServiceTest extends IntegrationTest {
     public void testProposeToAddAndEnact() throws InterruptedException {
         Asset asset = assetService.proposeToAdd(getAddAssetRequest(takerUser));
         Assertions.assertEquals(asset.getStatus(), AssetStatus.PENDING);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -76,7 +76,7 @@ public class AssetServiceTest extends IntegrationTest {
     public void testProposeToAddAndFailToEnactWhenBelowThreshold() throws InterruptedException {
         Asset asset = assetService.proposeToAdd(getAddAssetRequest(makerUser));
         Assertions.assertEquals(asset.getStatus(), AssetStatus.PENDING);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         long original = configService.getTimestamp();
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
@@ -92,7 +92,7 @@ public class AssetServiceTest extends IntegrationTest {
     public void testProposeToAddAndFailToEnactWithoutPassingOpenTime() throws InterruptedException {
         Asset asset = assetService.proposeToAdd(getAddAssetRequest(takerUser));
         Assertions.assertEquals(asset.getStatus(), AssetStatus.PENDING);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         proposalService.open();
         proposalService.approve();
         proposalService.enact();
@@ -105,7 +105,7 @@ public class AssetServiceTest extends IntegrationTest {
     public void testProposeToAddAndFailToEnactWithoutPassingEnactTime() throws InterruptedException {
         Asset asset = assetService.proposeToAdd(getAddAssetRequest(takerUser));
         Assertions.assertEquals(asset.getStatus(), AssetStatus.PENDING);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         long original = configService.getTimestamp();
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
@@ -121,7 +121,7 @@ public class AssetServiceTest extends IntegrationTest {
     public void testProposeToAddAndFailToEnactWhenRejected() throws InterruptedException {
         Asset asset = assetService.proposeToAdd(getAddAssetRequest(makerUser));
         Assertions.assertEquals(asset.getStatus(), AssetStatus.PENDING);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -165,7 +165,7 @@ public class AssetServiceTest extends IntegrationTest {
     public void testProposeToAddDuplicateAllowedWhenPreviouslyRejected() throws InterruptedException {
         Asset asset = assetService.proposeToAdd(getAddAssetRequest(makerUser));
         Assertions.assertEquals(asset.getStatus(), AssetStatus.PENDING);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -181,7 +181,7 @@ public class AssetServiceTest extends IntegrationTest {
     public void testProposeToSuspend() throws InterruptedException {
         Asset asset = assetService.proposeToAdd(getAddAssetRequest(takerUser));
         Assertions.assertEquals(asset.getStatus(), AssetStatus.PENDING);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -199,7 +199,7 @@ public class AssetServiceTest extends IntegrationTest {
         List<Proposal> proposals = proposalRepository.findByStatus(ProposalStatus.CREATED);
         Assertions.assertEquals(proposals.size(), 1);
         Assertions.assertEquals(proposals.get(0).getLinkedId(), asset.getId());
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -213,7 +213,7 @@ public class AssetServiceTest extends IntegrationTest {
     public void testProposeToSuspendFailWhenNotActive() throws InterruptedException {
         Asset asset = assetService.proposeToAdd(getAddAssetRequest(takerUser));
         Assertions.assertEquals(asset.getStatus(), AssetStatus.PENDING);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         proposalService.open();
         proposalService.approve();
         proposalService.enact();
@@ -238,7 +238,7 @@ public class AssetServiceTest extends IntegrationTest {
     public void testProposeToUnsuspend() throws InterruptedException {
         Asset asset = assetService.proposeToAdd(getAddAssetRequest(takerUser));
         Assertions.assertEquals(asset.getStatus(), AssetStatus.PENDING);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -256,7 +256,7 @@ public class AssetServiceTest extends IntegrationTest {
         List<Proposal> proposals = proposalRepository.findByStatus(ProposalStatus.CREATED);
         Assertions.assertEquals(proposals.size(), 1);
         Assertions.assertEquals(proposals.get(0).getLinkedId(), asset.getId());
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -273,7 +273,7 @@ public class AssetServiceTest extends IntegrationTest {
         proposals = proposalRepository.findByStatus(ProposalStatus.CREATED);
         Assertions.assertEquals(proposals.size(), 1);
         Assertions.assertEquals(proposals.get(0).getLinkedId(), asset.getId());
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -287,7 +287,7 @@ public class AssetServiceTest extends IntegrationTest {
     public void testProposeToUnsuspendFailWhenNotActive() throws InterruptedException {
         Asset asset = assetService.proposeToAdd(getAddAssetRequest(takerUser));
         Assertions.assertEquals(asset.getStatus(), AssetStatus.PENDING);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         proposalService.open();
         proposalService.approve();
         proposalService.enact();

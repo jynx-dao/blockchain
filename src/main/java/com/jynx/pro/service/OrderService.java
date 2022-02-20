@@ -352,12 +352,12 @@ public class OrderService {
     public Order create(
             final CreateOrderRequest request
     ) {
+        validateRequest(request);
         Market market = marketService.get(request.getMarketId());
         performMarginCheck(market, request.getType(), request.getSize(), request.getPrice(), request.getUser());
         if(!market.getStatus().equals(MarketStatus.ACTIVE)) {
             throw new JynxProException(ErrorCode.MARKET_NOT_ACTIVE);
         }
-        validateRequest(request);
         if(OrderType.LIMIT.equals(request.getType())) {
             return handleLimitOrder(request, market);
         } else if(OrderType.STOP_MARKET.equals(request.getType())) {
@@ -374,7 +374,7 @@ public class OrderService {
     private void validateRequest(
             final CreateOrderRequest request
     ) {
-        if(request.getType().equals(OrderType.MARKET)) {
+        if(OrderType.MARKET.equals(request.getType())) {
             request.setPrice(null);
             request.setPostOnly(null);
             request.setReduceOnly(null);
@@ -528,10 +528,9 @@ public class OrderService {
             BigDecimal midPrice = getMidPrice(market);
             BigDecimal notionalSize = midPrice.multiply(size);
             return notionalSize.multiply(market.getInitialMargin());
-        } else if(OrderType.STOP_MARKET.equals(type)) {
+        } else {
             return BigDecimal.ZERO;
         }
-        throw new JynxProException(ErrorCode.INVALID_ORDER_TYPE);
     }
 
     /**

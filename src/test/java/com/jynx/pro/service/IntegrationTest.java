@@ -74,10 +74,13 @@ public abstract class IntegrationTest {
     protected static final String PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
     private static final String GANACHE_CMD = String
             .format("ganache-cli --gasLimit 100000000 --account=\"%s,1000000000000000000000\"", PRIVATE_KEY);
+    // TODO - speed up tests by persisting Ganache across all tests in a single class
     @Container
-    public GenericContainer ganache = new GenericContainer(DockerImageName.parse("trufflesuite/ganache-cli:latest"))
+    public static GenericContainer ganache = new GenericContainer(DockerImageName.parse("trufflesuite/ganache-cli:latest"))
             .withExposedPorts(8545)
             .withCommand(GANACHE_CMD);
+
+    protected boolean setupComplete = false;
 
     protected User takerUser;
     protected User makerUser;
@@ -87,7 +90,7 @@ public abstract class IntegrationTest {
     ) throws InterruptedException {
         Asset asset = assetService.proposeToAdd(getAddAssetRequest(takerUser));
         Assertions.assertEquals(asset.getStatus(), AssetStatus.PENDING);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         if(activate) {
             configService.setTimestamp(nowAsMillis());
         }
@@ -115,7 +118,7 @@ public abstract class IntegrationTest {
         List<Oracle> oracles = List.of(new Oracle().setType(OracleType.SIGNED_DATA).setIdentifier("price"));
         Market market = marketService.proposeToAdd(getAddMarketRequest(asset, oracles));
         Assertions.assertEquals(market.getStatus(), MarketStatus.PENDING);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         if(activate) {
             configService.setTimestamp(nowAsMillis());
         }
@@ -198,24 +201,27 @@ public abstract class IntegrationTest {
     }
 
     protected void initializeState() {
-        ethereumHelper.deploy(ganache.getHost(), ganache.getFirstMappedPort(), PRIVATE_KEY);
-        ethereumService.setRpcHost(ganache.getHost());
-        ethereumService.setRpcPort(ganache.getFirstMappedPort());
-        Config config = new Config()
-                .setId(1L)
-                .setGovernanceTokenAddress(ethereumHelper.getJynxToken().getContractAddress())
-                .setMinClosingDelay(1L)
-                .setMinEnactmentDelay(1L)
-                .setMinOpenDelay(1L)
-                .setMinProposerStake(1L)
-                .setNetworkFee(BigDecimal.valueOf(0.001))
-                .setParticipationThreshold(BigDecimal.valueOf(0.66))
-                .setUuidSeed(1L)
-                .setEthConfirmations(0)
-                .setBridgeAddress(ethereumHelper.getJynxProBridge().getContractAddress());
-        configRepository.save(config);
-        configService.setTimestamp(nowAsMillis());
-        ethereumService.initializeFilters();
+        if(!setupComplete) {
+            ethereumHelper.deploy(ganache.getHost(), ganache.getFirstMappedPort(), PRIVATE_KEY);
+            ethereumService.setRpcHost(ganache.getHost());
+            ethereumService.setRpcPort(ganache.getFirstMappedPort());
+            Config config = new Config()
+                    .setId(1L)
+                    .setGovernanceTokenAddress(ethereumHelper.getJynxToken().getContractAddress())
+                    .setMinClosingDelay(1L)
+                    .setMinEnactmentDelay(1L)
+                    .setMinOpenDelay(1L)
+                    .setMinProposerStake(1L)
+                    .setNetworkFee(BigDecimal.valueOf(0.001))
+                    .setParticipationThreshold(BigDecimal.valueOf(0.66))
+                    .setUuidSeed(1L)
+                    .setEthConfirmations(0)
+                    .setBridgeAddress(ethereumHelper.getJynxProBridge().getContractAddress());
+            configRepository.save(config);
+            configService.setTimestamp(nowAsMillis());
+            ethereumService.initializeFilters();
+            setupComplete = true;
+        }
         takerUser = new User()
                 .setId(uuidUtils.next())
                 .setPublicKey("11111111111111111111111111111111")

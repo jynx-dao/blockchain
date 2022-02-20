@@ -6,6 +6,7 @@ import com.jynx.pro.constant.OrderStatus;
 import com.jynx.pro.constant.OrderType;
 import com.jynx.pro.constant.TransactionType;
 import com.jynx.pro.entity.*;
+import com.jynx.pro.entity.Order;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.model.OrderBook;
@@ -13,10 +14,7 @@ import com.jynx.pro.model.OrderBookItem;
 import com.jynx.pro.request.CancelOrderRequest;
 import com.jynx.pro.request.CreateOrderRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -24,6 +22,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -44,6 +44,16 @@ public class OrderServiceTest extends IntegrationTest {
     @AfterEach
     public void shutdown() {
         clearState();
+    }
+
+    @BeforeAll
+    public static void setupAll() {
+        ganache.start();
+    }
+
+    @AfterAll
+    public static void shutdownAll() {
+        ganache.stop();
     }
 
     private CreateOrderRequest getCreateOrderRequest(
@@ -68,6 +78,7 @@ public class OrderServiceTest extends IntegrationTest {
             final int bids,
             final int asks
     ) throws InterruptedException {
+        long aa = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
         Market market = createAndEnactMarket(true);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         for(int i=0; i<bids; i++) {
@@ -80,7 +91,8 @@ public class OrderServiceTest extends IntegrationTest {
                     BigDecimal.valueOf(45610+i), BigDecimal.ONE, MarketSide.SELL, OrderType.LIMIT, makerUser));
             Assertions.assertEquals(sellOrder.getStatus(), OrderStatus.OPEN);
         }
-
+        long ab = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
+        log.info("Time to ab -> {}", ab-aa);
         OrderBook orderBook = orderService.getOrderBook(market);
         Assertions.assertEquals(orderBook.getAsks().size(), asks);
         Assertions.assertEquals(orderBook.getBids().size(), bids);
@@ -100,6 +112,8 @@ public class OrderServiceTest extends IntegrationTest {
             askMargin = askMargin.add(orderService
                     .getInitialMarginRequirement(market, OrderType.LIMIT, item.getSize(), item.getPrice()));
         }
+        long ac = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
+        log.info("Time to ac -> {}", ac-aa);
         BigDecimal marginBalance = bidMargin.add(askMargin);
         BigDecimal startingBalance = BigDecimal.valueOf(1000000);
         BigDecimal availableBalance = startingBalance.subtract(marginBalance);
@@ -112,6 +126,8 @@ public class OrderServiceTest extends IntegrationTest {
                 marginBalance.setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(accountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
                 startingBalance.setScale(dps, RoundingMode.HALF_UP));
+        long ad = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
+        log.info("Time to ad -> {}", ad-aa);
         return market;
     }
 
@@ -171,20 +187,11 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void createOrderFailedWithInvalidType() throws InterruptedException {
-        Market market = createAndEnactMarket(true);
-        try {
-            orderService.create(getCreateOrderRequest(market.getId(),
-                    BigDecimal.valueOf(45590), BigDecimal.valueOf(1), MarketSide.BUY, null, makerUser));
-            Assertions.fail();
-        } catch(JynxProException e) {
-            Assertions.assertEquals(e.getMessage(), ErrorCode.INVALID_ORDER_TYPE);
-        }
-    }
-
-    @Test
     public void cancelOrder() throws InterruptedException {
+        long a = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
         Market market = createOrderBook(1, 1);
+        long b = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
+        log.info("Time to b -> {}", b-a);
         List<Order> orders = orderService.getOpenLimitOrders(market);
         for(Order order : orders) {
             CancelOrderRequest request = new CancelOrderRequest();
@@ -194,6 +201,8 @@ public class OrderServiceTest extends IntegrationTest {
             Order cancelledOrder = orderRepository.findById(order.getId()).orElse(new Order());
             Assertions.assertEquals(cancelledOrder.getStatus(), OrderStatus.CANCELLED);
         }
+        long c = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
+        log.info("Time to c -> {}", c-a);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         Optional<Account> accountOptional = accountRepository
                 .findByUserAndAsset(makerUser, market.getSettlementAsset());
@@ -204,6 +213,8 @@ public class OrderServiceTest extends IntegrationTest {
                 BigDecimal.valueOf(0).setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(accountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(1000000).setScale(dps, RoundingMode.HALF_UP));
+        long d = LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
+        log.info("Time to d -> {}", d-a);
     }
 
     @Test
@@ -410,18 +421,6 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void createOrderFailsWithInvalidType() throws InterruptedException {
-        Market market = createOrderBook(1, 1);
-        try {
-            orderService.create(getCreateOrderRequest(market.getId(),
-                    null, BigDecimal.valueOf(0.5), MarketSide.BUY, null, takerUser));
-            Assertions.fail();
-        } catch(JynxProException e) {
-            Assertions.assertEquals(e.getMessage(), ErrorCode.INVALID_ORDER_TYPE);
-        }
-    }
-
-    @Test
     public void testBulkInstructions() throws InterruptedException {
         Market market = createOrderBook(1, 1);
         CreateOrderRequest createOrderRequest = getCreateOrderRequest(market.getId(), BigDecimal.valueOf(5),
@@ -459,6 +458,78 @@ public class OrderServiceTest extends IntegrationTest {
             Assertions.fail();
         } catch(JynxProException e) {
             Assertions.assertEquals(e.getMessage(), ErrorCode.MAX_BULK_EXCEEDED);
+        }
+    }
+
+    @Test
+    public void testCreateStopOrderFails() throws InterruptedException {
+        Market market = createOrderBook(1, 1);
+        try {
+            orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.ONE, BigDecimal.valueOf(1),
+                    MarketSide.SELL, OrderType.STOP_MARKET, takerUser));
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.STOP_ORDER_NOT_SUPPORTED);
+        }
+    }
+
+    @Test
+    public void testCreateOrderFailsWithMissingSize() throws InterruptedException {
+        Market market = createOrderBook(1, 1);
+        try {
+            orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.ONE, null,
+                    MarketSide.SELL, OrderType.LIMIT, takerUser));
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.ORDER_SIZE_MANDATORY);
+        }
+    }
+
+    @Test
+    public void testCreateOrderFailsWithMissingType() throws InterruptedException {
+        Market market = createOrderBook(1, 1);
+        try {
+            orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.ONE, BigDecimal.ONE,
+                    MarketSide.SELL, null, takerUser));
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.ORDER_TYPE_MANDATORY);
+        }
+    }
+
+    @Test
+    public void testCreateOrderFailsWithMissingSide() throws InterruptedException {
+        Market market = createOrderBook(1, 1);
+        try {
+            orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.ONE,
+                    MarketSide.BUY, OrderType.LIMIT, takerUser));
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.ORDER_PRICE_MANDATORY);
+        }
+    }
+
+    @Test
+    public void testCreateOrderFailsWithMissingPrice() throws InterruptedException {
+        Market market = createOrderBook(1, 1);
+        try {
+            orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.ONE, BigDecimal.ONE,
+                    null, OrderType.LIMIT, takerUser));
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.ORDER_SIDE_MANDATORY);
+        }
+    }
+
+    @Test
+    public void testCreateOrderFailsWithMissingMarket() throws InterruptedException {
+        createOrderBook(1, 1);
+        try {
+            orderService.create(getCreateOrderRequest(null, BigDecimal.ONE, BigDecimal.ONE,
+                    MarketSide.SELL, OrderType.LIMIT, takerUser));
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.ORDER_MARKET_MANDATORY);
         }
     }
 

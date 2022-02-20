@@ -92,7 +92,7 @@ public class MarketServiceTest extends IntegrationTest {
         request.setEnactmentTime(times[2]);
         request.setUser(takerUser);
         marketService.proposeToSuspend(request);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -112,7 +112,7 @@ public class MarketServiceTest extends IntegrationTest {
         request.setEnactmentTime(times[2]);
         request.setUser(takerUser);
         marketService.proposeToSuspend(request);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -121,7 +121,7 @@ public class MarketServiceTest extends IntegrationTest {
         market = marketRepository.findById(market.getId()).orElse(new Market());
         Assertions.assertEquals(market.getStatus(), MarketStatus.SUSPENDED);
         marketService.proposeToUnsuspend(request);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -145,7 +145,7 @@ public class MarketServiceTest extends IntegrationTest {
         request.setEnactmentTime(times[2]);
         request.setUser(takerUser);
         marketService.proposeToAmend(request);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -170,7 +170,7 @@ public class MarketServiceTest extends IntegrationTest {
         request.setEnactmentTime(times[2]);
         request.setUser(takerUser);
         marketService.proposeToAmend(request);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -194,7 +194,7 @@ public class MarketServiceTest extends IntegrationTest {
         request.setEnactmentTime(times[2]);
         request.setUser(takerUser);
         marketService.proposeToAmend(request);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -217,7 +217,7 @@ public class MarketServiceTest extends IntegrationTest {
         request.setEnactmentTime(times[2]);
         request.setUser(takerUser);
         marketService.proposeToAmend(request);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -241,7 +241,7 @@ public class MarketServiceTest extends IntegrationTest {
         request.setEnactmentTime(times[2]);
         request.setUser(takerUser);
         marketService.proposeToAmend(request);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -266,7 +266,7 @@ public class MarketServiceTest extends IntegrationTest {
         request.setEnactmentTime(times[2]);
         request.setUser(takerUser);
         marketService.proposeToAmend(request);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -290,7 +290,7 @@ public class MarketServiceTest extends IntegrationTest {
         request.setEnactmentTime(times[2]);
         request.setUser(takerUser);
         marketService.proposeToAmend(request);
-        Thread.sleep(3000L);
+        Thread.sleep(100L);
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
