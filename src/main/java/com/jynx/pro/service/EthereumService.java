@@ -13,7 +13,6 @@ import org.apache.commons.codec.binary.Hex;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.web3j.abi.EventEncoder;
 import org.web3j.abi.FunctionEncoder;
 import org.web3j.abi.FunctionReturnDecoder;
@@ -42,7 +41,6 @@ import java.util.Optional;
 
 @Slf4j
 @Service
-@Transactional
 public class EthereumService {
 
     @Setter
@@ -278,6 +276,25 @@ public class EthereumService {
         } catch (Exception e) {
             log.error(e.getMessage(), e);
             throw new JynxProException(ErrorCode.CANNOT_GET_SUPPLY);
+        }
+    }
+
+    /**
+     * Gets the decimal places of an ERC20 token
+     *
+     * @param contractAddress contract address
+     *
+     * @return the decimal places
+     */
+    public int decimalPlaces(
+            final String contractAddress
+    ) {
+        try {
+            ERC20Detailed erc20contract = getERC20Contract(contractAddress);
+            return erc20contract.decimals().send().intValue();
+        } catch (Exception e) {
+            log.error(e.getMessage(), e);
+            throw new JynxProException(ErrorCode.CANNOT_GET_DECIMAL_PLACES);
         }
     }
 

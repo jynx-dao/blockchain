@@ -15,7 +15,6 @@ import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -23,7 +22,6 @@ import java.util.Optional;
 
 @Slf4j
 @Service
-@Transactional
 public class AccountService {
 
     @Autowired
@@ -46,6 +44,8 @@ public class AccountService {
     private UUIDUtils uuidUtils;
     @Autowired
     private PriceUtils priceUtils;
+    @Autowired
+    private EthereumService ethereumService;
 
     public Optional<Account> get(
             final User user,
@@ -102,8 +102,9 @@ public class AccountService {
         Event event = eventService.save(user, blockNumber,
                 txHash, amount, EventType.DEPOSIT_ASSET, assetAddress);
         Asset asset = assetService.getByAddress(assetAddress);
+        int dps = ethereumService.decimalPlaces(asset.getAddress());
         Deposit deposit = new Deposit()
-                .setAmount(priceUtils.fromBigInteger(amount, asset.getDecimalPlaces()))
+                .setAmount(priceUtils.fromBigInteger(amount, dps))
                 .setId(uuidUtils.next())
                 .setAsset(asset)
                 .setStatus(DepositStatus.PENDING)

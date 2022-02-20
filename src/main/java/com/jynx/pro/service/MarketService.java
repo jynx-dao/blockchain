@@ -16,7 +16,6 @@ import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Objects;
@@ -24,7 +23,6 @@ import java.util.UUID;
 
 @Slf4j
 @Service
-@Transactional
 public class MarketService {
 
     @Autowired
@@ -245,7 +243,11 @@ public class MarketService {
             final Market market
     ) {
         market.setLastPrice(lastPrice);
-        market.setMarkPrice(orderService.getMidPrice(market));
+        try {
+            market.setMarkPrice(orderService.getMidPrice(market));
+        } catch(JynxProException e) {
+            market.setMarkPrice(lastPrice);
+        }
         positionService.updateUnrealisedProfit(market);
         market.setOpenVolume(positionService.calculateOpenVolume(market));
         marketRepository.save(market);

@@ -19,7 +19,6 @@ import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.util.Arrays;
@@ -30,7 +29,6 @@ import java.util.stream.Collectors;
 
 @Slf4j
 @Service
-@Transactional
 public class OrderService {
 
     @Autowired
@@ -229,6 +227,9 @@ public class OrderService {
             final CreateOrderRequest request,
             final Market market
     ) {
+        if(request.getPostOnly() == null) {
+            request.setPostOnly(false);
+        }
         if(request.getPostOnly()) {
             throw new JynxProException(ErrorCode.POST_ONLY_FAILED);
         }
@@ -249,7 +250,10 @@ public class OrderService {
                 .setSize(request.getSize())
                 .setRemainingSize(request.getSize())
                 .setPrice(request.getPrice());
-        // TODO - allocate margin
+        order = orderRepository.save(order);
+        // TODO - can we calculate the effective execution price for the purpose of the margin calculation??
+        BigDecimal margin = getInitialMarginRequirement(market, order.getType(), request.getSize(), request.getPrice());
+        accountService.allocateMargin(margin, request.getUser(), market.getSettlementAsset());
         return matchOrders(passiveOrders, order, market, request.getSide());
     }
 
@@ -258,7 +262,7 @@ public class OrderService {
             final Market market
     ) {
         List<Order> openLimitOrders = getOpenLimitOrders(market);
-        if(request.getSide().equals(MarketSide.BUY)) {
+        if(MarketSide.BUY.equals(request.getSide())) {
             Optional<Order> bestOffer = openLimitOrders.stream()
                     .filter(o -> o.getSide().equals(MarketSide.SELL)).min(Comparator.comparing(Order::getPrice));
             if(bestOffer.isEmpty() || request.getPrice().doubleValue() < bestOffer.get().getPrice().doubleValue()) {
@@ -266,7 +270,7 @@ public class OrderService {
             } else {
                 return handleCrossingLimitOrder(request, market);
             }
-        } else if(request.getSide().equals(MarketSide.SELL)) {
+        } else if(MarketSide.SELL.equals(request.getSide())) {
             Optional<Order> bestBid = openLimitOrders.stream()
                     .filter(o -> o.getSide().equals(MarketSide.BUY)).max(Comparator.comparing(Order::getPrice));
             if(bestBid.isEmpty() || request.getPrice().doubleValue() > bestBid.get().getPrice().doubleValue()) {
