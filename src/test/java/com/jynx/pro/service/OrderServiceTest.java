@@ -665,7 +665,7 @@ public class OrderServiceTest extends IntegrationTest {
         startingBalance = BigDecimal.valueOf(1000000);
         availableBalance = startingBalance.subtract(expectedMargin);
         Assertions.assertEquals(accountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
-                marginBalance.setScale(dps, RoundingMode.HALF_UP));
+                expectedMargin.setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(accountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
                 startingBalance.setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(accountOptional.get().getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
@@ -674,28 +674,32 @@ public class OrderServiceTest extends IntegrationTest {
 
     @Test
     public void testAmendBuyOrderChangePrice() throws InterruptedException {
-        BigDecimal expectedMargin = BigDecimal.ZERO; // TODO
+        BigDecimal expectedMargin = BigDecimal.valueOf(45100)
+                .multiply(BigDecimal.ONE).multiply(BigDecimal.valueOf(0.1));
         amendOrder(MarketSide.BUY, BigDecimal.valueOf(45600), BigDecimal.valueOf(45100),
                 BigDecimal.ONE, BigDecimal.ONE, expectedMargin);
     }
 
     @Test
     public void testAmendBuyOrderChangeSize() throws InterruptedException {
-        BigDecimal expectedMargin = BigDecimal.ZERO; // TODO
+        BigDecimal expectedMargin = BigDecimal.valueOf(45600)
+                .multiply(BigDecimal.valueOf(0.9)).multiply(BigDecimal.valueOf(0.1));
         amendOrder(MarketSide.BUY, BigDecimal.valueOf(45600), BigDecimal.valueOf(45600),
                 BigDecimal.ONE, BigDecimal.valueOf(0.9), expectedMargin);
     }
 
     @Test
     public void testAmendSellOrderChangePrice() throws InterruptedException {
-        BigDecimal expectedMargin = BigDecimal.ZERO; // TODO
+        BigDecimal expectedMargin = BigDecimal.valueOf(46500)
+                .multiply(BigDecimal.ONE).multiply(BigDecimal.valueOf(0.1));
         amendOrder(MarketSide.SELL, BigDecimal.valueOf(45600), BigDecimal.valueOf(46500),
                 BigDecimal.ONE, null, expectedMargin);
     }
 
     @Test
     public void testAmendSellOrderChangeSize() throws InterruptedException {
-        BigDecimal expectedMargin = BigDecimal.ZERO; // TODO
+        BigDecimal expectedMargin = BigDecimal.valueOf(45600)
+                .multiply(BigDecimal.valueOf(1.1)).multiply(BigDecimal.valueOf(0.1));
         amendOrder(MarketSide.SELL, BigDecimal.valueOf(45600), null,
                 BigDecimal.ONE, BigDecimal.valueOf(1.1), expectedMargin);
     }
