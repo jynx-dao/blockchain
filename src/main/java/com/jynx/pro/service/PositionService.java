@@ -40,6 +40,8 @@ public class PositionService {
     @Autowired
     private TransactionRepository transactionRepository;
     @Autowired
+    private ConfigService configService;
+    @Autowired
     private UUIDUtils uuidUtils;
 
     /**
@@ -138,6 +140,7 @@ public class PositionService {
             position.setAverageEntryPrice(BigDecimal.ZERO);
             position.setLeverage(BigDecimal.ZERO);
             position.setLiquidationPrice(BigDecimal.ZERO);
+            position.setLatestMarkPrice(BigDecimal.ZERO);
         }
         positionRepository.save(position);
     }
@@ -250,13 +253,14 @@ public class PositionService {
             BigDecimal liquidationPrice = BigDecimal.ZERO;
             if(leverage.doubleValue() > 0) {
                 BigDecimal effectiveMargin = BigDecimal.ONE.divide(leverage, dps, RoundingMode.HALF_UP)
-                        .multiply(BigDecimal.valueOf(0.9));
+                        .multiply(BigDecimal.valueOf(0.8));
                 liquidationPrice = position.getSide().equals(MarketSide.BUY) ?
-                        (BigDecimal.ONE.subtract(effectiveMargin)).multiply(market.getMarkPrice()) :
-                        (BigDecimal.ONE.add(effectiveMargin)).multiply(market.getMarkPrice());
+                        (BigDecimal.ONE.subtract(effectiveMargin)).multiply(position.getAverageEntryPrice()) :
+                        (BigDecimal.ONE.add(effectiveMargin)).multiply(position.getAverageEntryPrice());
             }
             position.setLeverage(leverage);
             position.setLiquidationPrice(liquidationPrice);
+            position.setLatestMarkPrice(market.getMarkPrice());
             accountService.allocateMargin(margin, position.getUser(), market.getSettlementAsset());
         }
         positionRepository.saveAll(positions);
@@ -313,8 +317,16 @@ public class PositionService {
                 orderService.create(createOrderRequest);
                 Account account = accountService.getAndCreate(
                         position.getUser(), position.getMarket().getSettlementAsset());
+                // TODO - the insurance fund credit/debit needs to be added to the settlement transactions
                 if(account.getBalance().doubleValue() > 0) {
                     market.setInsuranceFund(market.getInsuranceFund().add(account.getBalance()));
+                    Transaction transaction = new Transaction()
+                            .setTimestamp(configService.getTimestamp())
+                            .setAsset(position.getMarket().getSettlementAsset())
+                            .setAmount(account.getBalance().multiply(BigDecimal.valueOf(-1)))
+                            .setType(TransactionType.LIQUIDATION_DEBIT)
+                            .setUser(position.getUser());
+                    transactionRepository.save(transaction);
                     account.setBalance(BigDecimal.ZERO);
                     account.setAvailableBalance(BigDecimal.ZERO);
                     account.setMarginBalance(BigDecimal.ZERO);
@@ -322,11 +334,26 @@ public class PositionService {
                     marketRepository.save(market);
                 } else if(account.getBalance().doubleValue() < 0) {
                     if(market.getInsuranceFund().doubleValue() < account.getBalance().abs().doubleValue()) {
-                        BigDecimal lossToSocialize = account.getBalance().abs().subtract(market.getInsuranceFund());
+                        BigDecimal insuranceFund = market.getInsuranceFund();
+                        BigDecimal lossToSocialize = account.getBalance().abs().subtract(insuranceFund);
                         market.setInsuranceFund(BigDecimal.ZERO);
                         socializeLosses(winningPositions, lossToSocialize);
+                        Transaction transaction = new Transaction()
+                                .setTimestamp(configService.getTimestamp())
+                                .setAsset(position.getMarket().getSettlementAsset())
+                                .setAmount(insuranceFund.add(lossToSocialize))
+                                .setType(TransactionType.LIQUIDATION_CREDIT)
+                                .setUser(position.getUser());
+                        transactionRepository.save(transaction);
                     } else {
                         market.setInsuranceFund(market.getInsuranceFund().subtract(account.getBalance().abs()));
+                        Transaction transaction = new Transaction()
+                                .setTimestamp(configService.getTimestamp())
+                                .setAsset(position.getMarket().getSettlementAsset())
+                                .setAmount(account.getBalance().multiply(BigDecimal.valueOf(-1)))
+                                .setType(TransactionType.LIQUIDATION_CREDIT)
+                                .setUser(position.getUser());
+                        transactionRepository.save(transaction);
                     }
                     account.setBalance(BigDecimal.ZERO);
                     account.setAvailableBalance(BigDecimal.ZERO);
@@ -348,32 +375,47 @@ public class PositionService {
             final List<Position> winningPositions,
             final BigDecimal lossToSocialize
     ) {
+        double lossThreshold = 0.0001d;
         BigDecimal remainingLoss = lossToSocialize;
-        for(Position position : winningPositions) {
-            BigDecimal orderSize = position.getSize().doubleValue() >= remainingLoss.doubleValue() ?
-                    remainingLoss : position.getSize();
-            remainingLoss = remainingLoss.subtract(orderSize);
-            CreateOrderRequest createOrderRequest = new CreateOrderRequest();
-            createOrderRequest.setUser(position.getUser());
-            createOrderRequest.setType(OrderType.MARKET);
-            createOrderRequest.setMarketId(position.getMarket().getId());
-            createOrderRequest.setSide(orderService.getOtherSide(position.getSide()));
-            createOrderRequest.setSize(orderSize);
-            // TODO - this should be tagged as a loss-socialization
-            orderService.create(createOrderRequest);
-            Transaction transaction = transactionRepository.findByUserAndAsset(
-                            position.getUser(), position.getMarket().getSettlementAsset())
-                    .stream()
-                    .filter(t -> t.getType().equals(TransactionType.SETTLEMENT))
-                    .max(Comparator.comparing(Transaction::getTimestamp))
-                    .orElseThrow(() -> new JynxProException(ErrorCode.FATAL_ERROR));
-            Account account = accountService.getAndCreate(
-                    position.getUser(), position.getMarket().getSettlementAsset());
-            account.setBalance(account.getBalance().subtract(transaction.getAmount()));
-            account.setAvailableBalance(account.getAvailableBalance().subtract(transaction.getAmount()));
-            accountRepository.save(account);
-            if(remainingLoss.doubleValue() == 0d) {
-                break;
+        while(remainingLoss.doubleValue() > lossThreshold) {
+            for (Position position : winningPositions) {
+                int dps = position.getMarket().getSettlementAsset().getDecimalPlaces();
+                BigDecimal positionRatio = remainingLoss.divide(position.getUnrealisedPnl(), dps, RoundingMode.HALF_UP);
+                BigDecimal lossSocializationSize = position.getSize().multiply(positionRatio);
+                BigDecimal orderSize = position.getSize().doubleValue() >= lossSocializationSize.doubleValue() ?
+                        lossSocializationSize : position.getSize();
+                CreateOrderRequest createOrderRequest = new CreateOrderRequest();
+                createOrderRequest.setUser(position.getUser());
+                createOrderRequest.setType(OrderType.MARKET);
+                createOrderRequest.setMarketId(position.getMarket().getId());
+                createOrderRequest.setSide(orderService.getOtherSide(position.getSide()));
+                createOrderRequest.setSize(orderSize);
+                // TODO - this should be tagged as a loss-socialization
+                orderService.create(createOrderRequest);
+                Transaction latestTx = transactionRepository.findByUserAndAsset(
+                                position.getUser(), position.getMarket().getSettlementAsset())
+                        .stream()
+                        .filter(t -> t.getType().equals(TransactionType.SETTLEMENT))
+                        .max(Comparator.comparing(Transaction::getId))
+                        .orElseThrow(() -> new JynxProException(ErrorCode.FATAL_ERROR));
+                remainingLoss = remainingLoss.subtract(latestTx.getAmount());
+                BigDecimal amountToDebit = remainingLoss.doubleValue() > 0 ?
+                        latestTx.getAmount() : latestTx.getAmount().add(remainingLoss);
+                Transaction transaction = new Transaction()
+                        .setTimestamp(configService.getTimestamp())
+                        .setAsset(position.getMarket().getSettlementAsset())
+                        .setAmount(amountToDebit.multiply(BigDecimal.valueOf(-1)))
+                        .setType(TransactionType.LOSS_SOCIALIZATION)
+                        .setUser(position.getUser());
+                transactionRepository.save(transaction);
+                Account account = accountService.getAndCreate(
+                        position.getUser(), position.getMarket().getSettlementAsset());
+                account.setBalance(account.getBalance().subtract(amountToDebit));
+                account.setAvailableBalance(account.getAvailableBalance().subtract(amountToDebit));
+                accountRepository.save(account);
+                if (remainingLoss.doubleValue() <= lossThreshold) {
+                    break;
+                }
             }
         }
     }

@@ -109,7 +109,6 @@ public class AccountService {
         account.setBalance(account.getBalance().add(deposit.getAmount()));
         account.setAvailableBalance(account.getAvailableBalance().add(deposit.getAmount()));
         Transaction transaction = new Transaction()
-                .setId(uuidUtils.next())
                 .setType(TransactionType.DEPOSIT)
                 .setAmount(deposit.getAmount())
                 .setUser(deposit.getUser())
@@ -143,14 +142,12 @@ public class AccountService {
         accountRepository.save(makerAccount);
         assetRepository.save(market.getSettlementAsset());
         Transaction takerTx = new Transaction()
-                .setId(uuidUtils.next())
                 .setType(TransactionType.FEE)
                 .setAmount(takerAmount.multiply(BigDecimal.valueOf(-1)))
                 .setUser(taker)
                 .setAsset(market.getSettlementAsset())
                 .setTimestamp(configService.getTimestamp());
         Transaction makerTx = new Transaction()
-                .setId(uuidUtils.next())
                 .setType(TransactionType.FEE)
                 .setAmount(makerAmount)
                 .setUser(maker)
@@ -163,15 +160,12 @@ public class AccountService {
     public void bookProfit(
             final User user,
             final Market market,
-            final BigDecimal realisedProfit
+            BigDecimal realisedProfit
     ) {
         Account account = getAndCreate(user, market.getSettlementAsset());
         account.setBalance(account.getBalance().add(realisedProfit));
-        account.setAvailableBalance(account.getAvailableBalance().add(realisedProfit));
-        account.setMarginBalance(account.getMarginBalance().subtract(realisedProfit));
         accountRepository.save(account);
         Transaction tx = new Transaction()
-                .setId(uuidUtils.next())
                 .setType(TransactionType.SETTLEMENT)
                 .setAmount(realisedProfit)
                 .setUser(user)

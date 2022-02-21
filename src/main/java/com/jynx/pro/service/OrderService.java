@@ -89,10 +89,10 @@ public class OrderService {
     ) {
         List<Order> orders = getOpenLimitOrders(market).stream()
                 .filter(o -> o.getSide().equals(side))
-                .sorted(Comparator.comparing(Order::getPrice).thenComparing(Order::getUpdated))
+                .sorted(Comparator.comparing(Order::getPrice).thenComparing(Order::getUpdated)) // TODO - timestamp won't work within a single block !!
                 .collect(Collectors.toList());
         if(side.equals(MarketSide.BUY)) {
-            orders.sort(Comparator.comparing(Order::getPrice).reversed().thenComparing(Order::getUpdated));
+            orders.sort(Comparator.comparing(Order::getPrice).reversed().thenComparing(Order::getUpdated)); // TODO - timestamp won't work within a single block !!
         }
         return orders;
     }
@@ -580,7 +580,9 @@ public class OrderService {
             sellInitialMargin = sellInitialMargin.add(newInitialMargin);
         }
         BigDecimal initialMargin = buyInitialMargin.max(sellInitialMargin);
+        // TODO - initial margin should be deducted from unrealised PNL component
         BigDecimal unrealisedProfitMargin = position.getUnrealisedPnl().min(BigDecimal.ZERO).abs();
+        unrealisedProfitMargin = unrealisedProfitMargin.subtract(maintenanceMargin).max(BigDecimal.ZERO);
         return initialMargin.add(maintenanceMargin).add(unrealisedProfitMargin);
     }
 
@@ -663,6 +665,7 @@ public class OrderService {
             final BigDecimal price,
             final User user
     ) {
+        positionService.getAndCreate(user, market);
         Account account = accountService.getAndCreate(user, market.getSettlementAsset());
         BigDecimal margin = getMarginRequirementWithNewOrder(market, side, size, price, user);
         if(account.getBalance().doubleValue() < margin.doubleValue()) {

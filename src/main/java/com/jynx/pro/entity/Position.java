@@ -40,4 +40,6 @@ public class Position {
     private BigDecimal unrealisedPnl;
     @Column(name = "leverage", nullable = false, scale = 8, precision = 18)
     private BigDecimal leverage = BigDecimal.ZERO;
+    @Column(name = "latest_mark_price", nullable = false, scale = 8, precision = 18)
+    private BigDecimal latestMarkPrice = BigDecimal.ZERO;
 }

@@ -135,7 +135,7 @@ public class MarketServiceTest extends IntegrationTest {
     public void testAmendInitialMargin() throws InterruptedException {
         Market market = createAndEnactMarket(true);
         Assertions.assertEquals(market.getInitialMargin().setScale(2, RoundingMode.HALF_UP),
-                BigDecimal.valueOf(0.1).setScale(2, RoundingMode.HALF_UP));
+                BigDecimal.valueOf(0.01).setScale(2, RoundingMode.HALF_UP));
         long[] times = proposalTimes();
         AmendMarketRequest request = new AmendMarketRequest()
                 .setId(market.getId())
@@ -160,7 +160,7 @@ public class MarketServiceTest extends IntegrationTest {
     public void testAmendMaintenanceMargin() throws InterruptedException {
         Market market = createAndEnactMarket(true);
         Assertions.assertEquals(market.getMaintenanceMargin().setScale(2, RoundingMode.HALF_UP),
-                BigDecimal.valueOf(0.15).setScale(2, RoundingMode.HALF_UP));
+                BigDecimal.valueOf(0.01).setScale(2, RoundingMode.HALF_UP));
         long[] times = proposalTimes();
         AmendMarketRequest request = new AmendMarketRequest()
                 .setId(market.getId())

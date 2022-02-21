@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import java.util.List;
 import java.util.UUID;
 
-public interface TradeRepository extends JpaRepository<Trade, UUID> {
+public interface TradeRepository extends JpaRepository<Trade, Long> {
     List<Trade> findByMakerOrderUserAndMarket(User user, Market market);
     List<Trade> findByTakerOrderUserAndMarket(User user, Market market);
 }

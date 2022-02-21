@@ -75,18 +75,19 @@ public class OrderServiceTest extends IntegrationTest {
 
     private Market createOrderBook(
             final int bids,
-            final int asks
+            final int asks,
+            final int stepSize
     ) throws InterruptedException {
         Market market = createAndEnactMarket(true);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         for(int i=0; i<bids; i++) {
             Order buyOrder = orderService.create(getCreateOrderRequest(market.getId(),
-                    BigDecimal.valueOf(45590-i), BigDecimal.ONE, MarketSide.BUY, OrderType.LIMIT, makerUser));
+                    BigDecimal.valueOf(45590-((long) i * stepSize)), BigDecimal.ONE, MarketSide.BUY, OrderType.LIMIT, makerUser));
             Assertions.assertEquals(buyOrder.getStatus(), OrderStatus.OPEN);
         }
         for(int i=0; i<asks; i++) {
             Order sellOrder = orderService.create(getCreateOrderRequest(market.getId(),
-                    BigDecimal.valueOf(45610+i), BigDecimal.ONE, MarketSide.SELL, OrderType.LIMIT, makerUser));
+                    BigDecimal.valueOf(45610+((long) i * stepSize)), BigDecimal.ONE, MarketSide.SELL, OrderType.LIMIT, makerUser));
             Assertions.assertEquals(sellOrder.getStatus(), OrderStatus.OPEN);
         }
         OrderBook orderBook = orderService.getOrderBook(market);
@@ -96,7 +97,7 @@ public class OrderServiceTest extends IntegrationTest {
         for(int i=0; i<bids; i++) {
             OrderBookItem item = orderBook.getBids().get(i);
             Assertions.assertEquals(item.getPrice().setScale(dps, RoundingMode.HALF_UP),
-                    BigDecimal.valueOf(45590-i).setScale(dps, RoundingMode.HALF_UP));
+                    BigDecimal.valueOf(45590-((long) i * stepSize)).setScale(dps, RoundingMode.HALF_UP));
             marginBalance = marginBalance.add(item.getPrice().multiply(item.getSize())
                     .multiply(market.getInitialMargin()));
         }
@@ -106,11 +107,11 @@ public class OrderServiceTest extends IntegrationTest {
             }
             OrderBookItem item = orderBook.getAsks().get(i);
             Assertions.assertEquals(item.getPrice().setScale(dps, RoundingMode.HALF_UP),
-                    BigDecimal.valueOf(45610+i).setScale(dps, RoundingMode.HALF_UP));
+                    BigDecimal.valueOf(45610+((long) i * stepSize)).setScale(dps, RoundingMode.HALF_UP));
             marginBalance = marginBalance.add(item.getPrice().multiply(item.getSize())
                     .multiply(market.getInitialMargin()));
         }
-        BigDecimal startingBalance = BigDecimal.valueOf(1000000);
+        BigDecimal startingBalance = BigDecimal.valueOf(INITIAL_BALANCE);
         BigDecimal availableBalance = startingBalance.subtract(marginBalance);
         Optional<Account> accountOptional = accountRepository
                 .findByUserAndAsset(makerUser, market.getSettlementAsset());
@@ -124,6 +125,13 @@ public class OrderServiceTest extends IntegrationTest {
         return market;
     }
 
+    private Market createOrderBook(
+            final int bids,
+            final int asks
+    ) throws InterruptedException {
+        return createOrderBook(bids, asks, 1);
+    }
+
     @Test
     public void createLimitOrder() throws InterruptedException {
         createOrderBook(2, 2);
@@ -134,7 +142,7 @@ public class OrderServiceTest extends IntegrationTest {
         Market market = createAndEnactMarket(true);
         try {
             orderService.create(getCreateOrderRequest(market.getId(),
-                    BigDecimal.valueOf(45590), BigDecimal.valueOf(1000), MarketSide.BUY, OrderType.LIMIT, makerUser));
+                    BigDecimal.valueOf(45590), BigDecimal.valueOf(10000000), MarketSide.BUY, OrderType.LIMIT, makerUser));
             Assertions.fail();
         } catch(JynxProException e) {
             Assertions.assertEquals(e.getMessage(), ErrorCode.INSUFFICIENT_MARGIN);
@@ -170,22 +178,20 @@ public class OrderServiceTest extends IntegrationTest {
                 .findByUserAndAsset(makerUser, market.getSettlementAsset());
         Assertions.assertTrue(accountOptional.isPresent());
         Assertions.assertEquals(accountOptional.get().getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
-                BigDecimal.valueOf(1000000).setScale(dps, RoundingMode.HALF_UP));
+                BigDecimal.valueOf(INITIAL_BALANCE).setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(accountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(0).setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(accountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
-                BigDecimal.valueOf(1000000).setScale(dps, RoundingMode.HALF_UP));
+                BigDecimal.valueOf(INITIAL_BALANCE).setScale(dps, RoundingMode.HALF_UP));
     }
 
     @Test
     public void createMarketOrderBuy() throws InterruptedException {
         Market market = createOrderBook(1, 1);
-        int dps = market.getSettlementAsset().getDecimalPlaces();
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.MARKET, takerUser));
         BigDecimal positionNotionalSize = BigDecimal.valueOf(45610).multiply(BigDecimal.valueOf(0.5));
-        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
-                .add(BigDecimal.TEN.divide(BigDecimal.valueOf(45610), dps, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(0.5).multiply(BigDecimal.valueOf(45610))));
+        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()));
         BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
                 .add((positionNotionalSize).multiply(market.getInitialMargin()));
         BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
@@ -218,13 +224,11 @@ public class OrderServiceTest extends IntegrationTest {
     @Test
     public void createCrossingLimitOrderBuy() throws InterruptedException {
         Market market = createOrderBook(3, 3);
-        int dps = market.getSettlementAsset().getDecimalPlaces();
         orderService.create(getCreateOrderRequest(market.getId(),
                 BigDecimal.valueOf(45611), BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.LIMIT, takerUser));
         BigDecimal positionNotionalSize = BigDecimal.valueOf(45610).multiply(BigDecimal.valueOf(0.5));
         BigDecimal makerSize = positionNotionalSize.add(BigDecimal.valueOf(45611).multiply(BigDecimal.valueOf(1))).add(BigDecimal.valueOf(45612).multiply(BigDecimal.valueOf(1)));
-        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
-                .add(BigDecimal.TEN.divide(BigDecimal.valueOf(45610), dps, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(0.5).multiply(BigDecimal.valueOf(45610))));
+        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()));
         BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
                 .add(makerSize.multiply(market.getInitialMargin()));
         BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
@@ -265,12 +269,9 @@ public class OrderServiceTest extends IntegrationTest {
         BigDecimal positionNotionalSize = BigDecimal.valueOf(45610.5).multiply(BigDecimal.valueOf(2));
         BigDecimal makerSize = BigDecimal.valueOf(45612).multiply(BigDecimal.valueOf(1));
         BigDecimal takerSize = BigDecimal.valueOf(45611).multiply(BigDecimal.valueOf(0.5));
-        BigDecimal gain = BigDecimal.valueOf(1).divide(BigDecimal.valueOf(45610.5), dps, RoundingMode.HALF_UP);
-        BigDecimal unrealisedProfit = gain.multiply(BigDecimal.valueOf(2).multiply(BigDecimal.valueOf(45610.5)));
         BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
                 .add(takerSize.multiply(market.getInitialMargin()));
         BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
-                .add(unrealisedProfit)
                 .add(makerSize.multiply(market.getInitialMargin()));
         BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
         BigDecimal takerFee = makerFee.multiply(BigDecimal.valueOf(-1));
@@ -371,9 +372,8 @@ public class OrderServiceTest extends IntegrationTest {
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.valueOf(3.5), MarketSide.SELL, OrderType.MARKET, takerUser));
         BigDecimal gain = BigDecimal.valueOf(12).divide(BigDecimal.valueOf(45587.5), dps, RoundingMode.HALF_UP);
-        BigDecimal unrealisedProfit = gain.multiply(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45587.5)));
         BigDecimal expectedTakerMargin = (BigDecimal.ONE.multiply(BigDecimal.valueOf(45587.5))
-                .multiply(market.getMaintenanceMargin())).add(unrealisedProfit);
+                .multiply(market.getMaintenanceMargin()));
         BigDecimal expectedMakerMargin = (BigDecimal.valueOf(0.5).multiply(BigDecimal.valueOf(45613))
                 .add(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45614))))
                 .multiply(market.getInitialMargin()).add(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45587.5)
@@ -424,13 +424,11 @@ public class OrderServiceTest extends IntegrationTest {
     @Test
     public void createMarketOrderSell() throws InterruptedException {
         Market market = createOrderBook(1, 1);
-        int dps = market.getSettlementAsset().getDecimalPlaces();
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.valueOf(0.5), MarketSide.SELL, OrderType.MARKET, takerUser));
         BigDecimal positionNotionalSize = BigDecimal.valueOf(45590).multiply(BigDecimal.valueOf(0.5));
         BigDecimal makerSize = BigDecimal.valueOf(45610).multiply(BigDecimal.valueOf(0.5));
-        BigDecimal unrealisedProfit = BigDecimal.TEN.divide(BigDecimal.valueOf(45590), dps, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(0.5).multiply(BigDecimal.valueOf(45590)));
-        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin())).add(unrealisedProfit);
+        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()));
         BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
                 .add((makerSize).multiply(market.getInitialMargin()));
         BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
@@ -463,13 +461,11 @@ public class OrderServiceTest extends IntegrationTest {
     @Test
     public void createCrossingLimitOrderSell() throws InterruptedException {
         Market market = createOrderBook(3, 3);
-        int dps = market.getSettlementAsset().getDecimalPlaces();
         orderService.create(getCreateOrderRequest(market.getId(),
                 BigDecimal.valueOf(45589), BigDecimal.valueOf(0.5), MarketSide.SELL, OrderType.LIMIT, takerUser));
         BigDecimal positionNotionalSize = BigDecimal.valueOf(45590).multiply(BigDecimal.valueOf(0.5));
         BigDecimal makerSize = BigDecimal.valueOf(45610).multiply(BigDecimal.valueOf(0.5)).add(BigDecimal.valueOf(45611).multiply(BigDecimal.valueOf(1))).add(BigDecimal.valueOf(45612).multiply(BigDecimal.valueOf(1)));
-        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
-                .add(BigDecimal.TEN.divide(BigDecimal.valueOf(45590), dps, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(0.5).multiply(BigDecimal.valueOf(45590))));
+        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()));
         BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
                 .add(makerSize.multiply(market.getInitialMargin()));
         BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
@@ -511,12 +507,9 @@ public class OrderServiceTest extends IntegrationTest {
         BigDecimal positionNotionalSize = BigDecimal.valueOf(45589.5).multiply(BigDecimal.valueOf(2));
         BigDecimal makerSize = BigDecimal.valueOf(45612).multiply(BigDecimal.valueOf(1));
         BigDecimal takerSize = BigDecimal.valueOf(45589).multiply(BigDecimal.valueOf(0.5));
-        BigDecimal gain = BigDecimal.valueOf(1).divide(BigDecimal.valueOf(45589.5), dps, RoundingMode.HALF_UP);
-        BigDecimal unrealisedProfit = gain.multiply(BigDecimal.valueOf(2).multiply(BigDecimal.valueOf(45589.5)));
         BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
                 .add(takerSize.multiply(market.getInitialMargin()));
         BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
-                .add(unrealisedProfit)
                 .add(makerSize.multiply(market.getInitialMargin()));
         BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
         BigDecimal takerFee = makerFee.multiply(BigDecimal.valueOf(-1));
@@ -789,7 +782,7 @@ public class OrderServiceTest extends IntegrationTest {
                 side, OrderType.LIMIT, takerUser));
         Optional<Account> accountOptional = accountRepository.findByUserAndAsset(takerUser, market.getSettlementAsset());
         Assertions.assertTrue(accountOptional.isPresent());
-        BigDecimal startingBalance = BigDecimal.valueOf(1000000);
+        BigDecimal startingBalance = BigDecimal.valueOf(INITIAL_BALANCE);
         BigDecimal marginBalance = order.getPrice().multiply(order.getSize()).multiply(market.getInitialMargin());
         BigDecimal availableBalance = startingBalance.subtract(marginBalance);
         Assertions.assertEquals(accountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
@@ -822,7 +815,7 @@ public class OrderServiceTest extends IntegrationTest {
             Assertions.assertEquals(order.getPrice().setScale(dps, RoundingMode.HALF_UP),
                     amendPrice.setScale(dps, RoundingMode.HALF_UP));
         }
-        startingBalance = BigDecimal.valueOf(1000000);
+        startingBalance = BigDecimal.valueOf(INITIAL_BALANCE);
         availableBalance = startingBalance.subtract(expectedMargin);
         Assertions.assertEquals(accountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
                 expectedMargin.setScale(dps, RoundingMode.HALF_UP));
@@ -835,7 +828,7 @@ public class OrderServiceTest extends IntegrationTest {
     @Test
     public void testAmendBuyOrderChangePrice() throws InterruptedException {
         BigDecimal expectedMargin = BigDecimal.valueOf(45100)
-                .multiply(BigDecimal.ONE).multiply(BigDecimal.valueOf(0.1));
+                .multiply(BigDecimal.ONE).multiply(BigDecimal.valueOf(0.01));
         amendOrder(MarketSide.BUY, BigDecimal.valueOf(45600), BigDecimal.valueOf(45100),
                 BigDecimal.ONE, BigDecimal.ONE, expectedMargin);
     }
@@ -843,7 +836,7 @@ public class OrderServiceTest extends IntegrationTest {
     @Test
     public void testAmendBuyOrderChangeSize() throws InterruptedException {
         BigDecimal expectedMargin = BigDecimal.valueOf(45600)
-                .multiply(BigDecimal.valueOf(0.9)).multiply(BigDecimal.valueOf(0.1));
+                .multiply(BigDecimal.valueOf(0.9)).multiply(BigDecimal.valueOf(0.01));
         amendOrder(MarketSide.BUY, BigDecimal.valueOf(45600), BigDecimal.valueOf(45600),
                 BigDecimal.ONE, BigDecimal.valueOf(0.9), expectedMargin);
     }
@@ -851,7 +844,7 @@ public class OrderServiceTest extends IntegrationTest {
     @Test
     public void testAmendSellOrderChangePrice() throws InterruptedException {
         BigDecimal expectedMargin = BigDecimal.valueOf(46500)
-                .multiply(BigDecimal.ONE).multiply(BigDecimal.valueOf(0.1));
+                .multiply(BigDecimal.ONE).multiply(BigDecimal.valueOf(0.01));
         amendOrder(MarketSide.SELL, BigDecimal.valueOf(45600), BigDecimal.valueOf(46500),
                 BigDecimal.ONE, null, expectedMargin);
     }
@@ -859,7 +852,7 @@ public class OrderServiceTest extends IntegrationTest {
     @Test
     public void testAmendSellOrderChangeSize() throws InterruptedException {
         BigDecimal expectedMargin = BigDecimal.valueOf(45600)
-                .multiply(BigDecimal.valueOf(1.1)).multiply(BigDecimal.valueOf(0.1));
+                .multiply(BigDecimal.valueOf(1.1)).multiply(BigDecimal.valueOf(0.01));
         amendOrder(MarketSide.SELL, BigDecimal.valueOf(45600), null,
                 BigDecimal.ONE, BigDecimal.valueOf(1.1), expectedMargin);
     }
@@ -874,7 +867,7 @@ public class OrderServiceTest extends IntegrationTest {
         amendOrderRequest.setId(order.getId());
         amendOrderRequest.setUser(takerUser);
         amendOrderRequest.setPrice(BigDecimal.valueOf(45600));
-        amendOrderRequest.setSize(BigDecimal.valueOf(1000));
+        amendOrderRequest.setSize(BigDecimal.valueOf(100000000));
         try {
             orderService.amend(amendOrderRequest);
             Assertions.fail();
@@ -883,7 +876,7 @@ public class OrderServiceTest extends IntegrationTest {
         }
         Optional<Account> accountOptional = accountRepository.findByUserAndAsset(takerUser, market.getSettlementAsset());
         Assertions.assertTrue(accountOptional.isPresent());
-        BigDecimal startingBalance = BigDecimal.valueOf(1000000);
+        BigDecimal startingBalance = BigDecimal.valueOf(INITIAL_BALANCE);
         BigDecimal marginBalance = order.getPrice().multiply(order.getSize()).multiply(market.getInitialMargin());
         BigDecimal availableBalance = startingBalance.subtract(marginBalance);
         Assertions.assertEquals(accountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
@@ -1037,6 +1030,78 @@ public class OrderServiceTest extends IntegrationTest {
         }
     }
 
+    private void testLiquidation(
+            final MarketSide side,
+            final int liquidationOffset,
+            final boolean withInsuranceFund
+    ) throws InterruptedException {
+        Market market = createOrderBook(100, 100, 15);
+        if(withInsuranceFund) {
+            market = market.setInsuranceFund(BigDecimal.valueOf(1000000));
+            market = marketRepository.save(market);
+        }
+        int dps = market.getSettlementAsset().getDecimalPlaces();
+        orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1.5),
+                side, OrderType.MARKET, degenUser));
+        Optional<Position> positionDegenOptional = positionRepository.findByUserAndMarket(degenUser, market);
+        Assertions.assertTrue(positionDegenOptional.isPresent());
+        Position positionDegen = positionDegenOptional.get();
+        BigDecimal price = side.equals(MarketSide.SELL) ? positionDegen.getLiquidationPrice().add(BigDecimal.valueOf(liquidationOffset)) :
+                positionDegen.getLiquidationPrice().subtract(BigDecimal.valueOf(liquidationOffset));
+        orderService.create(getCreateOrderRequest(market.getId(), price, BigDecimal.valueOf(400),
+                orderService.getOtherSide(side), OrderType.LIMIT, takerUser));
+        positionDegenOptional = positionRepository.findByUserAndMarket(degenUser, market);
+        Assertions.assertTrue(positionDegenOptional.isPresent());
+        positionDegen = positionDegenOptional.get();
+        Optional<Market> updatedMarketOptional = marketRepository.findById(market.getId());
+        Assertions.assertTrue(updatedMarketOptional.isPresent());
+        Market updatedMarket = updatedMarketOptional.get();
+        Optional<Account> degenAccountOptional = accountRepository.findByUserAndAsset(
+                degenUser, market.getSettlementAsset());
+        Assertions.assertTrue(degenAccountOptional.isPresent());
+        Account degenAccount = degenAccountOptional.get();
+        Assertions.assertEquals(degenAccount.getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(degenAccount.getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(degenAccount.getBalance().setScale(dps, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(dps, RoundingMode.HALF_UP));
+        List<Transaction> transactions = transactionRepository.findByUserAndAsset(
+                degenUser, market.getSettlementAsset());
+        double txSum = transactions.stream().mapToDouble(t -> t.getAmount().doubleValue()).sum();
+        List<TransactionType> txTypes = Arrays.asList(TransactionType.SETTLEMENT, TransactionType.LOSS_SOCIALIZATION,
+                TransactionType.LIQUIDATION_DEBIT, TransactionType.LIQUIDATION_CREDIT);
+        double settlementSum = transactions.stream().filter(t -> txTypes.contains(t.getType()))
+                .mapToDouble(t -> t.getAmount().doubleValue()).sum();
+        // TODO - the realised PNL on the position is wrong during liquidation events
+        // TODO - likely wrong for both sides of the trade
+        // TODO - I think we should be deriving realised PNL by summing the transactions, it'll be much cleaner
+        // TODO - realised PNL should also include fees, which will be achieved by doing [the above]
+//        Assertions.assertEquals(settlementSum, positionDegen.getRealisedPnl().doubleValue());
+        Assertions.assertEquals(Math.abs(txSum), 1000d, 0.001d);
+        // TODO - assert the market state is all okay...
+    }
+
+    @Test
+    public void testLiquidationShortPosition() throws InterruptedException {
+        testLiquidation(MarketSide.SELL, 1, false);
+    }
+
+    @Test
+    public void testLiquidationLongPosition() throws InterruptedException {
+        testLiquidation(MarketSide.BUY, 1, false);
+    }
+
+    @Test
+    public void testLiquidationShortPositionWithLossSocialization() throws InterruptedException {
+        testLiquidation(MarketSide.SELL, 100, false);
+    }
+
+    @Test
+    public void testLiquidationShortPositionWithInsuranceFund() throws InterruptedException {
+        testLiquidation(MarketSide.SELL, 100, true);
+    }
+
     private void validateMarketState(
             final UUID marketId,
             final BigDecimal size,
@@ -1121,9 +1186,9 @@ public class OrderServiceTest extends IntegrationTest {
         Assertions.assertEquals(makerTrades.size(), takerTrades.size());
         Assertions.assertEquals(makerTrades.size(), tradeCount);
         Assertions.assertEquals(makerTrades.get(0).getId(), takerTrades.get(0).getId());
-        BigDecimal takerStartingBalance = BigDecimal.valueOf(1000000).add(takerFee);
+        BigDecimal takerStartingBalance = BigDecimal.valueOf(INITIAL_BALANCE).add(takerFee);
         BigDecimal takerAvailableBalance = takerStartingBalance.subtract(expectedTakerMargin);
-        BigDecimal makerStartingBalance = BigDecimal.valueOf(1000000).add(makerFee);
+        BigDecimal makerStartingBalance = BigDecimal.valueOf(INITIAL_BALANCE).add(makerFee);
         BigDecimal makerAvailableBalance = makerStartingBalance.subtract(expectedMakerMargin);
         Optional<Account> makerAccountOptional = accountRepository.findByUserAndAsset(
                 makerUser, market.getSettlementAsset());
@@ -1170,5 +1235,6 @@ public class OrderServiceTest extends IntegrationTest {
                 takerAvailableBalance.setScale(dps, RoundingMode.HALF_DOWN));
         Assertions.assertEquals(takerAccountOptional.get().getBalance().doubleValue(),
                 takerStartingBalance.doubleValue(), 0.01d);
+        // TODO - should check that the settlement transactions sum to zero
     }
 }

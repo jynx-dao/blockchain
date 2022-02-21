@@ -6,7 +6,6 @@ import lombok.experimental.Accessors;
 
 import javax.persistence.*;
 import java.math.BigDecimal;
-import java.util.UUID;
 
 @Data
 @Entity
@@ -14,7 +13,8 @@ import java.util.UUID;
 @Accessors(chain = true)
 public class Transaction {
     @Id
-    private UUID id;
+    @GeneratedValue(strategy = GenerationType.SEQUENCE)
+    private Long id;
     @Column(name = "amount", nullable = false, scale = 8, precision = 18)
     private BigDecimal amount;
     @ManyToOne(fetch = FetchType.LAZY)

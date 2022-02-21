@@ -81,6 +81,9 @@ public abstract class IntegrationTest {
 
     protected boolean setupComplete = false;
 
+    protected static long INITIAL_BALANCE = 1000000000;
+
+    protected User degenUser;
     protected User takerUser;
     protected User makerUser;
 
@@ -100,12 +103,16 @@ public abstract class IntegrationTest {
         asset = assetRepository.findById(asset.getId()).orElse(new Asset());
         Assertions.assertEquals(asset.getStatus(), activate ? AssetStatus.ACTIVE : AssetStatus.PENDING);
         accountRepository.save(new Account().setAsset(asset).setUser(takerUser).setId(uuidUtils.next())
-                .setBalance(BigDecimal.valueOf(1000000))
-                .setAvailableBalance(BigDecimal.valueOf(1000000))
+                .setBalance(BigDecimal.valueOf(INITIAL_BALANCE))
+                .setAvailableBalance(BigDecimal.valueOf(INITIAL_BALANCE))
                 .setMarginBalance(BigDecimal.ZERO));
         accountRepository.save(new Account().setAsset(asset).setUser(makerUser).setId(uuidUtils.next())
-                .setBalance(BigDecimal.valueOf(1000000))
-                .setAvailableBalance(BigDecimal.valueOf(1000000))
+                .setBalance(BigDecimal.valueOf(INITIAL_BALANCE))
+                .setAvailableBalance(BigDecimal.valueOf(INITIAL_BALANCE))
+                .setMarginBalance(BigDecimal.ZERO));
+        accountRepository.save(new Account().setAsset(asset).setUser(degenUser).setId(uuidUtils.next())
+                .setBalance(BigDecimal.valueOf(1000))
+                .setAvailableBalance(BigDecimal.valueOf(1000))
                 .setMarginBalance(BigDecimal.ZERO));
         return asset;
     }
@@ -152,8 +159,8 @@ public abstract class IntegrationTest {
     ) {
         long[] times = proposalTimes();
         AddMarketRequest request = new AddMarketRequest();
-        request.setInitialMargin(BigDecimal.valueOf(0.1));
-        request.setMaintenanceMargin(BigDecimal.valueOf(0.15));
+        request.setInitialMargin(BigDecimal.valueOf(0.01));
+        request.setMaintenanceMargin(BigDecimal.valueOf(0.01));
         request.setName("BTC/USDT");
         request.setStepSize(1);
         request.setTickSize(1);
@@ -231,6 +238,11 @@ public abstract class IntegrationTest {
                 .setPublicKey("22222222222222222222222222222222")
                 .setUsername("test-user2");
         makerUser = userRepository.save(makerUser);
+        degenUser = new User()
+                .setId(uuidUtils.next())
+                .setPublicKey("33333333333333333333333333333333")
+                .setUsername("test-user3");
+        degenUser = userRepository.save(degenUser);
         stakeRepository.save(new Stake().setId(uuidUtils.next()).setUser(makerUser).setAmount(BigDecimal.valueOf(500000000L)));
         stakeRepository.save(new Stake().setId(uuidUtils.next()).setUser(takerUser).setAmount(BigDecimal.valueOf(700000000L)));
     }
