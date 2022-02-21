@@ -74,15 +74,17 @@ public class PositionService {
         if(position.getSide() == null) {
             position.setSide(side);
         }
+        BigDecimal originalPositionSize = position.getSize();
         int dps = market.getSettlementAsset().getDecimalPlaces();
         BigDecimal averageEntryPrice = getAverageEntryPrice(position.getAverageEntryPrice(), price,
                 position.getSize(), size, dps);
         BigDecimal sizeDelta = side.equals(position.getSide()) ? size : size.multiply(BigDecimal.valueOf(-1));
         BigDecimal realisedProfit = BigDecimal.ZERO;
         if(sizeDelta.doubleValue() < 0) {
+            averageEntryPrice = position.getAverageEntryPrice();
             BigDecimal closingSize = sizeDelta.abs().min(position.getSize()).multiply(price);
             BigDecimal gain = price.subtract(position.getAverageEntryPrice()).abs()
-                    .divide(position.getAverageEntryPrice(), 5, RoundingMode.HALF_UP);
+                    .divide(position.getAverageEntryPrice(), dps, RoundingMode.HALF_UP);
             gain = flipGain(position, gain, price);
             realisedProfit = gain.multiply(closingSize);
         }
@@ -93,10 +95,18 @@ public class PositionService {
             averageEntryPrice = price;
         }
         position.setAverageEntryPrice(averageEntryPrice);
-        position.setRealisedPnl(position.getRealisedPnl().add(realisedProfit));
-        position.setRealisedPnl(position.getUnrealisedPnl().subtract(realisedProfit));
-        accountService.bookProfit(user, market, realisedProfit);
-        // TODO - allocated margin needs to be updated too
+        if(realisedProfit.doubleValue() != 0) {
+            BigDecimal unrealisedProfitRatio = BigDecimal.ONE.subtract(sizeDelta.abs()
+                    .divide(originalPositionSize, dps, RoundingMode.HALF_UP));
+            position.setRealisedPnl(position.getRealisedPnl().add(realisedProfit));
+            position.setUnrealisedPnl(unrealisedProfitRatio.multiply(position.getUnrealisedPnl()));
+            accountService.bookProfit(user, market, realisedProfit);
+        }
+        if(position.getSize().setScale(dps, RoundingMode.HALF_UP)
+                .equals(BigDecimal.ZERO.setScale(dps, RoundingMode.HALF_UP))) {
+            position.setSide(null);
+            position.setAverageEntryPrice(BigDecimal.ZERO);
+        }
         positionRepository.save(position);
     }
 
@@ -153,9 +163,11 @@ public class PositionService {
     public void updateUnrealisedProfit(
             final Market market
     ) {
-        List<Position> positions = positionRepository.findByMarket(market).stream()
-                .filter(p -> p.getSize().doubleValue() > 0).collect(Collectors.toList());
+        List<Position> positions = positionRepository.findByMarket(market);
         for(Position position : positions) {
+            if(position.getSize().doubleValue() == 0) {
+                continue;
+            }
             BigDecimal gain = position.getAverageEntryPrice().subtract(market.getMarkPrice())
                     .divide(position.getAverageEntryPrice(),
                             market.getSettlementAsset().getDecimalPlaces(), RoundingMode.HALF_UP);
