@@ -207,9 +207,6 @@ public class OrderService {
             final Order order,
             final Market market
     ) {
-        if(passiveOrders.isEmpty()) {
-            throw new JynxProException(ErrorCode.EMPTY_ORDER_BOOK);
-        }
         int dps = market.getSettlementAsset().getDecimalPlaces();
         BigDecimal price = BigDecimal.ZERO;
         for(Order passiveOrder : passiveOrders) {
