@@ -1233,6 +1233,17 @@ public class OrderServiceTest extends IntegrationTest {
                 takerAvailableBalance.setScale(dps, RoundingMode.HALF_DOWN));
         Assertions.assertEquals(takerAccountOptional.get().getBalance().doubleValue(),
                 takerStartingBalance.doubleValue(), 0.01d);
-        // TODO - should check that the settlement transactions sum to zero
+        List<Transaction> makerSettlementTxns = transactionRepository
+                .findByUserAndAsset(makerUser, market.getSettlementAsset())
+                .stream().filter(t -> t.getType().equals(TransactionType.SETTLEMENT))
+                .collect(Collectors.toList());
+        List<Transaction> takerSettlementTxns = transactionRepository
+                .findByUserAndAsset(takerUser, market.getSettlementAsset())
+                .stream().filter(t -> t.getType().equals(TransactionType.SETTLEMENT))
+                .collect(Collectors.toList());
+        double sumTakerTxns = takerSettlementTxns.stream().mapToDouble(t -> t.getAmount().doubleValue()).sum();
+        double sumMakerTxns = makerSettlementTxns.stream().mapToDouble(t -> t.getAmount().doubleValue()).sum();
+        Assertions.assertEquals(sumTakerTxns, positionTaker.getRealisedPnl().doubleValue(), 0.0001d);
+        Assertions.assertEquals(sumMakerTxns, positionMaker.getRealisedPnl().doubleValue(), 0.0001d);
     }
 }

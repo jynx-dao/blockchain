@@ -420,4 +420,15 @@ public class PositionService {
             }
         }
     }
+
+    /**
+     * Update passive liquidity for given market
+     *
+     * @param market {@link Market}
+     */
+    public void updatePassiveLiquidity(
+            final Market market
+    ) {
+        // TODO - implement method when passive liquidity is supported
+    }
 }

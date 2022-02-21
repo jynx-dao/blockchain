@@ -239,12 +239,24 @@ public class OrderService {
         BigDecimal markPrice = getMidPrice(market);
         if(!markPrice.setScale(dps, RoundingMode.HALF_UP)
                 .equals(market.getMarkPrice().setScale(dps, RoundingMode.HALF_UP))) {
+            // TODO - how does the mark price get updated when the book moves without any trades happening??
             marketService.updateLastPrice(price, market);
+            executeStopOrders(market);
             positionService.executeLiquidations(markPrice, market);
-            // TODO - closeout distressed positions (incl. executing stop losses)
-            // TODO - update LP orders
+            positionService.updatePassiveLiquidity(market);
         }
         return takerOrder;
+    }
+
+    /**
+     * Execute all stop-loss orders
+     *
+     * @param market {@link Market}
+     */
+    private void executeStopOrders(
+            final Market market
+    ) {
+        // TODO - implement this method when stop-market orders are supported
     }
 
     /**
@@ -583,7 +595,6 @@ public class OrderService {
             sellInitialMargin = sellInitialMargin.add(newInitialMargin);
         }
         BigDecimal initialMargin = buyInitialMargin.max(sellInitialMargin);
-        // TODO - initial margin should be deducted from unrealised PNL component
         BigDecimal unrealisedProfitMargin = position.getUnrealisedPnl().min(BigDecimal.ZERO).abs();
         unrealisedProfitMargin = unrealisedProfitMargin.subtract(maintenanceMargin).max(BigDecimal.ZERO);
         return initialMargin.add(maintenanceMargin).add(unrealisedProfitMargin);
