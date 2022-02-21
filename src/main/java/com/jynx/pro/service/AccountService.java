@@ -4,8 +4,6 @@ import com.jynx.pro.constant.DepositStatus;
 import com.jynx.pro.constant.EventType;
 import com.jynx.pro.constant.TransactionType;
 import com.jynx.pro.entity.*;
-import com.jynx.pro.error.ErrorCode;
-import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.AccountRepository;
 import com.jynx.pro.repository.AssetRepository;
 import com.jynx.pro.repository.DepositRepository;
@@ -74,20 +72,10 @@ public class AccountService {
             final User user,
             final Asset asset
     ) {
-        Account account = get(user, asset).orElseThrow(() -> new JynxProException(ErrorCode.INSUFFICIENT_MARGIN));
-        account.setMarginBalance(account.getMarginBalance().add(margin));
+        Account account = getAndCreate(user, asset);
+        account.setAvailableBalance(account.getAvailableBalance().add(account.getMarginBalance()));
+        account.setMarginBalance(margin);
         account.setAvailableBalance(account.getAvailableBalance().subtract(margin));
-        accountRepository.save(account);
-    }
-
-    public void releaseMargin(
-            final BigDecimal margin,
-            final User user,
-            final Asset asset
-    ) {
-        Account account = get(user, asset).orElseThrow(() -> new JynxProException(ErrorCode.MARGIN_NOT_ALLOCATED));
-        account.setMarginBalance(account.getMarginBalance().subtract(margin));
-        account.setAvailableBalance(account.getAvailableBalance().add(margin));
         accountRepository.save(account);
     }
 

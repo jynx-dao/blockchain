@@ -243,13 +243,9 @@ public class MarketService {
             final Market market
     ) {
         market.setLastPrice(lastPrice);
-        try {
-            market.setMarkPrice(orderService.getMidPrice(market));
-        } catch(JynxProException e) {
-            market.setMarkPrice(lastPrice);
-        }
-        positionService.updateUnrealisedProfit(market);
+        market.setMarkPrice(orderService.getMidPrice(market));
         market.setOpenVolume(positionService.calculateOpenVolume(market));
         marketRepository.save(market);
+        positionService.updateUnrealisedProfit(market);
     }
 }

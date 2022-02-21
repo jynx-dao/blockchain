@@ -4,10 +4,7 @@ import com.jynx.pro.constant.MarketSide;
 import com.jynx.pro.constant.MarketStatus;
 import com.jynx.pro.constant.OrderStatus;
 import com.jynx.pro.constant.OrderType;
-import com.jynx.pro.entity.Account;
-import com.jynx.pro.entity.Market;
-import com.jynx.pro.entity.Order;
-import com.jynx.pro.entity.User;
+import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.model.OrderBook;
@@ -72,7 +69,7 @@ public class OrderService {
     ) {
         OrderBook orderBook = getOrderBook(market);
         if(orderBook.getAsks().size() == 0 || orderBook.getBids().size() == 0) {
-            throw new JynxProException(ErrorCode.EMPTY_ORDER_BOOK);
+            return market.getLastPrice();
         }
         return (orderBook.getBids().get(0).getPrice().add(orderBook.getAsks().get(0).getPrice()))
                 .multiply(BigDecimal.valueOf(0.5));
@@ -161,10 +158,10 @@ public class OrderService {
             throw new JynxProException(ErrorCode.INVALID_ORDER_STATUS);
         }
         order.setStatus(OrderStatus.CANCELLED);
-        BigDecimal margin = getInitialMarginRequirement(order.getMarket(), order.getType(),
-                order.getRemainingSize(), order.getPrice());
-        accountService.releaseMargin(margin, request.getUser(), order.getMarket().getSettlementAsset());
-        return orderRepository.save(order);
+        order = orderRepository.save(order);
+        BigDecimal margin = getMarginRequirement(order.getMarket(), order.getUser());
+        accountService.allocateMargin(margin, order.getUser(), order.getMarket().getSettlementAsset());
+        return order;
     }
 
     /**
@@ -190,7 +187,8 @@ public class OrderService {
                 .setStatus(OrderStatus.OPEN)
                 .setType(request.getType())
                 .setUpdated(configService.getTimestamp());
-        BigDecimal margin = getInitialMarginRequirement(market, order.getType(), request.getSize(), request.getPrice());
+        BigDecimal margin = getMarginRequirementWithNewOrder(market, order.getSide(), request.getSize(),
+                request.getPrice(), request.getUser());
         accountService.allocateMargin(margin, request.getUser(), market.getSettlementAsset());
         return orderRepository.save(order);
     }
@@ -209,8 +207,13 @@ public class OrderService {
             final Order order,
             final Market market
     ) {
+        if(passiveOrders.isEmpty()) {
+            throw new JynxProException(ErrorCode.EMPTY_ORDER_BOOK);
+        }
+        int dps = market.getSettlementAsset().getDecimalPlaces();
+        BigDecimal price = BigDecimal.ZERO;
         for(Order passiveOrder : passiveOrders) {
-            BigDecimal price = passiveOrder.getPrice();
+            price = passiveOrder.getPrice();
             User taker = order.getUser();
             User maker = passiveOrder.getUser();
             Order partialOrder = passiveOrder;
@@ -228,16 +231,21 @@ public class OrderService {
             tradeService.save(market, passiveOrder, order, price, size, order.getSide());
             positionService.update(market, price, size, maker, getOtherSide(order.getSide()));
             positionService.update(market, price, size, taker, order.getSide());
-            marketService.updateLastPrice(price, market);
             if(order.getRemainingSize().equals(BigDecimal.ZERO)) {
                 order.setStatus(OrderStatus.FILLED);
                 break;
             }
         }
         orderRepository.saveAll(passiveOrders);
-        // TODO - closeout distressed positions (incl. executing stop losses)
-        // TODO - update LP orders
-        return orderRepository.save(order);
+        Order takerOrder = orderRepository.save(order);
+        BigDecimal markPrice = getMidPrice(market);
+        if(!markPrice.setScale(dps, RoundingMode.HALF_UP)
+                .equals(market.getMarkPrice().setScale(dps, RoundingMode.HALF_UP))) {
+            marketService.updateLastPrice(price, market);
+            // TODO - closeout distressed positions (incl. executing stop losses)
+            // TODO - update LP orders
+        }
+        return takerOrder;
     }
 
     /**
@@ -271,7 +279,8 @@ public class OrderService {
             throw new JynxProException(ErrorCode.INSUFFICIENT_PASSIVE_VOLUME);
         }
         order = orderRepository.save(order);
-        BigDecimal margin = getInitialMarginRequirement(market, order.getType(), request.getSize(), request.getPrice());
+        BigDecimal margin = getMarginRequirementWithNewOrder(market, order.getSide(), request.getSize(),
+                request.getPrice(), request.getUser());
         accountService.allocateMargin(margin, request.getUser(), market.getSettlementAsset());
         return matchOrders(passiveOrders, order, market);
     }
@@ -305,8 +314,8 @@ public class OrderService {
                 .setPrice(request.getPrice())
                 .setUpdated(configService.getTimestamp());
         order = orderRepository.save(order);
-        // TODO - can we calculate the effective execution price for the purpose of the margin calculation??
-        BigDecimal margin = getInitialMarginRequirement(market, order.getType(), request.getSize(), request.getPrice());
+        BigDecimal margin = getMarginRequirementWithNewOrder(market, order.getSide(), request.getSize(),
+                request.getPrice(), request.getUser());
         accountService.allocateMargin(margin, request.getUser(), market.getSettlementAsset());
         return matchOrders(passiveOrders, order, market);
     }
@@ -355,7 +364,7 @@ public class OrderService {
     ) {
         validateRequest(request);
         Market market = marketService.get(request.getMarketId());
-        performMarginCheck(market, request.getType(), request.getSize(), request.getPrice(), request.getUser());
+        performMarginCheck(market, request.getSide(), request.getSize(), request.getPrice(), request.getUser());
         if(!market.getStatus().equals(MarketStatus.ACTIVE)) {
             throw new JynxProException(ErrorCode.MARKET_NOT_ACTIVE);
         }
@@ -411,7 +420,6 @@ public class OrderService {
                 .orElseThrow(() -> new JynxProException(ErrorCode.ORDER_NOT_FOUND));
         int dps = order.getMarket().getSettlementAsset().getDecimalPlaces();
         BigDecimal originalSize = order.getSize();
-        BigDecimal originalRemainingSize = order.getRemainingSize();
         BigDecimal originalPrice = order.getPrice();
         if(!order.getUser().getId().equals(request.getUser().getId())) {
             throw new JynxProException(ErrorCode.PERMISSION_DENIED);
@@ -444,19 +452,19 @@ public class OrderService {
             }
             order.setPrice(request.getPrice());
         }
-        BigDecimal marginToRelease = getInitialMarginRequirement(order.getMarket(), order.getType(),
-                originalRemainingSize, originalPrice);
-        BigDecimal marginToAllocate = getInitialMarginRequirement(order.getMarket(), order.getType(),
-                order.getRemainingSize(), order.getPrice());
-        accountService.releaseMargin(marginToRelease, order.getUser(), order.getMarket().getSettlementAsset());
-        try {
-            performMarginCheck(order.getMarket(), order.getType(), order.getSize(), order.getPrice(), order.getUser());
-            accountService.allocateMargin(marginToAllocate, order.getUser(), order.getMarket().getSettlementAsset());
-        } catch(JynxProException e) {
-            accountService.allocateMargin(marginToRelease, order.getUser(), order.getMarket().getSettlementAsset());
-            throw e;
+        if(order.getPrice().doubleValue() > originalPrice.doubleValue() ||
+                order.getRemainingSize().doubleValue() > originalSize.doubleValue()) {
+            BigDecimal deltaSize = order.getRemainingSize().subtract(originalSize).max(BigDecimal.ZERO);
+            performMarginCheck(order.getMarket(), order.getSide(), deltaSize,
+                    order.getPrice(), order.getUser());
         }
-        return orderRepository.save(order);
+        BigDecimal originalMargin = getMarginRequirement(order.getMarket(), request.getUser());
+        BigDecimal combinedMargin = getMarginRequirementWithNewOrder(order.getMarket(), order.getSide(),
+                order.getRemainingSize(), order.getPrice(), request.getUser());
+        BigDecimal newMargin = combinedMargin.subtract(originalMargin);
+        order = orderRepository.save(order);
+        accountService.allocateMargin(newMargin, order.getUser(), order.getMarket().getSettlementAsset());
+        return order;
     }
 
     /**
@@ -508,53 +516,111 @@ public class OrderService {
     }
 
     /**
-     * Get the initial margin requirement for a new {@link Order}
+     * Get the margin requirement for a {@link User}
      *
      * @param market the {@link Market}
-     * @param type the {@link OrderType}
-     * @param size the size of the order
-     * @param price the price of the order
+     * @param user the {@link User}
      *
      * @return the margin requirement
      */
-    public BigDecimal getInitialMarginRequirement(
+    public BigDecimal getMarginRequirement(
             final Market market,
-            final OrderType type,
-            final BigDecimal size,
-            final BigDecimal price
+            final User user
     ) {
-        // TODO - the margin requirement will be different if it doesn't increase exposure and trader has open position
-        if(OrderType.LIMIT.equals(type)) {
-            BigDecimal notionalSize = price.multiply(size);
-            return notionalSize.multiply(market.getInitialMargin());
-        } else if(OrderType.MARKET.equals(type)) {
-            BigDecimal midPrice = getMidPrice(market);
-            BigDecimal notionalSize = midPrice.multiply(size);
-            return notionalSize.multiply(market.getInitialMargin());
-        } else {
-            return BigDecimal.ZERO;
+        Position position = positionService.getAndCreate(user, market);
+        BigDecimal maintenanceMargin = position.getSize().multiply(position.getAverageEntryPrice())
+                .multiply(market.getMaintenanceMargin());
+        List<OrderStatus> statusList = Arrays.asList(OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED);
+        List<Order> openOrders = orderRepository.findByStatusInAndTypeAndMarketAndUser(
+                statusList, OrderType.LIMIT, market, user);
+        List<Order> buyOrders = openOrders.stream()
+                .filter(o -> o.getSide().equals(MarketSide.BUY)).collect(Collectors.toList());
+        List<Order> sellOrders = openOrders.stream()
+                .filter(o -> o.getSide().equals(MarketSide.SELL)).collect(Collectors.toList());
+        BigDecimal buyInitialMargin = BigDecimal.ZERO;
+        BigDecimal sellInitialMargin = BigDecimal.ZERO;
+        for(Order order : buyOrders) {
+            buyInitialMargin = buyInitialMargin.add(order.getPrice()
+                    .multiply(order.getSize().multiply(market.getInitialMargin())));
         }
+        for(Order order : sellOrders) {
+            sellInitialMargin = sellInitialMargin.add(order.getPrice()
+                    .multiply(order.getSize().multiply(market.getInitialMargin())));
+        }
+        BigDecimal initialMargin = buyInitialMargin.max(sellInitialMargin);
+        BigDecimal unrealisedProfitMargin = position.getUnrealisedPnl().min(BigDecimal.ZERO).abs();
+        return initialMargin.add(maintenanceMargin).add(unrealisedProfitMargin);
+    }
+
+    /**
+     * Get the margin requirement for a {@link User} when executing a new {@link Order}
+     *
+     * @param market the {@link Market}
+     * @param side the {@link MarketSide}
+     * @param size the size of the order
+     * @param price the price of the order
+     * @param user the {@link User}
+     *
+     * @return the margin requirement
+     */
+    public BigDecimal getMarginRequirementWithNewOrder(
+            final Market market,
+            final MarketSide side,
+            final BigDecimal size,
+            final BigDecimal price,
+            final User user
+    ) {
+        Position position = positionService.getAndCreate(user, market);
+        BigDecimal maintenanceMargin = position.getSize().multiply(position.getAverageEntryPrice())
+                .multiply(market.getMaintenanceMargin());
+        List<OrderStatus> statusList = Arrays.asList(OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED);
+        List<Order> openOrders = orderRepository.findByStatusInAndTypeAndMarketAndUser(
+                statusList, OrderType.LIMIT, market, user);
+        List<Order> buyOrders = openOrders.stream()
+                .filter(o -> o.getSide().equals(MarketSide.BUY)).collect(Collectors.toList());
+        List<Order> sellOrders = openOrders.stream()
+                .filter(o -> o.getSide().equals(MarketSide.SELL)).collect(Collectors.toList());
+        BigDecimal marginPrice = Objects.isNull(price) ? getMidPrice(market) : price;
+        BigDecimal newInitialMargin = marginPrice.multiply(size).multiply(market.getInitialMargin());
+        BigDecimal buyInitialMargin = BigDecimal.ZERO;
+        BigDecimal sellInitialMargin = BigDecimal.ZERO;
+        for(Order order : buyOrders) {
+            buyInitialMargin = buyInitialMargin.add(order.getPrice()
+                    .multiply(order.getSize().multiply(market.getInitialMargin())));
+        }
+        for(Order order : sellOrders) {
+            sellInitialMargin = sellInitialMargin.add(order.getPrice()
+                    .multiply(order.getSize().multiply(market.getInitialMargin())));
+        }
+        if(side.equals(MarketSide.BUY)) {
+            buyInitialMargin = buyInitialMargin.add(newInitialMargin);
+        } else {
+            sellInitialMargin = sellInitialMargin.add(newInitialMargin);
+        }
+        BigDecimal initialMargin = buyInitialMargin.max(sellInitialMargin);
+        BigDecimal unrealisedProfitMargin = position.getUnrealisedPnl().min(BigDecimal.ZERO).abs();
+        return initialMargin.add(maintenanceMargin).add(unrealisedProfitMargin);
     }
 
     /**
      * Check if a {@link User} has sufficient balance to create a new {@link Order}
      *
      * @param market the {@link Market}
-     * @param type the {@link OrderType}
+     * @param side the {@link MarketSide}
      * @param size the size of the order
      * @param price the price of the order
      * @param user the {@link User}
      */
     private void performMarginCheck(
             final Market market,
-            final OrderType type,
+            final MarketSide side,
             final BigDecimal size,
             final BigDecimal price,
             final User user
     ) {
         Account account = accountService.getAndCreate(user, market.getSettlementAsset());
-        BigDecimal margin = getInitialMarginRequirement(market, type, size, price);
-        if(account.getAvailableBalance().doubleValue() < margin.doubleValue()) {
+        BigDecimal margin = getMarginRequirementWithNewOrder(market, side, size, price, user);
+        if(account.getBalance().doubleValue() < margin.doubleValue()) {
             throw new JynxProException(ErrorCode.INSUFFICIENT_MARGIN);
         }
     }

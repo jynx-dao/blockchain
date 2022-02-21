@@ -29,7 +29,15 @@ public class PositionService {
     @Autowired
     private UUIDUtils uuidUtils;
 
-    private Position getAndCreate(
+    /**
+     * Get a {@link Position} and create one if it doesn't exist
+     *
+     * @param user the {@link User}
+     * @param market the {@link Market}
+     *
+     * @return the {@link Position}
+     */
+    public Position getAndCreate(
             final User user,
             final Market market
     ) {
@@ -142,6 +150,10 @@ public class PositionService {
                     .setScale(market.getSettlementAsset().getDecimalPlaces(), RoundingMode.HALF_UP);
             position.setUnrealisedPnl(unrealisedProfit);
         }
-        positionRepository.saveAll(positions);
+        positions = positionRepository.saveAll(positions);
+        for(Position position : positions) {
+            BigDecimal margin = orderService.getMarginRequirement(market, position.getUser());
+            accountService.allocateMargin(margin, position.getUser(), market.getSettlementAsset());
+        }
     }
 }

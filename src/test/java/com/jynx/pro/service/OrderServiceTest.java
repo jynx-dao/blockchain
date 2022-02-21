@@ -10,7 +10,6 @@ import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.model.OrderBook;
-import com.jynx.pro.model.OrderBookItem;
 import com.jynx.pro.request.AmendOrderRequest;
 import com.jynx.pro.request.CancelOrderRequest;
 import com.jynx.pro.request.CreateOrderRequest;
@@ -92,23 +91,15 @@ public class OrderServiceTest extends IntegrationTest {
         OrderBook orderBook = orderService.getOrderBook(market);
         Assertions.assertEquals(orderBook.getAsks().size(), asks);
         Assertions.assertEquals(orderBook.getBids().size(), bids);
-        BigDecimal bidMargin = BigDecimal.ZERO;
-        BigDecimal askMargin = BigDecimal.ZERO;
         for(int i=0; i<bids; i++) {
-            OrderBookItem item = orderBook.getBids().get(i);
             Assertions.assertEquals(orderBook.getBids().get(i).getPrice().setScale(dps, RoundingMode.HALF_UP),
                     BigDecimal.valueOf(45590-i).setScale(dps, RoundingMode.HALF_UP));
-            bidMargin = bidMargin.add(orderService
-                    .getInitialMarginRequirement(market, OrderType.LIMIT, item.getSize(), item.getPrice()));
         }
         for(int i=0; i<asks; i++) {
-            OrderBookItem item = orderBook.getAsks().get(i);
             Assertions.assertEquals(orderBook.getAsks().get(i).getPrice().setScale(dps, RoundingMode.HALF_UP),
                     BigDecimal.valueOf(45610+i).setScale(dps, RoundingMode.HALF_UP));
-            askMargin = askMargin.add(orderService
-                    .getInitialMarginRequirement(market, OrderType.LIMIT, item.getSize(), item.getPrice()));
         }
-        BigDecimal marginBalance = bidMargin.add(askMargin);
+        BigDecimal marginBalance = orderService.getMarginRequirement(market, makerUser);
         BigDecimal startingBalance = BigDecimal.valueOf(1000000);
         BigDecimal availableBalance = startingBalance.subtract(marginBalance);
         Optional<Account> accountOptional = accountRepository
@@ -121,32 +112,6 @@ public class OrderServiceTest extends IntegrationTest {
         Assertions.assertEquals(accountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
                 startingBalance.setScale(dps, RoundingMode.HALF_UP));
         return market;
-    }
-
-    @Test
-    public void cannotGetMidPriceWithEmptyAsk() throws InterruptedException {
-        Market market = createAndEnactMarket(true);
-        orderService.create(getCreateOrderRequest(market.getId(),
-                BigDecimal.valueOf(45590), BigDecimal.ONE, MarketSide.BUY, OrderType.LIMIT, makerUser));
-        try {
-            orderService.getMidPrice(market);
-            Assertions.fail();
-        } catch(JynxProException e) {
-            Assertions.assertEquals(e.getMessage(), ErrorCode.EMPTY_ORDER_BOOK);
-        }
-    }
-
-    @Test
-    public void cannotGetMidPriceWithEmptyBid() throws InterruptedException {
-        Market market = createAndEnactMarket(true);
-        orderService.create(getCreateOrderRequest(market.getId(),
-                BigDecimal.valueOf(45610), BigDecimal.ONE, MarketSide.SELL, OrderType.LIMIT, makerUser));
-        try {
-            orderService.getMidPrice(market);
-            Assertions.fail();
-        } catch(JynxProException e) {
-            Assertions.assertEquals(e.getMessage(), ErrorCode.EMPTY_ORDER_BOOK);
-        }
     }
 
     @Test
@@ -636,7 +601,7 @@ public class OrderServiceTest extends IntegrationTest {
                     amendPrice.setScale(dps, RoundingMode.HALF_UP));
         }
         startingBalance = BigDecimal.valueOf(1000000);
-        marginBalance = order.getPrice().multiply(order.getSize()).multiply(market.getInitialMargin());
+        marginBalance = orderService.getMarginRequirement(market, takerUser);
         availableBalance = startingBalance.subtract(marginBalance);
         Assertions.assertEquals(accountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
                 marginBalance.setScale(dps, RoundingMode.HALF_UP));
@@ -920,30 +885,8 @@ public class OrderServiceTest extends IntegrationTest {
         Assertions.assertEquals(makerTrades.size(), takerTrades.size());
         Assertions.assertEquals(makerTrades.size(), tradeCount);
         Assertions.assertEquals(makerTrades.get(0).getId(), takerTrades.get(0).getId());
-        BigDecimal takerMarginBalance = BigDecimal.ZERO;
-        BigDecimal makerMarginBalance = BigDecimal.ZERO;
-        for(int i=0; i<tradeCount; i++) {
-            Trade trade = makerTrades.get(i);
-            takerMarginBalance = takerMarginBalance.add(orderService
-                    .getInitialMarginRequirement(market, OrderType.LIMIT, trade.getSize(), midPriceAtTrade.get(0)));
-        }
-        for(int i=0; i<tradeCount; i++) {
-            Trade trade = makerTrades.get(i);
-            makerMarginBalance = makerMarginBalance.add(orderService
-                    .getInitialMarginRequirement(market, OrderType.LIMIT, trade.getSize(), trade.getPrice()));
-        }
-        List<Order> makerOrders = orderService.getOpenLimitOrders(market).stream()
-                .filter(o -> o.getUser().getId().equals(makerUser.getId())).collect(Collectors.toList());
-        List<Order> takerOrders = orderService.getOpenLimitOrders(market).stream()
-                .filter(o -> o.getUser().getId().equals(takerUser.getId())).collect(Collectors.toList());
-        for(Order order : makerOrders) {
-            makerMarginBalance = makerMarginBalance.add(orderService.getInitialMarginRequirement(
-                    market, OrderType.LIMIT, order.getRemainingSize(), order.getPrice()));
-        }
-        for(Order order : takerOrders) {
-            takerMarginBalance = takerMarginBalance.add(orderService.getInitialMarginRequirement(
-                    market, OrderType.LIMIT, order.getRemainingSize(), order.getPrice()));
-        }
+        BigDecimal makerMarginBalance = orderService.getMarginRequirement(market, makerUser);
+        BigDecimal takerMarginBalance = orderService.getMarginRequirement(market, takerUser);
         BigDecimal takerStartingBalance = BigDecimal.valueOf(1000000).add(takerFee);
         BigDecimal takerAvailableBalance = takerStartingBalance.subtract(takerMarginBalance);
         BigDecimal makerStartingBalance = BigDecimal.valueOf(1000000).add(makerFee);
@@ -965,7 +908,6 @@ public class OrderServiceTest extends IntegrationTest {
                 positionMaker.getUnrealisedPnl().setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(takerUnrealisedProfit.setScale(dps, RoundingMode.HALF_UP),
                 positionTaker.getUnrealisedPnl().setScale(dps, RoundingMode.HALF_UP));
-        // TODO - balance and availableBalance should be adjusted to account for unrealised PNL
         // TODO - need to check realised PNL is correct
         Assertions.assertEquals(makerAccountOptional.get().getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
                 makerAvailableBalance.setScale(dps, RoundingMode.HALF_UP));
