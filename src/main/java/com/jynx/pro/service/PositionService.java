@@ -119,11 +119,23 @@ public class PositionService {
             final BigDecimal price
     ) {
         if(position.getSide().equals(MarketSide.BUY) &&
-                price.doubleValue() < position.getAverageEntryPrice().doubleValue()) {
+                price.doubleValue() < position.getAverageEntryPrice().doubleValue() &&
+                gain.doubleValue() > 0) {
+            return gain.multiply(BigDecimal.valueOf(-1));
+        }
+        if(position.getSide().equals(MarketSide.BUY) &&
+                price.doubleValue() > position.getAverageEntryPrice().doubleValue() &&
+                gain.doubleValue() < 0) {
             return gain.multiply(BigDecimal.valueOf(-1));
         }
         if(position.getSide().equals(MarketSide.SELL) &&
-                price.doubleValue() > position.getAverageEntryPrice().doubleValue()) {
+                price.doubleValue() > position.getAverageEntryPrice().doubleValue() &&
+                gain.doubleValue() > 0) {
+            return gain.multiply(BigDecimal.valueOf(-1));
+        }
+        if(position.getSide().equals(MarketSide.SELL) &&
+                price.doubleValue() < position.getAverageEntryPrice().doubleValue() &&
+                gain.doubleValue() < 0) {
             return gain.multiply(BigDecimal.valueOf(-1));
         }
         return gain;

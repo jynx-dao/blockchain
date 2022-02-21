@@ -564,19 +564,10 @@ public class OrderService {
         List<Order> sellOrders = openOrders.stream()
                 .filter(o -> o.getSide().equals(MarketSide.SELL)).collect(Collectors.toList());
         BigDecimal marginPrice = Objects.isNull(price) ? getMidPrice(market) : price;
-        BigDecimal newInitialMargin = marginPrice.multiply(size).multiply(market.getInitialMargin());
-        BigDecimal buyInitialMargin = BigDecimal.ZERO;
-        BigDecimal sellInitialMargin = BigDecimal.ZERO;
-        for(Order order : buyOrders) {
-            buyInitialMargin = buyInitialMargin.add(order.getPrice()
-                    .multiply(order.getSize().multiply(market.getInitialMargin())));
-        }
-        for(Order order : sellOrders) {
-            sellInitialMargin = sellInitialMargin.add(order.getPrice()
-                    .multiply(order.getSize().multiply(market.getInitialMargin())));
-        }
-        // TODO - this still increases the margin for closing orders, we should net-off the new order size
-        //  against open volume to ensure that closing orders don't increase margin allocation
+        BigDecimal newSize = getEffectiveNewSize(position, side, size);
+        BigDecimal newInitialMargin = marginPrice.multiply(newSize).multiply(market.getInitialMargin());
+        BigDecimal buyInitialMargin = getMarginFromOpenOrders(buyOrders, position, market, MarketSide.SELL);
+        BigDecimal sellInitialMargin = getMarginFromOpenOrders(sellOrders, position, market, MarketSide.BUY);
         if(side.equals(MarketSide.BUY)) {
             buyInitialMargin = buyInitialMargin.add(newInitialMargin);
         } else {
@@ -585,6 +576,69 @@ public class OrderService {
         BigDecimal initialMargin = buyInitialMargin.max(sellInitialMargin);
         BigDecimal unrealisedProfitMargin = position.getUnrealisedPnl().min(BigDecimal.ZERO).abs();
         return initialMargin.add(maintenanceMargin).add(unrealisedProfitMargin);
+    }
+
+    /**
+     * Calculates the size to use for margin calculations on new orders after considering open volume
+     *
+     * @param position {@link Position}
+     * @param side {@link MarketSide}
+     * @param size order size
+     *
+     * @return the effective size
+     */
+    private BigDecimal getEffectiveNewSize(
+            final Position position,
+            final MarketSide side,
+            final BigDecimal size
+    ) {
+        BigDecimal newSize = size;
+        if(!Objects.isNull(position.getSide()) && position.getSide().equals(getOtherSide(side))) {
+            BigDecimal sizeDelta = position.getSize().subtract(size);
+            if(sizeDelta.doubleValue() < 0) {
+                newSize = sizeDelta.abs();
+            } else {
+                newSize = BigDecimal.ZERO;
+            }
+        }
+        return newSize;
+    }
+
+    /**
+     * Calculates the margin to hold on open orders after considering open volume
+     *
+     * @param openOrders a list of open {@link Order}s
+     * @param position {@link Position}
+     * @param market {@link Market}
+     * @param side {@link MarketSide}
+     *
+     * @return the margin to hold
+     */
+    private BigDecimal getMarginFromOpenOrders(
+            final List<Order> openOrders,
+            final Position position,
+            final Market market,
+            final MarketSide side
+    ) {
+        BigDecimal positionAllocation = position.getSize();
+        BigDecimal initialMargin = BigDecimal.ZERO;
+        for(Order order : openOrders) {
+            if(position.getSide() != null && position.getSide().equals(side) &&
+                    positionAllocation.doubleValue() > BigDecimal.ZERO.doubleValue()) {
+                if(order.getRemainingSize().doubleValue() < positionAllocation.doubleValue()) {
+                    positionAllocation = positionAllocation.subtract(order.getRemainingSize());
+                } else {
+                    BigDecimal diff = order.getRemainingSize().subtract(positionAllocation);
+                    positionAllocation = BigDecimal.ZERO;
+                    initialMargin = initialMargin.add(order.getPrice()
+                            .multiply(diff.multiply(market.getInitialMargin())));
+                }
+            } else {
+                initialMargin = initialMargin.add(order.getPrice()
+                        .multiply(order.getRemainingSize().multiply(market.getInitialMargin())));
+            }
+        }
+        return initialMargin;
     }
 
     /**
