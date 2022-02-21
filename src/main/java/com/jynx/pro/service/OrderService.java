@@ -239,6 +239,7 @@ public class OrderService {
         if(!markPrice.setScale(dps, RoundingMode.HALF_UP)
                 .equals(market.getMarkPrice().setScale(dps, RoundingMode.HALF_UP))) {
             marketService.updateLastPrice(price, market);
+            positionService.executeLiquidations(markPrice, market);
             // TODO - closeout distressed positions (incl. executing stop losses)
             // TODO - update LP orders
         }
@@ -368,6 +369,7 @@ public class OrderService {
             final CreateOrderRequest request
     ) {
         validateRequest(request);
+        // TODO - should check if an order would lead to immediate liquidation, and if so it should be rejected
         Market market = marketService.get(request.getMarketId());
         performMarginCheck(market, request.getSide(), request.getSize(), request.getPrice(), request.getUser());
         if(!market.getStatus().equals(MarketStatus.ACTIVE)) {

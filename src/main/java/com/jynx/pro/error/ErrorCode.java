@@ -24,15 +24,12 @@ public class ErrorCode {
     public static final String MARKET_NOT_ACTIVE = "This market is not active.";
     public static final String MARKET_NOT_SUSPENDED = "This market is not suspended/";
     public static final String INSUFFICIENT_MARGIN = "Insufficient margin.";
-    public static final String MARGIN_NOT_ALLOCATED = "Margin has not been allocated";
-    public static final String USER_NOT_FOUND = "The user was not found.";
     public static final String DEPOSIT_NOT_FOUND = "The deposit was not found.";
     public static final String CANNOT_ADD_ASSET = "Cannot add asset to bridge.";
     public static final String CANNOT_REMOVE_ASSET = "Cannot remove asset from bridge.";
     public static final String INSUFFICIENT_PASSIVE_VOLUME = "There is insufficient passive volume on the order book.";
     public static final String POST_ONLY_FAILED = "Order would immediately execute.";
     public static final String INVALID_TAKER_FEE = "Taker fee must be greater than maker fee.";
-    public static final String EMPTY_ORDER_BOOK = "The order book is empty on at least one side.";
     public static final String TOO_MANY_DECIMAL_PLACES = "The maximum precision is 8 decimal places.";
     public static final String CANNOT_GET_DECIMAL_PLACES = "Failed to get the decimal places for the ERC20 token.";
     public static final String CANNOT_AMEND_WOULD_EXECUTE = "Cannot amend order as would immediately execute.";
@@ -42,4 +39,5 @@ public class ErrorCode {
     public static final String ORDER_MARKET_MANDATORY = "Order market ID is mandatory.";
     public static final String ORDER_SIDE_MANDATORY = "Order side is mandatory.";
     public static final String ORDER_PRICE_MANDATORY = "Order price is mandatory when type is LIMIT.";
+    public static final String FATAL_ERROR = "Fatal error occurred.";
 }

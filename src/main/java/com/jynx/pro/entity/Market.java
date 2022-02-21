@@ -59,4 +59,6 @@ public class Market {
     private BigDecimal pendingMakerFee;
     @Column(name = "pending_taker_fee", scale = 8, precision = 18)
     private BigDecimal pendingTakerFee;
+    @Column(name = "insurance_fund", scale = 8, precision = 18)
+    private BigDecimal insuranceFund = BigDecimal.ZERO;
 }

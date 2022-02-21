@@ -1,10 +1,16 @@
 package com.jynx.pro.service;
 
 import com.jynx.pro.constant.MarketSide;
-import com.jynx.pro.entity.Market;
-import com.jynx.pro.entity.Position;
-import com.jynx.pro.entity.User;
+import com.jynx.pro.constant.OrderType;
+import com.jynx.pro.constant.TransactionType;
+import com.jynx.pro.entity.*;
+import com.jynx.pro.error.ErrorCode;
+import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.repository.AccountRepository;
+import com.jynx.pro.repository.MarketRepository;
 import com.jynx.pro.repository.PositionRepository;
+import com.jynx.pro.repository.TransactionRepository;
+import com.jynx.pro.request.CreateOrderRequest;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -12,6 +18,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -26,6 +33,12 @@ public class PositionService {
     private OrderService orderService;
     @Autowired
     private AccountService accountService;
+    @Autowired
+    private AccountRepository accountRepository;
+    @Autowired
+    private MarketRepository marketRepository;
+    @Autowired
+    private TransactionRepository transactionRepository;
     @Autowired
     private UUIDUtils uuidUtils;
 
@@ -123,6 +136,8 @@ public class PositionService {
                 .equals(BigDecimal.ZERO.setScale(dps, RoundingMode.HALF_UP))) {
             position.setSide(null);
             position.setAverageEntryPrice(BigDecimal.ZERO);
+            position.setLeverage(BigDecimal.ZERO);
+            position.setLiquidationPrice(BigDecimal.ZERO);
         }
         positionRepository.save(position);
     }
@@ -213,6 +228,7 @@ public class PositionService {
             final Market market
     ) {
         List<Position> positions = positionRepository.findByMarket(market);
+        int dps = market.getSettlementAsset().getDecimalPlaces();
         for(Position position : positions) {
             if(position.getSize().doubleValue() == 0) {
                 continue;
@@ -228,7 +244,137 @@ public class PositionService {
         positions = positionRepository.saveAll(positions);
         for(Position position : positions) {
             BigDecimal margin = orderService.getMarginRequirement(market, position.getUser());
+            Account account = accountService.getAndCreate(position.getUser(), market.getSettlementAsset());
+            BigDecimal leverage = (position.getSize().multiply(position.getAverageEntryPrice()))
+                    .divide(account.getBalance(), dps, RoundingMode.HALF_UP);
+            BigDecimal liquidationPrice = BigDecimal.ZERO;
+            if(leverage.doubleValue() > 0) {
+                BigDecimal effectiveMargin = BigDecimal.ONE.divide(leverage, dps, RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(0.9));
+                liquidationPrice = position.getSide().equals(MarketSide.BUY) ?
+                        (BigDecimal.ONE.subtract(effectiveMargin)).multiply(market.getMarkPrice()) :
+                        (BigDecimal.ONE.add(effectiveMargin)).multiply(market.getMarkPrice());
+            }
+            position.setLeverage(leverage);
+            position.setLiquidationPrice(liquidationPrice);
             accountService.allocateMargin(margin, position.getUser(), market.getSettlementAsset());
+        }
+        positionRepository.saveAll(positions);
+    }
+
+    /**
+     * Check if a position is distressed
+     *
+     * @param position {@link Position}
+     * @param markPrice the current mark price
+     *
+     * @return true / false
+     */
+    private boolean isDistressed(
+            final Position position,
+            final BigDecimal markPrice
+    ) {
+        return (position.getSide().equals(MarketSide.BUY) &&
+                markPrice.doubleValue() <= position.getLiquidationPrice().doubleValue()) ||
+                (position.getSide().equals(MarketSide.SELL) &&
+                        markPrice.doubleValue() >= position.getLiquidationPrice().doubleValue());
+    }
+
+    /**
+     * Closes distressed positions for given market
+     *
+     * @param markPrice the current mark price
+     * @param market {@link Market}
+     */
+    public void executeLiquidations(
+            final BigDecimal markPrice,
+            final Market market
+    ) {
+        List<Position> losingPositions = positionRepository.findByMarket(market).stream()
+                .filter(p -> p.getSize().doubleValue() > 0)
+                .filter(p -> p.getUnrealisedPnl().doubleValue() < 0)
+                .sorted(Comparator.comparing(Position::getLeverage).reversed().thenComparing(Position::getSize))
+                .collect(Collectors.toList());
+        List<Position> winningPositions = positionRepository.findByMarket(market).stream()
+                .filter(p -> p.getSize().doubleValue() > 0)
+                .filter(p -> p.getUnrealisedPnl().doubleValue() > 0)
+                .sorted(Comparator.comparing(Position::getLeverage).reversed()
+                        .thenComparing(Position::getUnrealisedPnl).reversed())
+                .collect(Collectors.toList());
+        for(Position position : losingPositions) {
+            if(isDistressed(position, markPrice)) {
+                CreateOrderRequest createOrderRequest = new CreateOrderRequest();
+                createOrderRequest.setUser(position.getUser());
+                createOrderRequest.setType(OrderType.MARKET);
+                createOrderRequest.setMarketId(position.getMarket().getId());
+                createOrderRequest.setSide(orderService.getOtherSide(position.getSide()));
+                createOrderRequest.setSize(position.getSize());
+                // TODO - this should be tagged as a liquidation
+                orderService.create(createOrderRequest);
+                Account account = accountService.getAndCreate(
+                        position.getUser(), position.getMarket().getSettlementAsset());
+                if(account.getBalance().doubleValue() > 0) {
+                    market.setInsuranceFund(market.getInsuranceFund().add(account.getBalance()));
+                    account.setBalance(BigDecimal.ZERO);
+                    account.setAvailableBalance(BigDecimal.ZERO);
+                    account.setMarginBalance(BigDecimal.ZERO);
+                    accountRepository.save(account);
+                    marketRepository.save(market);
+                } else if(account.getBalance().doubleValue() < 0) {
+                    if(market.getInsuranceFund().doubleValue() < account.getBalance().abs().doubleValue()) {
+                        BigDecimal lossToSocialize = account.getBalance().abs().subtract(market.getInsuranceFund());
+                        market.setInsuranceFund(BigDecimal.ZERO);
+                        socializeLosses(winningPositions, lossToSocialize);
+                    } else {
+                        market.setInsuranceFund(market.getInsuranceFund().subtract(account.getBalance().abs()));
+                    }
+                    account.setBalance(BigDecimal.ZERO);
+                    account.setAvailableBalance(BigDecimal.ZERO);
+                    account.setMarginBalance(BigDecimal.ZERO);
+                    accountRepository.save(account);
+                    marketRepository.save(market);
+                }
+            }
+        }
+    }
+
+    /**
+     * Close out winning positions to socialize the loss
+     *
+     * @param winningPositions list of {@link Position}s
+     * @param lossToSocialize loss amount to socialize
+     */
+    private void socializeLosses(
+            final List<Position> winningPositions,
+            final BigDecimal lossToSocialize
+    ) {
+        BigDecimal remainingLoss = lossToSocialize;
+        for(Position position : winningPositions) {
+            BigDecimal orderSize = position.getSize().doubleValue() >= remainingLoss.doubleValue() ?
+                    remainingLoss : position.getSize();
+            remainingLoss = remainingLoss.subtract(orderSize);
+            CreateOrderRequest createOrderRequest = new CreateOrderRequest();
+            createOrderRequest.setUser(position.getUser());
+            createOrderRequest.setType(OrderType.MARKET);
+            createOrderRequest.setMarketId(position.getMarket().getId());
+            createOrderRequest.setSide(orderService.getOtherSide(position.getSide()));
+            createOrderRequest.setSize(orderSize);
+            // TODO - this should be tagged as a loss-socialization
+            orderService.create(createOrderRequest);
+            Transaction transaction = transactionRepository.findByUserAndAsset(
+                            position.getUser(), position.getMarket().getSettlementAsset())
+                    .stream()
+                    .filter(t -> t.getType().equals(TransactionType.SETTLEMENT))
+                    .max(Comparator.comparing(Transaction::getTimestamp))
+                    .orElseThrow(() -> new JynxProException(ErrorCode.FATAL_ERROR));
+            Account account = accountService.getAndCreate(
+                    position.getUser(), position.getMarket().getSettlementAsset());
+            account.setBalance(account.getBalance().subtract(transaction.getAmount()));
+            account.setAvailableBalance(account.getAvailableBalance().subtract(transaction.getAmount()));
+            accountRepository.save(account);
+            if(remainingLoss.doubleValue() == 0d) {
+                break;
+            }
         }
     }
 }
