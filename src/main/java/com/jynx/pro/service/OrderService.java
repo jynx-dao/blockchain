@@ -560,9 +560,13 @@ public class OrderService {
         List<Order> openOrders = orderRepository.findByStatusInAndTypeAndMarketAndUser(
                 statusList, OrderType.LIMIT, market, user);
         List<Order> buyOrders = openOrders.stream()
-                .filter(o -> o.getSide().equals(MarketSide.BUY)).collect(Collectors.toList());
+                .filter(o -> o.getSide().equals(MarketSide.BUY))
+                .sorted(Comparator.comparing(Order::getPrice).reversed())
+                .collect(Collectors.toList());
         List<Order> sellOrders = openOrders.stream()
-                .filter(o -> o.getSide().equals(MarketSide.SELL)).collect(Collectors.toList());
+                .filter(o -> o.getSide().equals(MarketSide.SELL))
+                .sorted(Comparator.comparing(Order::getPrice))
+                .collect(Collectors.toList());
         BigDecimal marginPrice = Objects.isNull(price) ? getMidPrice(market) : price;
         BigDecimal newSize = getEffectiveNewSize(position, side, size);
         BigDecimal newInitialMargin = marginPrice.multiply(newSize).multiply(market.getInitialMargin());

@@ -56,6 +56,14 @@ public class PositionService {
         return positionRepository.save(position);
     }
 
+    /**
+     * Get a position by user and market
+     *
+     * @param user {@link User}
+     * @param market {@link Market}
+     *
+     * @return optional {@link Position}
+     */
     private Optional<Position> get(
             final User user,
             final Market market
@@ -63,6 +71,15 @@ public class PositionService {
         return positionRepository.findByUserAndMarket(user, market);
     }
 
+    /**
+     * Update a position after a new trade executes
+     *
+     * @param market {@link Market}
+     * @param price the price of the trade
+     * @param size the size of the trade
+     * @param user {@link User}
+     * @param side the {@link MarketSide} of the trade
+     */
     public void update(
             final Market market,
             final BigDecimal price,
@@ -110,6 +127,17 @@ public class PositionService {
         positionRepository.save(position);
     }
 
+    /**
+     * Calculate volume-weighted average price from two data-points
+     *
+     * @param price1 the first price
+     * @param price2 the second price
+     * @param size1 the first size
+     * @param size2 the second size
+     * @param dps decimal places to use
+     *
+     * @return the volume-weighted average price
+     */
     private BigDecimal getAverageEntryPrice(
             final BigDecimal price1,
             final BigDecimal price2,
@@ -123,6 +151,15 @@ public class PositionService {
         return sumProduct.divide(size1.add(size2), dps, RoundingMode.HALF_UP);
     }
 
+    /**
+     * Invert the gain if it's the wrong way around
+     *
+     * @param position {@link Position}
+     * @param gain the gain %
+     * @param price the current price
+     *
+     * @return the updated gain %
+     */
     private BigDecimal flipGain(
             final Position position,
             final BigDecimal gain,
@@ -151,6 +188,13 @@ public class PositionService {
         return gain;
     }
 
+    /**
+     * Calculate the open volume of given market
+     *
+     * @param market {@link Market}
+     *
+     * @return the open volume
+     */
     public BigDecimal calculateOpenVolume(
             final Market market
     ) {
@@ -160,6 +204,11 @@ public class PositionService {
         return BigDecimal.valueOf(positions.stream().mapToDouble(p -> p.getSize().doubleValue()).sum());
     }
 
+    /**
+     * Update the unrealised profit of open positions and refresh margin allocations
+     *
+     * @param market {@link Market}
+     */
     public void updateUnrealisedProfit(
             final Market market
     ) {

@@ -74,7 +74,6 @@ public abstract class IntegrationTest {
     protected static final String PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
     private static final String GANACHE_CMD = String
             .format("ganache-cli --gasLimit 100000000 --account=\"%s,1000000000000000000000\"", PRIVATE_KEY);
-    // TODO - speed up tests by persisting Ganache across all tests in a single class
     @Container
     public static GenericContainer ganache = new GenericContainer(DockerImageName.parse("trufflesuite/ganache-cli:latest"))
             .withExposedPorts(8545)
