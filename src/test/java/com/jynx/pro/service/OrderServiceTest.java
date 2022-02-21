@@ -188,8 +188,8 @@ public class OrderServiceTest extends IntegrationTest {
                 .add(BigDecimal.TEN.divide(BigDecimal.valueOf(45610), dps, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(0.5).multiply(BigDecimal.valueOf(45610))));
         BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
                 .add((positionNotionalSize).multiply(market.getInitialMargin()));
-        BigDecimal makerFee = BigDecimal.ZERO; // TODO
-        BigDecimal takerFee = BigDecimal.ZERO; // TODO
+        BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
+        BigDecimal takerFee = makerFee.multiply(BigDecimal.valueOf(-1));
         BigDecimal treasuryFee = BigDecimal.ZERO;
         validateMarketState(
                 market.getId(),
@@ -309,7 +309,6 @@ public class OrderServiceTest extends IntegrationTest {
 
     @Test
     public void testOpenAndClosePosition() throws InterruptedException {
-        // TODO - test market order that crosses multiple passive orders on the book
         Market market = createOrderBook(5, 5);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         orderService.create(getCreateOrderRequest(market.getId(),
