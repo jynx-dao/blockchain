@@ -1100,6 +1100,16 @@ public class OrderServiceTest extends IntegrationTest {
         testLiquidation(MarketSide.SELL, 100, true);
     }
 
+    @Test
+    public void testLiquidationLongPositionWithLossSocialization() throws InterruptedException {
+        testLiquidation(MarketSide.BUY, 100, false);
+    }
+
+    @Test
+    public void testLiquidationLongPositionWithInsuranceFund() throws InterruptedException {
+        testLiquidation(MarketSide.BUY, 100, true);
+    }
+
     private void validateMarketState(
             final UUID marketId,
             final BigDecimal size,
