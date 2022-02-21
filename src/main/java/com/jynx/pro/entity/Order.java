@@ -2,6 +2,7 @@ package com.jynx.pro.entity;
 
 import com.jynx.pro.constant.MarketSide;
 import com.jynx.pro.constant.OrderStatus;
+import com.jynx.pro.constant.OrderTag;
 import com.jynx.pro.constant.OrderType;
 import lombok.Data;
 import lombok.experimental.Accessors;
@@ -48,4 +49,7 @@ public class Order {
     private Boolean reduceOnly = false;
     @Column(name = "updated", nullable = false)
     private Long updated;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tag", nullable = false)
+    private OrderTag tag;
 }

@@ -1,10 +1,7 @@
 package com.jynx.pro.service;
 
 import com.jynx.pro.Application;
-import com.jynx.pro.constant.MarketSide;
-import com.jynx.pro.constant.OrderStatus;
-import com.jynx.pro.constant.OrderType;
-import com.jynx.pro.constant.TransactionType;
+import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.Order;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
@@ -70,6 +67,7 @@ public class OrderServiceTest extends IntegrationTest {
         request.setUser(user);
         request.setMarketId(marketId);
         request.setType(type);
+        request.setTag(OrderTag.USER_GENERATED);
         return request;
     }
 

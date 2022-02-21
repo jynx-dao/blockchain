@@ -1,6 +1,7 @@
 package com.jynx.pro.service;
 
 import com.jynx.pro.constant.MarketSide;
+import com.jynx.pro.constant.OrderTag;
 import com.jynx.pro.constant.OrderType;
 import com.jynx.pro.constant.TransactionType;
 import com.jynx.pro.entity.*;
@@ -308,12 +309,12 @@ public class PositionService {
         for(Position position : losingPositions) {
             if(isDistressed(position, markPrice)) {
                 CreateOrderRequest createOrderRequest = new CreateOrderRequest();
+                createOrderRequest.setTag(OrderTag.LIQUIDATION);
                 createOrderRequest.setUser(position.getUser());
                 createOrderRequest.setType(OrderType.MARKET);
                 createOrderRequest.setMarketId(position.getMarket().getId());
                 createOrderRequest.setSide(orderService.getOtherSide(position.getSide()));
                 createOrderRequest.setSize(position.getSize());
-                // TODO - this should be tagged as a liquidation
                 orderService.create(createOrderRequest);
                 Account account = accountService.getAndCreate(
                         position.getUser(), position.getMarket().getSettlementAsset());
@@ -385,12 +386,12 @@ public class PositionService {
                 BigDecimal orderSize = position.getSize().doubleValue() >= lossSocializationSize.doubleValue() ?
                         lossSocializationSize : position.getSize();
                 CreateOrderRequest createOrderRequest = new CreateOrderRequest();
+                createOrderRequest.setTag(OrderTag.LOSS_SOCIALIZATION);
                 createOrderRequest.setUser(position.getUser());
                 createOrderRequest.setType(OrderType.MARKET);
                 createOrderRequest.setMarketId(position.getMarket().getId());
                 createOrderRequest.setSide(orderService.getOtherSide(position.getSide()));
                 createOrderRequest.setSize(orderSize);
-                // TODO - this should be tagged as a loss-socialization
                 orderService.create(createOrderRequest);
                 Transaction latestTx = transactionRepository.findByUserAndAsset(
                                 position.getUser(), position.getMarket().getSettlementAsset())

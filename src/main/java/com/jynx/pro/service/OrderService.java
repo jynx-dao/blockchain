@@ -177,6 +177,7 @@ public class OrderService {
             final Market market
     ) {
         Order order = new Order()
+                .setTag(request.getTag())
                 .setId(uuidUtils.next())
                 .setMarket(market)
                 .setUser(request.getUser())
@@ -261,6 +262,7 @@ public class OrderService {
         List<Order> passiveOrders = getSideOfBook(market, getOtherSide(request.getSide()));
         double passiveVolume = passiveOrders.stream().mapToDouble(o -> o.getRemainingSize().doubleValue()).sum();
         Order order = new Order()
+                .setTag(request.getTag())
                 .setType(OrderType.MARKET)
                 .setSide(request.getSide())
                 .setMarket(market)
@@ -309,6 +311,7 @@ public class OrderService {
             }
         }).collect(Collectors.toList());
         Order order = new Order()
+                .setTag(request.getTag())
                 .setUser(request.getUser())
                 .setId(uuidUtils.next())
                 .setStatus(OrderStatus.OPEN)

@@ -1,6 +1,7 @@
 package com.jynx.pro.request;
 
 import com.jynx.pro.constant.MarketSide;
+import com.jynx.pro.constant.OrderTag;
 import com.jynx.pro.constant.OrderType;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -20,4 +21,5 @@ public class CreateOrderRequest extends SignedRequest {
     private MarketSide side;
     private Boolean postOnly;
     private Boolean reduceOnly;
+    private OrderTag tag;
 }
