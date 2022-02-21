@@ -282,6 +282,14 @@ public class OrderService {
         return matchOrders(passiveOrders, order, market);
     }
 
+    /**
+     * Handles limit orders that cross with the other side of the book
+     *
+     * @param request {@link CreateOrderRequest}
+     * @param market {@link Market}
+     *
+     * @return the new {@link Order}
+     */
     private Order handleCrossingLimitOrder(
             final CreateOrderRequest request,
             final Market market
@@ -524,29 +532,7 @@ public class OrderService {
             final Market market,
             final User user
     ) {
-        Position position = positionService.getAndCreate(user, market);
-        BigDecimal maintenanceMargin = position.getSize().multiply(position.getAverageEntryPrice())
-                .multiply(market.getMaintenanceMargin());
-        List<OrderStatus> statusList = Arrays.asList(OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED);
-        List<Order> openOrders = orderRepository.findByStatusInAndTypeAndMarketAndUser(
-                statusList, OrderType.LIMIT, market, user);
-        List<Order> buyOrders = openOrders.stream()
-                .filter(o -> o.getSide().equals(MarketSide.BUY)).collect(Collectors.toList());
-        List<Order> sellOrders = openOrders.stream()
-                .filter(o -> o.getSide().equals(MarketSide.SELL)).collect(Collectors.toList());
-        BigDecimal buyInitialMargin = BigDecimal.ZERO;
-        BigDecimal sellInitialMargin = BigDecimal.ZERO;
-        for(Order order : buyOrders) {
-            buyInitialMargin = buyInitialMargin.add(order.getPrice()
-                    .multiply(order.getSize().multiply(market.getInitialMargin())));
-        }
-        for(Order order : sellOrders) {
-            sellInitialMargin = sellInitialMargin.add(order.getPrice()
-                    .multiply(order.getSize().multiply(market.getInitialMargin())));
-        }
-        BigDecimal initialMargin = buyInitialMargin.max(sellInitialMargin);
-        BigDecimal unrealisedProfitMargin = position.getUnrealisedPnl().min(BigDecimal.ZERO).abs();
-        return initialMargin.add(maintenanceMargin).add(unrealisedProfitMargin);
+        return getMarginRequirementWithNewOrder(market, MarketSide.BUY, BigDecimal.ONE, BigDecimal.ZERO, user);
     }
 
     /**
@@ -589,6 +575,8 @@ public class OrderService {
             sellInitialMargin = sellInitialMargin.add(order.getPrice()
                     .multiply(order.getSize().multiply(market.getInitialMargin())));
         }
+        // TODO - this still increases the margin for closing orders, we should net-off the new order size
+        //  against open volume to ensure that closing orders don't increase margin allocation
         if(side.equals(MarketSide.BUY)) {
             buyInitialMargin = buyInitialMargin.add(newInitialMargin);
         } else {
