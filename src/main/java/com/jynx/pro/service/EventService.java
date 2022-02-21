@@ -56,7 +56,7 @@ public class EventService {
                 .setHash(txHash)
                 .setType(type)
                 .setAmount(BigDecimal.valueOf(amount.doubleValue())
-                        .divide(BigDecimal.valueOf(modifier), 4, RoundingMode.HALF_DOWN));
+                        .divide(BigDecimal.valueOf(modifier), 8, RoundingMode.HALF_DOWN));
         if(asset != null) {
             event.setAsset(asset);
         }

@@ -74,8 +74,9 @@ public class PositionService {
         if(position.getSide() == null) {
             position.setSide(side);
         }
+        int dps = market.getSettlementAsset().getDecimalPlaces();
         BigDecimal averageEntryPrice = getAverageEntryPrice(position.getAverageEntryPrice(), price,
-                position.getSize(), size);
+                position.getSize(), size, dps);
         BigDecimal sizeDelta = side.equals(position.getSide()) ? size : size.multiply(BigDecimal.valueOf(-1));
         BigDecimal realisedProfit = BigDecimal.ZERO;
         if(sizeDelta.doubleValue() < 0) {
@@ -103,12 +104,13 @@ public class PositionService {
             final BigDecimal price1,
             final BigDecimal price2,
             final BigDecimal size1,
-            final BigDecimal size2
+            final BigDecimal size2,
+            final int dps
     ) {
         BigDecimal product1 = price1.multiply(size1);
         BigDecimal product2 = price2.multiply(size2);
         BigDecimal sumProduct = product1.add(product2);
-        return sumProduct.divide(size1.add(size2), 4, RoundingMode.HALF_UP);
+        return sumProduct.divide(size1.add(size2), dps, RoundingMode.HALF_UP);
     }
 
     private BigDecimal flipGain(
