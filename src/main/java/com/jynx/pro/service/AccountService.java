@@ -31,6 +31,8 @@ public class AccountService {
     @Autowired
     private AssetRepository assetRepository;
     @Autowired
+    private PositionService positionService;
+    @Autowired
     private EventService eventService;
     @Autowired
     private UserService userService;
@@ -153,6 +155,12 @@ public class AccountService {
                 .setUser(maker)
                 .setAsset(market.getSettlementAsset())
                 .setTimestamp(configService.getTimestamp());
+        Position makerPosition = positionService.getAndCreate(maker, market);
+        Position takerPosition = positionService.getAndCreate(taker, market);
+        makerPosition.setRealisedPnl(makerPosition.getRealisedPnl().add(makerAmount));
+        takerPosition.setRealisedPnl(takerPosition.getRealisedPnl().subtract(takerAmount));
+        positionService.save(makerPosition);
+        positionService.save(takerPosition);
         transactionRepository.save(takerTx);
         transactionRepository.save(makerTx);
     }
@@ -160,10 +168,11 @@ public class AccountService {
     public void bookProfit(
             final User user,
             final Market market,
-            BigDecimal realisedProfit
+            final BigDecimal realisedProfit
     ) {
         Account account = getAndCreate(user, market.getSettlementAsset());
         account.setBalance(account.getBalance().add(realisedProfit));
+        account.setAvailableBalance(account.getAvailableBalance().add(realisedProfit));
         accountRepository.save(account);
         Transaction tx = new Transaction()
                 .setType(TransactionType.SETTLEMENT)

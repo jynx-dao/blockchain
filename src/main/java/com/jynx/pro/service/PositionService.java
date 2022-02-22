@@ -19,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -109,31 +110,33 @@ public class PositionService {
         }
         BigDecimal originalPositionSize = position.getSize();
         int dps = market.getSettlementAsset().getDecimalPlaces();
-        BigDecimal averageEntryPrice = getAverageEntryPrice(position.getAverageEntryPrice(), price,
-                position.getSize(), size, dps);
         BigDecimal sizeDelta = side.equals(position.getSide()) ? size : size.multiply(BigDecimal.valueOf(-1));
-        BigDecimal realisedProfit = BigDecimal.ZERO;
         if(sizeDelta.doubleValue() < 0) {
-            averageEntryPrice = position.getAverageEntryPrice();
-            BigDecimal closingSize = sizeDelta.abs().min(position.getSize()).multiply(price);
+            BigDecimal closingSize = sizeDelta.abs().doubleValue() < position.getSize().doubleValue() ?
+                    sizeDelta.abs() : position.getSize();
+            BigDecimal closingNotionalSize = closingSize.multiply(price);
             BigDecimal gain = price.subtract(position.getAverageEntryPrice()).abs()
                     .divide(position.getAverageEntryPrice(), dps, RoundingMode.HALF_UP);
             gain = flipGain(position, gain, price);
-            realisedProfit = gain.multiply(closingSize);
-        }
-        position.setSize(position.getSize().add(sizeDelta));
-        if(position.getSize().doubleValue() < 0) {
-            position.setSize(position.getSize().multiply(BigDecimal.valueOf(-1)));
-            position.setSide(orderService.getOtherSide(position.getSide()));
-            averageEntryPrice = price;
-        }
-        position.setAverageEntryPrice(averageEntryPrice);
-        if(realisedProfit.doubleValue() != 0) {
-            BigDecimal unrealisedProfitRatio = BigDecimal.ONE.subtract(sizeDelta.abs()
+            BigDecimal realisedProfit = gain.multiply(closingNotionalSize);
+            position.setSize(position.getSize().add(sizeDelta));
+            if(position.getSize().doubleValue() < 0) {
+                position.setSize(position.getSize().multiply(BigDecimal.valueOf(-1)));
+                position.setSide(orderService.getOtherSide(position.getSide()));
+                position.setAverageEntryPrice(price);
+            }
+            BigDecimal unrealisedProfitRatio = BigDecimal.ONE.subtract(closingSize.abs()
                     .divide(originalPositionSize, dps, RoundingMode.HALF_UP));
             position.setRealisedPnl(position.getRealisedPnl().add(realisedProfit));
+            // TODO - the realised PNL needs to be added to the available balance
             position.setUnrealisedPnl(unrealisedProfitRatio.multiply(position.getUnrealisedPnl()));
             accountService.bookProfit(user, market, realisedProfit);
+
+        } else {
+            BigDecimal averageEntryPrice = getAverageEntryPrice(position.getAverageEntryPrice(), price,
+                    position.getSize(), size, dps);
+            position.setSize(position.getSize().add(sizeDelta));
+            position.setAverageEntryPrice(averageEntryPrice);
         }
         if(position.getSize().setScale(dps, RoundingMode.HALF_UP)
                 .equals(BigDecimal.ZERO.setScale(dps, RoundingMode.HALF_UP))) {
@@ -249,9 +252,12 @@ public class PositionService {
         for(Position position : positions) {
             BigDecimal margin = orderService.getMarginRequirement(market, position.getUser());
             Account account = accountService.getAndCreate(position.getUser(), market.getSettlementAsset());
-            BigDecimal leverage = (position.getSize().multiply(position.getAverageEntryPrice()))
-                    .divide(account.getBalance(), dps, RoundingMode.HALF_UP);
+            BigDecimal leverage = BigDecimal.ZERO;
             BigDecimal liquidationPrice = BigDecimal.ZERO;
+            if(account.getBalance().doubleValue() > 0) {
+                leverage = (position.getSize().multiply(position.getAverageEntryPrice()))
+                        .divide(account.getBalance(), dps, RoundingMode.HALF_UP);
+            }
             if(leverage.doubleValue() > 0) {
                 BigDecimal effectiveMargin = BigDecimal.ONE.divide(leverage, dps, RoundingMode.HALF_UP)
                         .multiply(BigDecimal.valueOf(0.8));
@@ -306,6 +312,7 @@ public class PositionService {
                 .sorted(Comparator.comparing(Position::getLeverage).reversed()
                         .thenComparing(Position::getUnrealisedPnl).reversed())
                 .collect(Collectors.toList());
+        List<Position> liquidatedPositions = new ArrayList<>();
         for(Position position : losingPositions) {
             if(isDistressed(position, markPrice)) {
                 CreateOrderRequest createOrderRequest = new CreateOrderRequest();
@@ -318,7 +325,7 @@ public class PositionService {
                 orderService.create(createOrderRequest);
                 Account account = accountService.getAndCreate(
                         position.getUser(), position.getMarket().getSettlementAsset());
-                // TODO - the insurance fund credit/debit needs to be added to the settlement transactions
+                liquidatedPositions.add(position);
                 if(account.getBalance().doubleValue() > 0) {
                     market.setInsuranceFund(market.getInsuranceFund().add(account.getBalance()));
                     Transaction transaction = new Transaction()
@@ -364,6 +371,19 @@ public class PositionService {
                 }
             }
         }
+        for(Position position : liquidatedPositions) {
+            List<Transaction> transactions = transactionRepository.findByUserAndAsset(
+                    position.getUser(), market.getSettlementAsset());
+            BigDecimal txSum = BigDecimal.valueOf(transactions.stream()
+                    .mapToDouble(t -> t.getAmount().doubleValue()).sum());
+            position.setRealisedPnl(txSum);
+            position.setSide(null);
+            position.setAverageEntryPrice(BigDecimal.ZERO);
+            position.setLeverage(BigDecimal.ZERO);
+            position.setLiquidationPrice(BigDecimal.ZERO);
+            position.setLatestMarkPrice(BigDecimal.ZERO);
+        }
+        positionRepository.saveAll(liquidatedPositions);
     }
 
     /**
@@ -430,5 +450,18 @@ public class PositionService {
             final Market market
     ) {
         // TODO - implement method when passive liquidity is supported
+    }
+
+    /**
+     * Save a position
+     *
+     * @param position {@link Position}
+     *
+     * @return the updated {@link Position}
+     */
+    public Position save(
+            final Position position
+    ) {
+        return positionRepository.save(position);
     }
 }

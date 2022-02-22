@@ -214,8 +214,8 @@ public class OrderServiceTest extends IntegrationTest {
                 makerFee,
                 takerFee,
                 treasuryFee,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO
+                makerFee,
+                takerFee
         );
     }
 
@@ -250,8 +250,8 @@ public class OrderServiceTest extends IntegrationTest {
                 makerFee,
                 takerFee,
                 treasuryFee,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO
+                makerFee,
+                takerFee
         );
         List<Order> orders = orderService.getOpenLimitOrders(market).stream()
                 .filter(o -> o.getUser().getId().equals(takerUser.getId())).collect(Collectors.toList());
@@ -293,8 +293,8 @@ public class OrderServiceTest extends IntegrationTest {
                 makerFee,
                 takerFee,
                 treasuryFee,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO
+                makerFee,
+                takerFee
         );
         List<Order> orders = orderService.getOpenLimitOrders(market).stream()
                 .filter(o -> o.getUser().getId().equals(takerUser.getId())).collect(Collectors.toList());
@@ -356,8 +356,8 @@ public class OrderServiceTest extends IntegrationTest {
                 makerFee,
                 takerFee,
                 treasuryFee,
-                realisedProfit,
-                realisedProfit.multiply(BigDecimal.valueOf(-1))
+                realisedProfit.add(makerFee),
+                realisedProfit.multiply(BigDecimal.valueOf(-1)).add(takerFee)
         );
     }
 
@@ -369,7 +369,6 @@ public class OrderServiceTest extends IntegrationTest {
                 null, BigDecimal.valueOf(2.5), MarketSide.BUY, OrderType.MARKET, takerUser));
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.valueOf(3.5), MarketSide.SELL, OrderType.MARKET, takerUser));
-        BigDecimal gain = BigDecimal.valueOf(12).divide(BigDecimal.valueOf(45587.5), dps, RoundingMode.HALF_UP);
         BigDecimal expectedTakerMargin = (BigDecimal.ONE.multiply(BigDecimal.valueOf(45587.5))
                 .multiply(market.getMaintenanceMargin()));
         BigDecimal expectedMakerMargin = (BigDecimal.valueOf(0.5).multiply(BigDecimal.valueOf(45613))
@@ -414,8 +413,8 @@ public class OrderServiceTest extends IntegrationTest {
                 makerFee,
                 takerFee,
                 treasuryFee,
-                realisedProfit,
-                realisedProfit.multiply(BigDecimal.valueOf(-1))
+                realisedProfit.add(makerFee),
+                realisedProfit.multiply(BigDecimal.valueOf(-1)).add(takerFee)
         );
     }
 
@@ -451,8 +450,8 @@ public class OrderServiceTest extends IntegrationTest {
                 makerFee,
                 takerFee,
                 treasuryFee,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO
+                makerFee,
+                takerFee
         );
     }
 
@@ -488,8 +487,8 @@ public class OrderServiceTest extends IntegrationTest {
                 makerFee,
                 takerFee,
                 treasuryFee,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO
+                makerFee,
+                takerFee
         );
         List<Order> orders = orderService.getOpenLimitOrders(market).stream()
                 .filter(o -> o.getUser().getId().equals(takerUser.getId())).collect(Collectors.toList());
@@ -531,8 +530,8 @@ public class OrderServiceTest extends IntegrationTest {
                 makerFee,
                 takerFee,
                 treasuryFee,
-                BigDecimal.ZERO,
-                BigDecimal.ZERO
+                makerFee,
+                takerFee
         );
         List<Order> orders = orderService.getOpenLimitOrders(market).stream()
                 .filter(o -> o.getUser().getId().equals(takerUser.getId())).collect(Collectors.toList());
@@ -1048,6 +1047,7 @@ public class OrderServiceTest extends IntegrationTest {
                 positionDegen.getLiquidationPrice().subtract(BigDecimal.valueOf(liquidationOffset));
         orderService.create(getCreateOrderRequest(market.getId(), price, BigDecimal.valueOf(400),
                 orderService.getOtherSide(side), OrderType.LIMIT, takerUser));
+        // TODO - use the generic method for validating market state instead of all of the code below... 
         positionDegenOptional = positionRepository.findByUserAndMarket(degenUser, market);
         Assertions.assertTrue(positionDegenOptional.isPresent());
         positionDegen = positionDegenOptional.get();
@@ -1066,18 +1066,16 @@ public class OrderServiceTest extends IntegrationTest {
                 BigDecimal.ZERO.setScale(dps, RoundingMode.HALF_UP));
         List<Transaction> transactions = transactionRepository.findByUserAndAsset(
                 degenUser, market.getSettlementAsset());
-        double txSum = transactions.stream().mapToDouble(t -> t.getAmount().doubleValue()).sum();
-        List<TransactionType> txTypes = Arrays.asList(TransactionType.SETTLEMENT, TransactionType.LOSS_SOCIALIZATION,
-                TransactionType.LIQUIDATION_DEBIT, TransactionType.LIQUIDATION_CREDIT);
-        double settlementSum = transactions.stream().filter(t -> txTypes.contains(t.getType()))
+        List<TransactionType> tradingTypes = Arrays.asList(TransactionType.SETTLEMENT, TransactionType.FEE);
+        double tradingSum = transactions.stream().filter(t -> tradingTypes.contains(t.getType()))
                 .mapToDouble(t -> t.getAmount().doubleValue()).sum();
-        // TODO - the realised PNL on the position is wrong during liquidation events
-        // TODO - likely wrong for both sides of the trade
-        // TODO - I think we should be deriving realised PNL by summing the transactions, it'll be much cleaner
-        // TODO - realised PNL should also include fees, which will be achieved by doing [the above]
-//        Assertions.assertEquals(settlementSum, positionDegen.getRealisedPnl().doubleValue());
+        List<TransactionType> liquidationTypes = Arrays.asList(TransactionType.LIQUIDATION_CREDIT,
+                TransactionType.LIQUIDATION_DEBIT, TransactionType.LOSS_SOCIALIZATION);
+        double liquidationSum = transactions.stream().filter(t -> liquidationTypes.contains(t.getType()))
+                .mapToDouble(t -> t.getAmount().doubleValue()).sum();
+        double txSum = tradingSum + liquidationSum;
+        Assertions.assertEquals(txSum, positionDegen.getRealisedPnl().doubleValue(), 0.001d);
         Assertions.assertEquals(Math.abs(txSum), 1000d, 0.001d);
-        // TODO - assert the market state is all okay...
     }
 
     @Test
@@ -1194,9 +1192,9 @@ public class OrderServiceTest extends IntegrationTest {
         Assertions.assertEquals(makerTrades.size(), takerTrades.size());
         Assertions.assertEquals(makerTrades.size(), tradeCount);
         Assertions.assertEquals(makerTrades.get(0).getId(), takerTrades.get(0).getId());
-        BigDecimal takerStartingBalance = BigDecimal.valueOf(INITIAL_BALANCE).add(takerFee);
+        BigDecimal takerStartingBalance = BigDecimal.valueOf(INITIAL_BALANCE).add(takerRealisedProfit);
         BigDecimal takerAvailableBalance = takerStartingBalance.subtract(expectedTakerMargin);
-        BigDecimal makerStartingBalance = BigDecimal.valueOf(INITIAL_BALANCE).add(makerFee);
+        BigDecimal makerStartingBalance = BigDecimal.valueOf(INITIAL_BALANCE).add(makerRealisedProfit);
         BigDecimal makerAvailableBalance = makerStartingBalance.subtract(expectedMakerMargin);
         Optional<Account> makerAccountOptional = accountRepository.findByUserAndAsset(
                 makerUser, market.getSettlementAsset());
@@ -1225,35 +1223,29 @@ public class OrderServiceTest extends IntegrationTest {
         Assertions.assertEquals(takerUnrealisedProfit.setScale(dps, RoundingMode.HALF_UP),
                 positionTaker.getUnrealisedPnl().setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(makerRealisedProfit.doubleValue(),
-                positionMaker.getRealisedPnl().doubleValue(), 0.01d);
+                positionMaker.getRealisedPnl().doubleValue(), 0.001d);
         Assertions.assertEquals(takerRealisedProfit.doubleValue(),
-                positionTaker.getRealisedPnl().doubleValue(), 0.01d);
-        makerStartingBalance = makerStartingBalance.add(makerRealisedProfit);
-        takerStartingBalance = takerStartingBalance.add(takerRealisedProfit);
-        orderService.getMarginRequirement(market, makerUser);
+                positionTaker.getRealisedPnl().doubleValue(), 0.001d);
         Assertions.assertEquals(makerAccountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
                 expectedMakerMargin.setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(makerAccountOptional.get().getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
-                makerAvailableBalance.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(makerAccountOptional.get().getAvailableBalance().doubleValue(),
+                makerAvailableBalance.doubleValue(), 0.001d);
         Assertions.assertEquals(makerAccountOptional.get().getBalance().doubleValue(),
-                makerStartingBalance.doubleValue(), 0.01d);
+                makerStartingBalance.doubleValue(), 0.001d);
         Assertions.assertEquals(takerAccountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
                 expectedTakerMargin.setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(takerAccountOptional.get().getAvailableBalance().setScale(dps, RoundingMode.HALF_DOWN),
-                takerAvailableBalance.setScale(dps, RoundingMode.HALF_DOWN));
+        Assertions.assertEquals(takerAccountOptional.get().getAvailableBalance().doubleValue(),
+                takerAvailableBalance.doubleValue(), 0.001d);
         Assertions.assertEquals(takerAccountOptional.get().getBalance().doubleValue(),
-                takerStartingBalance.doubleValue(), 0.01d);
+                takerStartingBalance.doubleValue(), 0.001d);
         List<Transaction> makerSettlementTxns = transactionRepository
-                .findByUserAndAsset(makerUser, market.getSettlementAsset())
-                .stream().filter(t -> t.getType().equals(TransactionType.SETTLEMENT))
-                .collect(Collectors.toList());
+                .findByUserAndAsset(makerUser, market.getSettlementAsset());
         List<Transaction> takerSettlementTxns = transactionRepository
-                .findByUserAndAsset(takerUser, market.getSettlementAsset())
-                .stream().filter(t -> t.getType().equals(TransactionType.SETTLEMENT))
-                .collect(Collectors.toList());
+                .findByUserAndAsset(takerUser, market.getSettlementAsset());
         double sumTakerTxns = takerSettlementTxns.stream().mapToDouble(t -> t.getAmount().doubleValue()).sum();
         double sumMakerTxns = makerSettlementTxns.stream().mapToDouble(t -> t.getAmount().doubleValue()).sum();
         Assertions.assertEquals(sumTakerTxns, positionTaker.getRealisedPnl().doubleValue(), 0.0001d);
         Assertions.assertEquals(sumMakerTxns, positionMaker.getRealisedPnl().doubleValue(), 0.0001d);
+        // TODO - check the balances across all positions and accounts are 100% reconciled
     }
 }
