@@ -3,6 +3,7 @@ package com.jynx.pro.request;
 import com.jynx.pro.constant.MarketSide;
 import com.jynx.pro.constant.OrderTag;
 import com.jynx.pro.constant.OrderType;
+import com.jynx.pro.constant.StopTrigger;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
@@ -22,4 +23,5 @@ public class CreateOrderRequest extends SignedRequest {
     private Boolean postOnly;
     private Boolean reduceOnly;
     private OrderTag tag;
+    private StopTrigger stopTrigger;
 }

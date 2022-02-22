@@ -1,9 +1,6 @@
 package com.jynx.pro.entity;
 
-import com.jynx.pro.constant.MarketSide;
-import com.jynx.pro.constant.OrderStatus;
-import com.jynx.pro.constant.OrderTag;
-import com.jynx.pro.constant.OrderType;
+import com.jynx.pro.constant.*;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
@@ -52,4 +49,7 @@ public class Order {
     @Enumerated(EnumType.STRING)
     @Column(name = "tag", nullable = false)
     private OrderTag tag;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "stop_trigger")
+    private StopTrigger stopTrigger;
 }

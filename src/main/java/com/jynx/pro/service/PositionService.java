@@ -432,7 +432,8 @@ public class PositionService {
         double lossThreshold = 0d;
         BigDecimal remainingLoss = lossToSocialize;
         while(remainingLoss.doubleValue() > lossThreshold) {
-            for (Position position : getLossSocializationQueue(market)) {
+            List<Position> socializationQueue = getLossSocializationQueue(market);
+            for (Position position : socializationQueue) {
                 int dps = position.getMarket().getSettlementAsset().getDecimalPlaces();
                 BigDecimal positionRatio = remainingLoss.divide(position.getUnrealisedPnl(), dps, RoundingMode.HALF_UP);
                 BigDecimal lossSocializationSize = position.getSize().multiply(positionRatio);

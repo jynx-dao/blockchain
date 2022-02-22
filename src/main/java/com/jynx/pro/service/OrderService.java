@@ -291,18 +291,18 @@ public class OrderService {
      * Check if a stop-loss order is triggered
      *
      * @param order stop-loss {@link Order}
-     * @param markPrice the current mark price
+     * @param price the price used to trigger the stop execution
      *
      * @return true / false
      */
     private boolean isStopTriggered(
             final Order order,
-            final BigDecimal markPrice
+            final BigDecimal price
     ) {
         return (order.getSide().equals(MarketSide.SELL) &&
-                order.getPrice().doubleValue() < markPrice.doubleValue()) ||
+                order.getPrice().doubleValue() < price.doubleValue()) ||
                 (order.getSide().equals(MarketSide.BUY) &&
-                    order.getPrice().doubleValue() > markPrice.doubleValue());
+                    order.getPrice().doubleValue() > price.doubleValue());
     }
 
     /**
@@ -316,7 +316,9 @@ public class OrderService {
         List<Order> stopOrders = orderRepository.findByStatusInAndTypeAndMarket(
                 List.of(OrderStatus.OPEN), OrderType.STOP_MARKET, market);
         for(Order order : stopOrders) {
-            if(isStopTriggered(order, market.getLastPrice())) { // TODO - user should be able to choose whether to trigger on last price or mark price
+            BigDecimal triggerPrice = order.getStopTrigger().equals(StopTrigger.LAST_PRICE) ?
+                    market.getLastPrice() : market.getMarkPrice();
+            if(isStopTriggered(order, triggerPrice)) {
                 order = createMarketOrder(null, market, order);
                 reconcileBalanceAfterStopOrder(order, market);
             }
@@ -407,14 +409,18 @@ public class OrderService {
         return createMarketOrder(request, market, null);
     }
 
+    /**
+     * Create a new stop-loss order
+     *
+     * @param request {@link CreateOrderRequest}
+     * @param market {@link Market}
+     *
+     * @return {@link Order}
+     */
     private Order handleStopOrder(
             final CreateOrderRequest request,
             final Market market
     ) {
-        OrderBook orderBook = getOrderBook(market);
-        BigDecimal bestBid = orderBook.getBids().size() > 0 ? orderBook.getBids().get(0).getPrice() : BigDecimal.ZERO;
-        BigDecimal bestAsk = orderBook.getAsks().size() > 0 ? orderBook.getAsks().get(0).getPrice() : BigDecimal.ZERO;
-        BigDecimal price = request.getPrice();
         Order order = new Order()
                 .setUser(request.getUser())
                 .setId(uuidUtils.next())
@@ -426,10 +432,12 @@ public class OrderService {
                 .setRemainingSize(request.getSize())
                 .setPrice(request.getPrice())
                 .setPriority(1)
-                .setTag(OrderTag.USER_GENERATED);
+                .setTag(OrderTag.USER_GENERATED)
+                .setStopTrigger(request.getStopTrigger());
         order = orderRepository.save(order);
-        if((request.getSide().equals(MarketSide.BUY) && price.doubleValue() > bestAsk.doubleValue()) ||
-                (request.getSide().equals(MarketSide.SELL) && price.doubleValue() < bestBid.doubleValue())) {
+        BigDecimal triggerPrice = request.getStopTrigger().equals(StopTrigger.LAST_PRICE) ?
+                market.getLastPrice() : market.getMarkPrice();
+        if(isStopTriggered(order, triggerPrice)) {
             order = createMarketOrder(null, market, order);
             reconcileBalanceAfterStopOrder(order, market);
         }
@@ -524,7 +532,7 @@ public class OrderService {
             final CreateOrderRequest request,
             final boolean skipMarginCheck
     ) {
-        validateRequest(request);
+        validate(request);
         Market market = marketService.get(request.getMarketId());
         if(!skipMarginCheck) {
             performMarginCheck(market, request.getSide(), request.getSize(), request.getPrice(), request.getUser());
@@ -571,9 +579,10 @@ public class OrderService {
      *
      * @param request {@link CreateOrderRequest}
      */
-    private void validateRequest(
+    private void validate(
             final CreateOrderRequest request
     ) {
+        // TODO - we need to check more things here for stop-loss orders
         if(OrderType.MARKET.equals(request.getType())) {
             request.setPrice(null);
             request.setPostOnly(null);
