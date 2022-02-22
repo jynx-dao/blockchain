@@ -1,13 +1,10 @@
 package com.jynx.pro.request;
 
-import com.jynx.pro.entity.Oracle;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 @EqualsAndHashCode(callSuper = true)
@@ -23,5 +20,5 @@ public class AddMarketRequest extends ProposalRequest {
     private BigDecimal makerFee;
     private BigDecimal takerFee;
     private BigDecimal liquidationFee;
-    private List<Oracle> oracles = new ArrayList<>();
+    private Integer minOracleCount;
 }

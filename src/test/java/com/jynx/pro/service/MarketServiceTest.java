@@ -2,10 +2,10 @@ package com.jynx.pro.service;
 
 import com.jynx.pro.Application;
 import com.jynx.pro.constant.MarketStatus;
+import com.jynx.pro.constant.OracleType;
 import com.jynx.pro.entity.Asset;
 import com.jynx.pro.entity.Market;
 import com.jynx.pro.entity.Oracle;
-import com.jynx.pro.constant.OracleType;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.AmendMarketRequest;
@@ -22,7 +22,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -48,32 +47,18 @@ public class MarketServiceTest extends IntegrationTest {
     @Test
     public void testAddMarket() throws InterruptedException {
         Asset asset = createAndEnactAsset(true);
-        List<Oracle> oracles = List.of(new Oracle().setType(OracleType.SIGNED_DATA).setIdentifier("price"));
-        Market market = marketService.proposeToAdd(getAddMarketRequest(asset, oracles));
+        Market market = marketService.proposeToAdd(getAddMarketRequest(asset));
         Assertions.assertEquals(market.getStatus(), MarketStatus.PENDING);
     }
 
     @Test
     public void testAddMarketFailsWhenAssetNotActive() throws InterruptedException {
         Asset asset = createAndEnactAsset(false);
-        List<Oracle> oracles = List.of(new Oracle().setType(OracleType.SIGNED_DATA).setIdentifier("price"));
         try {
-            marketService.proposeToAdd(getAddMarketRequest(asset, oracles));
+            marketService.proposeToAdd(getAddMarketRequest(asset));
             Assertions.fail();
         } catch(Exception e) {
             Assertions.assertEquals(e.getMessage(), ErrorCode.ASSET_NOT_ACTIVE);
-        }
-    }
-
-    @Test
-    public void testAddMarketFailsWithNoOracle() throws InterruptedException {
-        Asset asset = createAndEnactAsset(true);
-        List<Oracle> oracles = Collections.emptyList();
-        try {
-            marketService.proposeToAdd(getAddMarketRequest(asset, oracles));
-            Assertions.fail();
-        } catch(Exception e) {
-            Assertions.assertEquals(e.getMessage(), ErrorCode.ORACLE_NOT_DEFINED);
         }
     }
 

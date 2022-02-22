@@ -1,9 +1,6 @@
 package com.jynx.pro.service;
 
-import com.jynx.pro.constant.AssetStatus;
-import com.jynx.pro.constant.AssetType;
-import com.jynx.pro.constant.MarketStatus;
-import com.jynx.pro.constant.OracleType;
+import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.helper.EthereumHelper;
 import com.jynx.pro.repository.*;
@@ -21,6 +18,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.UUID;
 
 public abstract class IntegrationTest {
 
@@ -123,8 +121,14 @@ public abstract class IntegrationTest {
             final boolean activate
     ) throws InterruptedException {
         Asset asset = createAndEnactAsset(true);
-        List<Oracle> oracles = List.of(new Oracle().setType(OracleType.SIGNED_DATA).setIdentifier("price"));
-        Market market = marketService.proposeToAdd(getAddMarketRequest(asset, oracles));
+        Market market = marketService.proposeToAdd(getAddMarketRequest(asset));
+        Oracle oracle = new Oracle()
+                .setId(UUID.randomUUID())
+                .setType(OracleType.SIGNED_DATA)
+                .setUser(makerUser)
+                .setMarket(market)
+                .setStatus(OracleStatus.ACTIVE);
+        oracleRepository.save(oracle);
         Assertions.assertEquals(market.getStatus(), MarketStatus.PENDING);
         Thread.sleep(100L);
         if(activate) {
@@ -156,8 +160,7 @@ public abstract class IntegrationTest {
     }
 
     protected AddMarketRequest getAddMarketRequest(
-            final Asset asset,
-            final List<Oracle> oracles
+            final Asset asset
     ) {
         long[] times = proposalTimes();
         AddMarketRequest request = new AddMarketRequest();
@@ -174,7 +177,7 @@ public abstract class IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
-        request.setOracles(oracles);
+        request.setMinOracleCount(1);
         return request;
     }
 

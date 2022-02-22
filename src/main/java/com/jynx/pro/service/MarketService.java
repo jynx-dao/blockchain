@@ -1,25 +1,23 @@
 package com.jynx.pro.service;
 
-import com.jynx.pro.constant.AssetStatus;
-import com.jynx.pro.constant.MarketStatus;
-import com.jynx.pro.constant.ProposalType;
-import com.jynx.pro.entity.Asset;
-import com.jynx.pro.entity.Market;
-import com.jynx.pro.entity.Proposal;
+import com.jynx.pro.constant.*;
+import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
-import com.jynx.pro.repository.MarketRepository;
+import com.jynx.pro.repository.*;
 import com.jynx.pro.request.AddMarketRequest;
 import com.jynx.pro.request.AmendMarketRequest;
 import com.jynx.pro.request.SingleItemRequest;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.math3.stat.descriptive.rank.Percentile;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.Objects;
-import java.util.UUID;
+import java.math.RoundingMode;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -40,7 +38,21 @@ public class MarketService {
     @Autowired
     private PositionService positionService;
     @Autowired
+    private PositionRepository positionRepository;
+    @Autowired
     private OrderService orderService;
+    @Autowired
+    private ConfigService configService;
+    @Autowired
+    private SettlementRepository settlementRepository;
+    @Autowired
+    private OracleRepository oracleRepository;
+    @Autowired
+    private AccountService accountService;
+    @Autowired
+    private TransactionRepository transactionRepository;
+    @Autowired
+    private AccountRepository accountRepository;
 
     public Market get(
             final UUID id
@@ -48,8 +60,78 @@ public class MarketService {
         return marketRepository.findById(id).orElseThrow(() -> new JynxProException(ErrorCode.MARKET_NOT_FOUND));
     }
 
+    private void settlePosition(
+            final Position position,
+            final Market market,
+            final BigDecimal settlementDelta
+    ) {
+        BigDecimal settlementAmount = position.getSize().multiply(settlementDelta);
+        position.setRealisedPnl(position.getRealisedPnl().add(settlementAmount));
+        Account account = accountService.getAndCreate(
+                position.getUser(), market.getSettlementAsset());
+        account.setBalance(account.getBalance().add(settlementAmount));
+        account.setAvailableBalance(account.getAvailableBalance().add(settlementAmount));
+        Transaction transaction = new Transaction()
+                .setType(TransactionType.SETTLEMENT)
+                .setAmount(settlementAmount)
+                .setUser(position.getUser())
+                .setAsset(market.getSettlementAsset())
+                .setTimestamp(configService.getTimestamp());
+        transactionRepository.save(transaction);
+        accountRepository.save(account);
+    }
+
     public void settleMarkets() {
-        // TODO - settle markets using their oracles
+        List<Market> markets = marketRepository.findByStatusIn(List.of(MarketStatus.ACTIVE, MarketStatus.SUSPENDED));
+        for(Market market : markets) {
+            int dps = market.getSettlementAsset().getDecimalPlaces();
+            long timeSinceSettlement = configService.getTimestamp() - market.getLastSettlement();
+            if(timeSinceSettlement > (60 * 60 * 9)) {
+                List<Settlement> settlementData = settlementRepository.findBySettlementInterval(market.getSettlementCount() + 1);
+                List<Oracle> oracles = oracleRepository.findByMarketAndStatus(market, OracleStatus.ACTIVE);
+                slashOffendingOracles(settlementData, oracles);
+                if(settlementData.size() >= (oracles.size() * 0.667)) {
+                    List<Position> positions = positionRepository
+                            .findByMarketAndSizeGreaterThan(market, BigDecimal.ZERO);
+                    BigDecimal value = BigDecimal.valueOf(settlementData.stream()
+                            .mapToDouble(d -> d.getValue().doubleValue()).average().orElse(0d));
+                    if(value.doubleValue() > 0d) {
+                        BigDecimal settlementDelta = (value.subtract(market.getMarkPrice()))
+                                .divide(market.getMarkPrice(), dps, RoundingMode.HALF_UP);
+                        positions.forEach(position -> settlePosition(position, market, settlementDelta));
+                        positionRepository.saveAll(positions);
+                        market.setLastSettlement(configService.getTimestamp());
+                        market.setSettlementCount(market.getSettlementCount() + 1);
+                        marketRepository.save(market);
+                    }
+                }
+            }
+        }
+    }
+
+    private void slashOffendingOracles(
+            final List<Settlement> settlementData,
+            final List<Oracle> oracles
+    ) {
+        List<UUID> presentOracleIds = settlementData.stream()
+                .map(d -> d.getOracle().getId()).collect(Collectors.toList());
+        List<Oracle> missingOracles = oracles.stream().filter(o -> !presentOracleIds.contains(o.getId()))
+                .collect(Collectors.toList());
+        double[] oracleValues = settlementData.stream().mapToDouble(d -> d.getValue().doubleValue()).toArray();
+        double lowerLimit = new Percentile().evaluate(oracleValues, 0.15);
+        double upperLimit = new Percentile().evaluate(oracleValues, 0.85);
+        List<Oracle> outlierOracles = settlementData
+                .stream()
+                .filter(d -> d.getValue().doubleValue() < lowerLimit ||
+                        d.getValue().doubleValue() > upperLimit)
+                .map(Settlement::getOracle)
+                .collect(Collectors.toList());
+        List<Oracle> oraclesToSlash = new ArrayList<>();
+        oraclesToSlash.addAll(missingOracles);
+        oraclesToSlash.addAll(outlierOracles);
+        HashSet<Object> seen = new HashSet<>();
+        oraclesToSlash.removeIf(o -> !seen.add(o.getId()));
+        oracleService.slash(oraclesToSlash);
     }
 
     public Market proposeToAdd(
@@ -60,9 +142,6 @@ public class MarketService {
         Asset settlementAsset = assetService.get(request.getSettlementAssetId());
         if(!settlementAsset.getStatus().equals(AssetStatus.ACTIVE)) {
             throw new JynxProException(ErrorCode.ASSET_NOT_ACTIVE);
-        }
-        if(request.getOracles().size() == 0) {
-            throw new JynxProException(ErrorCode.ORACLE_NOT_DEFINED);
         }
         if(request.getTakerFee().doubleValue() < request.getMakerFee().doubleValue()) {
             throw new JynxProException(ErrorCode.INVALID_TAKER_FEE);
@@ -81,9 +160,10 @@ public class MarketService {
                 .setTakerFee(request.getTakerFee())
                 .setLiquidationFee(request.getLiquidationFee())
                 .setStatus(MarketStatus.PENDING)
-                .setId(uuidUtils.next());
+                .setId(uuidUtils.next())
+                .setLastSettlement(0L)
+                .setMinOracleCount(request.getMinOracleCount());
         market = marketRepository.save(market);
-        oracleService.save(request.getOracles(), market);
         proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
                 request.getEnactmentTime(), market.getId(), ProposalType.ADD_MARKET);
         return market;
@@ -177,6 +257,9 @@ public class MarketService {
     ) {
         Market market = get(proposal.getLinkedId());
         market.setStatus(status);
+        if(status.equals(MarketStatus.ACTIVE)) {
+            market.setLastSettlement(configService.getTimestamp());
+        }
         marketRepository.save(market);
     }
     
@@ -184,7 +267,11 @@ public class MarketService {
             final Proposal proposal
     ) {
         proposalService.checkEnacted(proposal);
-        updateStatus(proposal, MarketStatus.ACTIVE);
+        Market market = get(proposal.getLinkedId());
+        List<Oracle> oracles = oracleRepository.findByMarketAndStatus(market, OracleStatus.ACTIVE);
+        if(oracles.size() >= market.getMinOracleCount()) {
+            updateStatus(proposal, MarketStatus.ACTIVE);
+        }
     }
 
     public void reject(

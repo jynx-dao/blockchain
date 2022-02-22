@@ -61,4 +61,14 @@ public class Market {
     private BigDecimal pendingLiquidationFee;
     @Column(name = "insurance_fund", scale = 8, precision = 18)
     private BigDecimal insuranceFund = BigDecimal.ZERO;
+    @Column(name = "last_settlement", nullable = false)
+    private Long lastSettlement;
+    @Column(name = "settlement_count", nullable = false)
+    private Long settlementCount = 0L;
+    @Column(name = "oracle_bond", scale = 8, precision = 18)
+    private BigDecimal oracleBond;
+    @Column(name = "oracle_slashing_ratio", scale = 8, precision = 18)
+    private BigDecimal oracleSlashingRatio;
+    @Column(name = "min_oracle_count", nullable = false)
+    private Integer minOracleCount;
 }

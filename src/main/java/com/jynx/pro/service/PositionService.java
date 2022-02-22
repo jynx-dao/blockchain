@@ -429,7 +429,7 @@ public class PositionService {
             final Market market,
             final BigDecimal lossToSocialize
     ) {
-        double lossThreshold = 0d;
+        double lossThreshold = 0.001d;
         BigDecimal remainingLoss = lossToSocialize;
         while(remainingLoss.doubleValue() > lossThreshold) {
             List<Position> socializationQueue = getLossSocializationQueue(market);

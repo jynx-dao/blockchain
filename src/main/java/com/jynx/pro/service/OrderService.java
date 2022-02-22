@@ -319,10 +319,22 @@ public class OrderService {
             BigDecimal triggerPrice = order.getStopTrigger().equals(StopTrigger.LAST_PRICE) ?
                     market.getLastPrice() : market.getMarkPrice();
             if(isStopTriggered(order, triggerPrice)) {
-                order = createMarketOrder(null, market, order);
-                reconcileBalanceAfterStopOrder(order, market);
+                executeStopLoss(order, market);
             }
         }
+    }
+
+    /**
+     * Execute a stop loss order and reconcile balances
+     *
+     * @param order {@link Order}
+     * @param market {@link Market}
+     */
+    private void executeStopLoss(
+            final Order order,
+            final Market market
+    ) {
+        reconcileBalanceAfterStopOrder(createMarketOrder(null, market, order), market);
     }
 
     /**
@@ -438,8 +450,7 @@ public class OrderService {
         BigDecimal triggerPrice = request.getStopTrigger().equals(StopTrigger.LAST_PRICE) ?
                 market.getLastPrice() : market.getMarkPrice();
         if(isStopTriggered(order, triggerPrice)) {
-            order = createMarketOrder(null, market, order);
-            reconcileBalanceAfterStopOrder(order, market);
+            executeStopLoss(order, market);
         }
         return order;
     }
@@ -582,11 +593,19 @@ public class OrderService {
     private void validate(
             final CreateOrderRequest request
     ) {
-        // TODO - we need to check more things here for stop-loss orders
+        if(OrderType.STOP_MARKET.equals(request.getType())) {
+            if(request.getStopTrigger() == null) {
+                request.setStopTrigger(StopTrigger.MARK_PRICE);
+            }
+        }
+        if(request.getPostOnly() == null) {
+            request.setPostOnly(false);
+        }
+        if(request.getReduceOnly() == null) {
+            request.setReduceOnly(false);
+        }
         if(OrderType.MARKET.equals(request.getType())) {
             request.setPrice(null);
-            request.setPostOnly(null);
-            request.setReduceOnly(null);
         }
         if(request.getSize() == null) {
             throw new JynxProException(ErrorCode.ORDER_SIZE_MANDATORY);
@@ -603,11 +622,18 @@ public class OrderService {
         if(request.getPrice() == null && request.getType().equals(OrderType.LIMIT)) {
             throw new JynxProException(ErrorCode.ORDER_PRICE_MANDATORY);
         }
-        if(request.getSize().doubleValue() < 0) {
+        if(request.getSize().doubleValue() <= 0) {
             throw new JynxProException(ErrorCode.NEGATIVE_SIZE);
         }
-        if(request.getPrice() != null && request.getPrice().doubleValue() < 0) {
+        if(request.getPrice() != null && request.getPrice().doubleValue() <= 0) {
             throw new JynxProException(ErrorCode.NEGATIVE_PRICE);
+        }
+        if(request.getReduceOnly()) {
+            Market market = marketService.get(request.getMarketId());
+            Position position = positionService.getAndCreate(request.getUser(), market);
+            if(request.getSize().doubleValue() > position.getSize().doubleValue()) {
+                request.setSize(position.getSize());
+            }
         }
     }
 

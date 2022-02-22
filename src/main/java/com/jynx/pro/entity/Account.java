@@ -23,6 +23,8 @@ public class Account {
     private BigDecimal availableBalance;
     @Column(name = "margin_balance", nullable = false, scale = 8, precision = 18)
     private BigDecimal marginBalance;
+    @Column(name = "oracle_bond", nullable = false, scale = 8, precision = 18)
+    private BigDecimal oracleBond = BigDecimal.ZERO;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "asset_id", nullable = false)
     private Asset asset;
