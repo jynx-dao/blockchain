@@ -259,7 +259,8 @@ public class PositionService {
             }
             if(leverage.doubleValue() > 0) {
                 BigDecimal effectiveMargin = BigDecimal.ONE.divide(leverage, dps, RoundingMode.HALF_UP)
-                        .multiply(BigDecimal.valueOf(0.8)); // TODO - this is too arbitrary (liquidation trigger vs price should come from the market config, and should scale based on leverage)
+                        .multiply(market.getLiquidationFee()
+                                .divide(market.getMarginRequirement(), dps, RoundingMode.HALF_UP));
                 liquidationPrice = position.getSide().equals(MarketSide.BUY) ?
                         (BigDecimal.ONE.subtract(effectiveMargin)).multiply(position.getAverageEntryPrice()) :
                         (BigDecimal.ONE.add(effectiveMargin)).multiply(position.getAverageEntryPrice());
