@@ -291,6 +291,77 @@ public class PositionService {
     }
 
     /**
+     * Liquidate a position when the user has excess balance
+     *
+     * @param market {@link Market}
+     * @param account {@link Account}
+     * @param position {@link Position}
+     */
+    private void liquidateWithExcessBalance(
+            final Market market,
+            final Account account,
+            final Position position
+    ) {
+        market.setInsuranceFund(market.getInsuranceFund().add(account.getBalance()));
+        Transaction transaction = new Transaction()
+                .setTimestamp(configService.getTimestamp())
+                .setAsset(position.getMarket().getSettlementAsset())
+                .setAmount(account.getBalance().multiply(BigDecimal.valueOf(-1)))
+                .setType(TransactionType.LIQUIDATION_DEBIT)
+                .setUser(position.getUser());
+        transactionRepository.save(transaction);
+    }
+
+    /**
+     * Liquidate a position with loss socialization
+     *
+     * @param market {@link Market}
+     * @param account {@link Account}
+     * @param position {@link Position}
+     * @param winningPositions the winning {@link Position}s
+     */
+    private void liquidateWithLossSocialization(
+            final Market market,
+            final Account account,
+            final Position position,
+            final List<Position> winningPositions
+    ) {
+        BigDecimal insuranceFund = market.getInsuranceFund();
+        BigDecimal lossToSocialize = account.getBalance().abs().subtract(insuranceFund);
+        market.setInsuranceFund(BigDecimal.ZERO);
+        socializeLosses(winningPositions, lossToSocialize);
+        Transaction transaction = new Transaction()
+                .setTimestamp(configService.getTimestamp())
+                .setAsset(position.getMarket().getSettlementAsset())
+                .setAmount(insuranceFund.add(lossToSocialize))
+                .setType(TransactionType.LIQUIDATION_CREDIT)
+                .setUser(position.getUser());
+        transactionRepository.save(transaction);
+    }
+
+    /**
+     * Liquidate a position using the insurance fund
+     *
+     * @param market {@link Market}
+     * @param account {@link Account}
+     * @param position {@link Position}
+     */
+    private void liquidateWithInsuranceFund(
+            final Market market,
+            final Account account,
+            final Position position
+    ) {
+        market.setInsuranceFund(market.getInsuranceFund().subtract(account.getBalance().abs()));
+        Transaction transaction = new Transaction()
+                .setTimestamp(configService.getTimestamp())
+                .setAsset(position.getMarket().getSettlementAsset())
+                .setAmount(account.getBalance().multiply(BigDecimal.valueOf(-1)))
+                .setType(TransactionType.LIQUIDATION_CREDIT)
+                .setUser(position.getUser());
+        transactionRepository.save(transaction);
+    }
+
+    /**
      * Closes distressed positions for given market
      *
      * @param markPrice the current mark price
@@ -326,48 +397,19 @@ public class PositionService {
                         position.getUser(), position.getMarket().getSettlementAsset());
                 liquidatedPositions.add(position);
                 if(account.getBalance().doubleValue() > 0) {
-                    market.setInsuranceFund(market.getInsuranceFund().add(account.getBalance()));
-                    Transaction transaction = new Transaction()
-                            .setTimestamp(configService.getTimestamp())
-                            .setAsset(position.getMarket().getSettlementAsset())
-                            .setAmount(account.getBalance().multiply(BigDecimal.valueOf(-1)))
-                            .setType(TransactionType.LIQUIDATION_DEBIT)
-                            .setUser(position.getUser());
-                    transactionRepository.save(transaction);
-                    account.setBalance(BigDecimal.ZERO);
-                    account.setAvailableBalance(BigDecimal.ZERO);
-                    account.setMarginBalance(BigDecimal.ZERO);
-                    accountRepository.save(account);
-                    marketRepository.save(market);
+                    liquidateWithExcessBalance(market, account, position);
                 } else if(account.getBalance().doubleValue() < 0) {
                     if(market.getInsuranceFund().doubleValue() < account.getBalance().abs().doubleValue()) {
-                        BigDecimal insuranceFund = market.getInsuranceFund();
-                        BigDecimal lossToSocialize = account.getBalance().abs().subtract(insuranceFund);
-                        market.setInsuranceFund(BigDecimal.ZERO);
-                        socializeLosses(winningPositions, lossToSocialize);
-                        Transaction transaction = new Transaction()
-                                .setTimestamp(configService.getTimestamp())
-                                .setAsset(position.getMarket().getSettlementAsset())
-                                .setAmount(insuranceFund.add(lossToSocialize))
-                                .setType(TransactionType.LIQUIDATION_CREDIT)
-                                .setUser(position.getUser());
-                        transactionRepository.save(transaction);
+                        liquidateWithLossSocialization(market, account, position, winningPositions);
                     } else {
-                        market.setInsuranceFund(market.getInsuranceFund().subtract(account.getBalance().abs()));
-                        Transaction transaction = new Transaction()
-                                .setTimestamp(configService.getTimestamp())
-                                .setAsset(position.getMarket().getSettlementAsset())
-                                .setAmount(account.getBalance().multiply(BigDecimal.valueOf(-1)))
-                                .setType(TransactionType.LIQUIDATION_CREDIT)
-                                .setUser(position.getUser());
-                        transactionRepository.save(transaction);
+                        liquidateWithInsuranceFund(market, account, position);
                     }
-                    account.setBalance(BigDecimal.ZERO);
-                    account.setAvailableBalance(BigDecimal.ZERO);
-                    account.setMarginBalance(BigDecimal.ZERO);
-                    accountRepository.save(account);
-                    marketRepository.save(market);
                 }
+                account.setBalance(BigDecimal.ZERO);
+                account.setAvailableBalance(BigDecimal.ZERO);
+                account.setMarginBalance(BigDecimal.ZERO);
+                accountRepository.save(account);
+                marketRepository.save(market);
             }
         }
         for(Position position : liquidatedPositions) {
