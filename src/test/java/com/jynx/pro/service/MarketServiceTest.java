@@ -134,12 +134,12 @@ public class MarketServiceTest extends IntegrationTest {
     @Test
     public void testAmendInitialMargin() throws InterruptedException {
         Market market = createAndEnactMarket(true);
-        Assertions.assertEquals(market.getInitialMargin().setScale(2, RoundingMode.HALF_UP),
+        Assertions.assertEquals(market.getMarginRequirement().setScale(2, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(0.01).setScale(2, RoundingMode.HALF_UP));
         long[] times = proposalTimes();
         AmendMarketRequest request = new AmendMarketRequest()
                 .setId(market.getId())
-                .setInitialMargin(BigDecimal.valueOf(0.2));
+                .setMarginRequirement(BigDecimal.valueOf(0.2));
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
@@ -152,19 +152,19 @@ public class MarketServiceTest extends IntegrationTest {
         proposalService.enact();
         proposalService.reject();
         market = marketRepository.findById(market.getId()).orElse(new Market());
-        Assertions.assertEquals(market.getInitialMargin().setScale(2, RoundingMode.HALF_UP),
+        Assertions.assertEquals(market.getMarginRequirement().setScale(2, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(0.20).setScale(2, RoundingMode.HALF_UP));
     }
 
     @Test
     public void testAmendMaintenanceMargin() throws InterruptedException {
         Market market = createAndEnactMarket(true);
-        Assertions.assertEquals(market.getMaintenanceMargin().setScale(2, RoundingMode.HALF_UP),
+        Assertions.assertEquals(market.getMarginRequirement().setScale(2, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(0.01).setScale(2, RoundingMode.HALF_UP));
         long[] times = proposalTimes();
         AmendMarketRequest request = new AmendMarketRequest()
                 .setId(market.getId())
-                .setMaintenanceMargin(BigDecimal.valueOf(0.2));
+                .setMarginRequirement(BigDecimal.valueOf(0.2));
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
@@ -177,7 +177,7 @@ public class MarketServiceTest extends IntegrationTest {
         proposalService.enact();
         proposalService.reject();
         market = marketRepository.findById(market.getId()).orElse(new Market());
-        Assertions.assertEquals(market.getMaintenanceMargin().setScale(2, RoundingMode.HALF_UP),
+        Assertions.assertEquals(market.getMarginRequirement().setScale(2, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(0.20).setScale(2, RoundingMode.HALF_UP));
     }
 

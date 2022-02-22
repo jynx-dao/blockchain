@@ -40,4 +40,7 @@ public class ErrorCode {
     public static final String ORDER_SIDE_MANDATORY = "Order side is mandatory.";
     public static final String ORDER_PRICE_MANDATORY = "Order price is mandatory when type is LIMIT.";
     public static final String FATAL_ERROR = "Fatal error occurred.";
+    public static final String NEGATIVE_SIZE = "Size cannot be negative.";
+    public static final String NEGATIVE_PRICE = "Price cannot be negative.";
+    public static final String INVALID_LIQUIDATION_FEE = "Liquidation fee must be less than 50% of margin requirement.";
 }

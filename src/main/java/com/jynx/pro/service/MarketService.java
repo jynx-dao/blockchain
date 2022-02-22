@@ -67,16 +67,19 @@ public class MarketService {
         if(request.getTakerFee().doubleValue() < request.getMakerFee().doubleValue()) {
             throw new JynxProException(ErrorCode.INVALID_TAKER_FEE);
         }
+        if(request.getLiquidationFee().doubleValue() > request.getMarginRequirement().doubleValue() * 0.5) {
+            throw new JynxProException(ErrorCode.INVALID_LIQUIDATION_FEE);
+        }
         Market market = new Market()
                 .setName(request.getName())
                 .setSettlementAsset(settlementAsset)
-                .setInitialMargin(request.getInitialMargin())
-                .setMaintenanceMargin(request.getMaintenanceMargin())
+                .setMarginRequirement(request.getMarginRequirement())
                 .setTickSize(request.getTickSize())
                 .setStepSize(request.getStepSize())
                 .setSettlementFrequency(request.getSettlementFrequency())
                 .setMakerFee(request.getMakerFee())
                 .setTakerFee(request.getTakerFee())
+                .setLiquidationFee(request.getLiquidationFee())
                 .setStatus(MarketStatus.PENDING)
                 .setId(uuidUtils.next());
         market = marketRepository.save(market);
@@ -94,23 +97,30 @@ public class MarketService {
         Market market = get(request.getId());
         BigDecimal makerFee = Objects.isNull(request.getMakerFee()) ? market.getMakerFee() : request.getMakerFee();
         BigDecimal takerFee = Objects.isNull(request.getTakerFee()) ? market.getTakerFee() : request.getTakerFee();
+        BigDecimal liquidationFee = Objects.isNull(request.getLiquidationFee()) ?
+                market.getLiquidationFee() : request.getLiquidationFee();
+        BigDecimal marginRequirement = Objects.isNull(request.getMarginRequirement()) ?
+                market.getMarginRequirement() : request.getMarginRequirement();
         if(takerFee.doubleValue() < makerFee.doubleValue()) {
             throw new JynxProException(ErrorCode.INVALID_TAKER_FEE);
+        }
+        if(liquidationFee.doubleValue() > marginRequirement.doubleValue() * 0.5) {
+            throw new JynxProException(ErrorCode.INVALID_LIQUIDATION_FEE);
         }
         if(!market.getStatus().equals(MarketStatus.ACTIVE)) {
             throw new JynxProException(ErrorCode.MARKET_NOT_ACTIVE);
         }
-        if(!Objects.isNull(request.getMaintenanceMargin())) {
-            market.setPendingMaintenanceMargin(request.getMaintenanceMargin());
-        }
-        if(!Objects.isNull(request.getInitialMargin())) {
-            market.setPendingInitialMargin(request.getInitialMargin());
+        if(!Objects.isNull(request.getMarginRequirement())) {
+            market.setMarginRequirement(request.getMarginRequirement());
         }
         if(!Objects.isNull(request.getMakerFee())) {
             market.setPendingMakerFee(request.getMakerFee());
         }
         if(!Objects.isNull(request.getTakerFee())) {
             market.setPendingTakerFee(request.getTakerFee());
+        }
+        if(!Objects.isNull(request.getLiquidationFee())) {
+            market.setPendingLiquidationFee(request.getLiquidationFee());
         }
         if(!Objects.isNull(request.getStepSize())) {
             market.setPendingStepSize(request.getStepSize());
@@ -169,7 +179,7 @@ public class MarketService {
         market.setStatus(status);
         marketRepository.save(market);
     }
-
+    
     public void add(
             final Proposal proposal
     ) {
@@ -188,13 +198,9 @@ public class MarketService {
     ) {
         proposalService.checkEnacted(proposal);
         Market market = get(proposal.getLinkedId());
-        if(!Objects.isNull(market.getPendingInitialMargin())) {
-            market.setInitialMargin(market.getPendingInitialMargin());
-            market.setPendingInitialMargin(null);
-        }
-        if(!Objects.isNull(market.getPendingMaintenanceMargin())) {
-            market.setMaintenanceMargin(market.getPendingMaintenanceMargin());
-            market.setPendingMaintenanceMargin(null);
+        if(!Objects.isNull(market.getPendingMarginRequirement())) {
+            market.setMarginRequirement(market.getPendingMarginRequirement());
+            market.setMarginRequirement(null);
         }
         if(!Objects.isNull(market.getPendingMakerFee())) {
             market.setMakerFee(market.getPendingMakerFee());
@@ -203,6 +209,10 @@ public class MarketService {
         if(!Objects.isNull(market.getPendingTakerFee())) {
             market.setTakerFee(market.getPendingTakerFee());
             market.setPendingTakerFee(null);
+        }
+        if(!Objects.isNull(market.getLiquidationFee())) {
+            market.setLiquidationFee(market.getLiquidationFee());
+            market.setPendingLiquidationFee(null);
         }
         if(!Objects.isNull(market.getPendingSettlementFrequency())) {
             market.setSettlementFrequency(market.getPendingSettlementFrequency());
@@ -219,6 +229,7 @@ public class MarketService {
         // TODO - orders breaching the new step size, tick size, or decimal places will be cancelled
         // TODO - orders breaching the new margin requirements will be cancelled
         // TODO - positions that would breach the new margin requirements will be closed out
+        // TODO - increasing liquidation fee will force out positions that become distressed
         marketRepository.save(market);
     }
 

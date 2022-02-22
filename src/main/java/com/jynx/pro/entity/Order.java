@@ -47,8 +47,8 @@ public class Order {
     private Boolean postOnly = false;
     @Column(name = "reduce_only")
     private Boolean reduceOnly = false;
-    @Column(name = "updated", nullable = false)
-    private Long updated;
+    @Column(name = "priority", nullable = false)
+    private Integer priority;
     @Enumerated(EnumType.STRING)
     @Column(name = "tag", nullable = false)
     private OrderTag tag;

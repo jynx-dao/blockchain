@@ -159,14 +159,14 @@ public abstract class IntegrationTest {
     ) {
         long[] times = proposalTimes();
         AddMarketRequest request = new AddMarketRequest();
-        request.setInitialMargin(BigDecimal.valueOf(0.01));
-        request.setMaintenanceMargin(BigDecimal.valueOf(0.01));
+        request.setMarginRequirement(BigDecimal.valueOf(0.01));
         request.setName("BTC/USDT");
         request.setStepSize(1);
         request.setTickSize(1);
         request.setSettlementFrequency(8);
         request.setMakerFee(BigDecimal.valueOf(0.001));
         request.setTakerFee(BigDecimal.valueOf(0.001));
+        request.setLiquidationFee(BigDecimal.valueOf(0.0005));
         request.setSettlementAssetId(asset.getId());
         request.setUser(takerUser);
         request.setOpenTime(times[0]);

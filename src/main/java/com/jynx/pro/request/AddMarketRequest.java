@@ -16,12 +16,12 @@ import java.util.UUID;
 public class AddMarketRequest extends ProposalRequest {
     private String name;
     private UUID settlementAssetId;
-    private BigDecimal initialMargin;
-    private BigDecimal maintenanceMargin;
+    private BigDecimal marginRequirement;
     private Integer tickSize;
     private Integer stepSize;
     private Integer settlementFrequency;
     private BigDecimal makerFee;
     private BigDecimal takerFee;
+    private BigDecimal liquidationFee;
     private List<Oracle> oracles = new ArrayList<>();
 }

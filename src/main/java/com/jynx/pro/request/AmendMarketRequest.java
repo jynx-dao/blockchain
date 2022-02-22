@@ -12,11 +12,11 @@ import java.util.UUID;
 @Accessors(chain = true)
 public class AmendMarketRequest extends ProposalRequest {
     private UUID id;
-    private BigDecimal initialMargin;
-    private BigDecimal maintenanceMargin;
+    private BigDecimal marginRequirement;
     private Integer tickSize;
     private Integer stepSize;
     private Integer settlementFrequency;
     private BigDecimal makerFee;
     private BigDecimal takerFee;
+    private BigDecimal liquidationFee;
 }

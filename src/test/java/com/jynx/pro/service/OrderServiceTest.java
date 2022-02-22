@@ -97,7 +97,7 @@ public class OrderServiceTest extends IntegrationTest {
             Assertions.assertEquals(item.getPrice().setScale(dps, RoundingMode.HALF_UP),
                     BigDecimal.valueOf(45590-((long) i * stepSize)).setScale(dps, RoundingMode.HALF_UP));
             marginBalance = marginBalance.add(item.getPrice().multiply(item.getSize())
-                    .multiply(market.getInitialMargin()));
+                    .multiply(market.getMarginRequirement()));
         }
         for(int i=0; i<asks; i++) {
             if(i == 0) {
@@ -107,7 +107,7 @@ public class OrderServiceTest extends IntegrationTest {
             Assertions.assertEquals(item.getPrice().setScale(dps, RoundingMode.HALF_UP),
                     BigDecimal.valueOf(45610+((long) i * stepSize)).setScale(dps, RoundingMode.HALF_UP));
             marginBalance = marginBalance.add(item.getPrice().multiply(item.getSize())
-                    .multiply(market.getInitialMargin()));
+                    .multiply(market.getMarginRequirement()));
         }
         BigDecimal startingBalance = BigDecimal.valueOf(INITIAL_BALANCE);
         BigDecimal availableBalance = startingBalance.subtract(marginBalance);
@@ -189,9 +189,9 @@ public class OrderServiceTest extends IntegrationTest {
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.MARKET, takerUser));
         BigDecimal positionNotionalSize = BigDecimal.valueOf(45610).multiply(BigDecimal.valueOf(0.5));
-        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()));
-        BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
-                .add((positionNotionalSize).multiply(market.getInitialMargin()));
+        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()));
+        BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
+                .add((positionNotionalSize).multiply(market.getMarginRequirement()));
         BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
         BigDecimal takerFee = makerFee.multiply(BigDecimal.valueOf(-1));
         BigDecimal treasuryFee = BigDecimal.ZERO;
@@ -226,9 +226,9 @@ public class OrderServiceTest extends IntegrationTest {
                 BigDecimal.valueOf(45611), BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.LIMIT, takerUser));
         BigDecimal positionNotionalSize = BigDecimal.valueOf(45610).multiply(BigDecimal.valueOf(0.5));
         BigDecimal makerSize = positionNotionalSize.add(BigDecimal.valueOf(45611).multiply(BigDecimal.valueOf(1))).add(BigDecimal.valueOf(45612).multiply(BigDecimal.valueOf(1)));
-        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()));
-        BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
-                .add(makerSize.multiply(market.getInitialMargin()));
+        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()));
+        BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
+                .add(makerSize.multiply(market.getMarginRequirement()));
         BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
         BigDecimal takerFee = makerFee.multiply(BigDecimal.valueOf(-1));
         BigDecimal treasuryFee = BigDecimal.ZERO;
@@ -267,10 +267,10 @@ public class OrderServiceTest extends IntegrationTest {
         BigDecimal positionNotionalSize = BigDecimal.valueOf(45610.5).multiply(BigDecimal.valueOf(2));
         BigDecimal makerSize = BigDecimal.valueOf(45612).multiply(BigDecimal.valueOf(1));
         BigDecimal takerSize = BigDecimal.valueOf(45611).multiply(BigDecimal.valueOf(0.5));
-        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
-                .add(takerSize.multiply(market.getInitialMargin()));
-        BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
-                .add(makerSize.multiply(market.getInitialMargin()));
+        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
+                .add(takerSize.multiply(market.getMarginRequirement()));
+        BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
+                .add(makerSize.multiply(market.getMarginRequirement()));
         BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
         BigDecimal takerFee = makerFee.multiply(BigDecimal.valueOf(-1));
         BigDecimal treasuryFee = BigDecimal.ZERO;
@@ -318,7 +318,7 @@ public class OrderServiceTest extends IntegrationTest {
         BigDecimal expectedMakerMargin = BigDecimal.valueOf(0.5).multiply(BigDecimal.valueOf(45612))
                 .add(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45613)))
                 .add(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45614)))
-                .multiply(market.getInitialMargin());
+                .multiply(market.getMarginRequirement());
         BigDecimal makerFee = market.getMakerFee().multiply(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45610))
                 .add(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45611)))
                 .add(BigDecimal.valueOf(0.5).multiply(BigDecimal.valueOf(45612)))
@@ -370,11 +370,11 @@ public class OrderServiceTest extends IntegrationTest {
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.valueOf(3.5), MarketSide.SELL, OrderType.MARKET, takerUser));
         BigDecimal expectedTakerMargin = (BigDecimal.ONE.multiply(BigDecimal.valueOf(45587.5))
-                .multiply(market.getMaintenanceMargin()));
+                .multiply(market.getMarginRequirement()));
         BigDecimal expectedMakerMargin = (BigDecimal.valueOf(0.5).multiply(BigDecimal.valueOf(45613))
                 .add(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45614))))
-                .multiply(market.getInitialMargin()).add(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45587.5)
-                        .multiply(market.getMaintenanceMargin())));
+                .multiply(market.getMarginRequirement()).add(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45587.5)
+                        .multiply(market.getMarginRequirement())));
         BigDecimal makerFee = market.getMakerFee().multiply(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45610))
                 .add(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45611)))
                 .add(BigDecimal.valueOf(0.5).multiply(BigDecimal.valueOf(45612)))
@@ -425,9 +425,9 @@ public class OrderServiceTest extends IntegrationTest {
                 null, BigDecimal.valueOf(0.5), MarketSide.SELL, OrderType.MARKET, takerUser));
         BigDecimal positionNotionalSize = BigDecimal.valueOf(45590).multiply(BigDecimal.valueOf(0.5));
         BigDecimal makerSize = BigDecimal.valueOf(45610).multiply(BigDecimal.valueOf(0.5));
-        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()));
-        BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
-                .add((makerSize).multiply(market.getInitialMargin()));
+        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()));
+        BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
+                .add((makerSize).multiply(market.getMarginRequirement()));
         BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
         BigDecimal takerFee = makerFee.multiply(BigDecimal.valueOf(-1));
         BigDecimal treasuryFee = BigDecimal.ZERO;
@@ -462,9 +462,9 @@ public class OrderServiceTest extends IntegrationTest {
                 BigDecimal.valueOf(45589), BigDecimal.valueOf(0.5), MarketSide.SELL, OrderType.LIMIT, takerUser));
         BigDecimal positionNotionalSize = BigDecimal.valueOf(45590).multiply(BigDecimal.valueOf(0.5));
         BigDecimal makerSize = BigDecimal.valueOf(45610).multiply(BigDecimal.valueOf(0.5)).add(BigDecimal.valueOf(45611).multiply(BigDecimal.valueOf(1))).add(BigDecimal.valueOf(45612).multiply(BigDecimal.valueOf(1)));
-        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()));
-        BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
-                .add(makerSize.multiply(market.getInitialMargin()));
+        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()));
+        BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
+                .add(makerSize.multiply(market.getMarginRequirement()));
         BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
         BigDecimal takerFee = makerFee.multiply(BigDecimal.valueOf(-1));
         BigDecimal treasuryFee = BigDecimal.ZERO;
@@ -504,10 +504,10 @@ public class OrderServiceTest extends IntegrationTest {
         BigDecimal positionNotionalSize = BigDecimal.valueOf(45589.5).multiply(BigDecimal.valueOf(2));
         BigDecimal makerSize = BigDecimal.valueOf(45612).multiply(BigDecimal.valueOf(1));
         BigDecimal takerSize = BigDecimal.valueOf(45589).multiply(BigDecimal.valueOf(0.5));
-        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
-                .add(takerSize.multiply(market.getInitialMargin()));
-        BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMaintenanceMargin()))
-                .add(makerSize.multiply(market.getInitialMargin()));
+        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
+                .add(takerSize.multiply(market.getMarginRequirement()));
+        BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
+                .add(makerSize.multiply(market.getMarginRequirement()));
         BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
         BigDecimal takerFee = makerFee.multiply(BigDecimal.valueOf(-1));
         BigDecimal treasuryFee = BigDecimal.ZERO;
@@ -780,7 +780,7 @@ public class OrderServiceTest extends IntegrationTest {
         Optional<Account> accountOptional = accountRepository.findByUserAndAsset(takerUser, market.getSettlementAsset());
         Assertions.assertTrue(accountOptional.isPresent());
         BigDecimal startingBalance = BigDecimal.valueOf(INITIAL_BALANCE);
-        BigDecimal marginBalance = order.getPrice().multiply(order.getSize()).multiply(market.getInitialMargin());
+        BigDecimal marginBalance = order.getPrice().multiply(order.getSize()).multiply(market.getMarginRequirement());
         BigDecimal availableBalance = startingBalance.subtract(marginBalance);
         Assertions.assertEquals(accountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
                 marginBalance.setScale(dps, RoundingMode.HALF_UP));
@@ -874,7 +874,7 @@ public class OrderServiceTest extends IntegrationTest {
         Optional<Account> accountOptional = accountRepository.findByUserAndAsset(takerUser, market.getSettlementAsset());
         Assertions.assertTrue(accountOptional.isPresent());
         BigDecimal startingBalance = BigDecimal.valueOf(INITIAL_BALANCE);
-        BigDecimal marginBalance = order.getPrice().multiply(order.getSize()).multiply(market.getInitialMargin());
+        BigDecimal marginBalance = order.getPrice().multiply(order.getSize()).multiply(market.getMarginRequirement());
         BigDecimal availableBalance = startingBalance.subtract(marginBalance);
         Assertions.assertEquals(accountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
                 marginBalance.setScale(dps, RoundingMode.HALF_UP));
@@ -1032,7 +1032,7 @@ public class OrderServiceTest extends IntegrationTest {
             final int liquidationOffset,
             final boolean withInsuranceFund
     ) throws InterruptedException {
-        Market market = createOrderBook(100, 100, 15);
+        Market market = createOrderBook(100, 100, 100);
         if(withInsuranceFund) {
             market = market.setInsuranceFund(BigDecimal.valueOf(1000000));
             market = marketRepository.save(market);
@@ -1045,7 +1045,7 @@ public class OrderServiceTest extends IntegrationTest {
         Position positionDegen = positionDegenOptional.get();
         BigDecimal price = side.equals(MarketSide.SELL) ? positionDegen.getLiquidationPrice().add(BigDecimal.valueOf(liquidationOffset)) :
                 positionDegen.getLiquidationPrice().subtract(BigDecimal.valueOf(liquidationOffset));
-        orderService.create(getCreateOrderRequest(market.getId(), price, BigDecimal.valueOf(400),
+        orderService.create(getCreateOrderRequest(market.getId(), price, BigDecimal.valueOf(5000),
                 orderService.getOtherSide(side), OrderType.LIMIT, takerUser));
         // TODO - use the generic method for validating market state instead of all of the code below...
         positionDegenOptional = positionRepository.findByUserAndMarket(degenUser, market);
@@ -1090,22 +1090,22 @@ public class OrderServiceTest extends IntegrationTest {
 
     @Test
     public void testLiquidationShortPositionWithLossSocialization() throws InterruptedException {
-        testLiquidation(MarketSide.SELL, 100, false);
+        testLiquidation(MarketSide.SELL, 300, false);
     }
 
     @Test
     public void testLiquidationShortPositionWithInsuranceFund() throws InterruptedException {
-        testLiquidation(MarketSide.SELL, 100, true);
+        testLiquidation(MarketSide.SELL, 300, true);
     }
 
     @Test
     public void testLiquidationLongPositionWithLossSocialization() throws InterruptedException {
-        testLiquidation(MarketSide.BUY, 100, false);
+        testLiquidation(MarketSide.BUY, 300, false);
     }
 
     @Test
     public void testLiquidationLongPositionWithInsuranceFund() throws InterruptedException {
-        testLiquidation(MarketSide.BUY, 100, true);
+        testLiquidation(MarketSide.BUY, 300, true);
     }
 
     private void validateMarketState(

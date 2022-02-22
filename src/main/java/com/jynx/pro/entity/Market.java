@@ -20,10 +20,8 @@ public class Market {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "settlement_asset_id", nullable = false)
     private Asset settlementAsset;
-    @Column(name = "initial_margin", nullable = false)
-    private BigDecimal initialMargin;
-    @Column(name = "maintenance_margin", nullable = false)
-    private BigDecimal maintenanceMargin;
+    @Column(name = "margin_requirement", nullable = false)
+    private BigDecimal marginRequirement;
     @Column(name = "tick_size", nullable = false)
     private Integer tickSize;
     @Column(name = "step_size", nullable = false)
@@ -34,6 +32,8 @@ public class Market {
     private BigDecimal makerFee;
     @Column(name = "taker_fee", nullable = false, scale = 8, precision = 18)
     private BigDecimal takerFee;
+    @Column(name = "liquidation_fee", nullable = false, scale = 8, precision = 18)
+    private BigDecimal liquidationFee;
     @Column(name = "open_volume", nullable = false, scale = 8, precision = 18)
     private BigDecimal openVolume = BigDecimal.ZERO;
     @Column(name = "volume_24h", nullable = false, scale = 8, precision = 18)
@@ -45,10 +45,8 @@ public class Market {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private MarketStatus status;
-    @Column(name = "pending_initial_margin", scale = 8, precision = 18)
-    private BigDecimal pendingInitialMargin;
-    @Column(name = "pending_maintenance_margin", scale = 8, precision = 18)
-    private BigDecimal pendingMaintenanceMargin;
+    @Column(name = "pending_margin_requirement", scale = 8, precision = 18)
+    private BigDecimal pendingMarginRequirement;
     @Column(name = "pending_tick_size")
     private Integer pendingTickSize;
     @Column(name = "pending_step_size")
@@ -59,6 +57,8 @@ public class Market {
     private BigDecimal pendingMakerFee;
     @Column(name = "pending_taker_fee", scale = 8, precision = 18)
     private BigDecimal pendingTakerFee;
+    @Column(name = "pending_liquidation_fee", scale = 8, precision = 18)
+    private BigDecimal pendingLiquidationFee;
     @Column(name = "insurance_fund", scale = 8, precision = 18)
     private BigDecimal insuranceFund = BigDecimal.ZERO;
 }
