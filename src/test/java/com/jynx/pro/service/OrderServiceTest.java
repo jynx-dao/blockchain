@@ -169,7 +169,7 @@ public class OrderServiceTest extends IntegrationTest {
             request.setId(order.getId());
             orderService.cancel(request);
             Order cancelledOrder = orderRepository.findById(order.getId()).orElse(new Order());
-            Assertions.assertEquals(cancelledOrder.getStatus(), OrderStatus.CANCELLED);
+            Assertions.assertEquals(cancelledOrder.getStatus(), OrderStatus.CANCELED);
         }
         int dps = market.getSettlementAsset().getDecimalPlaces();
         Optional<Account> accountOptional = accountRepository
@@ -656,7 +656,7 @@ public class OrderServiceTest extends IntegrationTest {
             bulkCancelRequest.get(i).setUser(makerUser);
         }
         orders = orderService.cancelMany(bulkCancelRequest);
-        orders.forEach(o -> Assertions.assertEquals(o.getStatus(), OrderStatus.CANCELLED));
+        orders.forEach(o -> Assertions.assertEquals(o.getStatus(), OrderStatus.CANCELED));
     }
 
     @Test
