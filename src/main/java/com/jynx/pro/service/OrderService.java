@@ -107,6 +107,8 @@ public class OrderService {
     public OrderBook getOrderBook(
             final Market market
     ) {
+        // TODO - need to group by price point
+        // TODO - need to add optional limit parameter
         OrderBook orderBook = new OrderBook();
         List<OrderBookItem> bids = getSideOfBook(market, MarketSide.BUY)
                 .stream()
@@ -216,7 +218,9 @@ public class OrderService {
         BigDecimal margin = getMarginRequirementWithNewOrder(market, order.getSide(), request.getSize(),
                 request.getPrice(), request.getUser());
         accountService.allocateMargin(margin, request.getUser(), market.getSettlementAsset());
-        return orderRepository.save(order);
+        order = orderRepository.save(order);
+        handleMarkPriceChange(market, market.getLastPrice()); // TODO - including this here breaks some tests
+        return order;
     }
 
     /**
@@ -233,7 +237,6 @@ public class OrderService {
             final Order order,
             final Market market
     ) {
-        int dps = market.getSettlementAsset().getDecimalPlaces();
         BigDecimal price = BigDecimal.ZERO;
         for(Order passiveOrder : passiveOrders) {
             price = passiveOrder.getPrice();
@@ -275,16 +278,33 @@ public class OrderService {
         }
         orderRepository.saveAll(passiveOrders);
         Order takerOrder = orderRepository.save(order);
+        handleMarkPriceChange(market, price);
+        return takerOrder;
+    }
+
+    /**
+     * Update the mark price, and:
+     * 1. Execute stop orders
+     * 2. Execute liquidations
+     * 3. Update passive liquidity
+     *
+     * @param market {@link Market}
+     * @param lastPrice the last traded price
+     */
+    private void handleMarkPriceChange(
+            final Market market,
+            final BigDecimal lastPrice
+    ) {
+        BigDecimal originalMarkPrice = market.getMarkPrice();
+        int dps = market.getSettlementAsset().getDecimalPlaces();
         BigDecimal markPrice = getMidPrice(market);
+        marketService.updateLastPrice(lastPrice, market);
         if(!markPrice.setScale(dps, RoundingMode.HALF_UP)
-                .equals(market.getMarkPrice().setScale(dps, RoundingMode.HALF_UP))) {
-            // TODO - how does the mark price get updated when the book moves without any trades happening??
-            marketService.updateLastPrice(price, market);
+                .equals(originalMarkPrice.setScale(dps, RoundingMode.HALF_UP))) {
             executeStopOrders(market);
             positionService.executeLiquidations(markPrice, market);
             positionService.updatePassiveLiquidity(market);
         }
-        return takerOrder;
     }
 
     /**
@@ -334,7 +354,8 @@ public class OrderService {
             final Order order,
             final Market market
     ) {
-        reconcileBalanceAfterStopOrder(createMarketOrder(null, market, order), market);
+        Order marketOrder = createMarketOrder(market, order);
+        reconcileBalanceAfterStopOrder(marketOrder, market);
     }
 
     /**
@@ -409,6 +430,21 @@ public class OrderService {
     /**
      * Create a market order
      *
+     * @param orderOverride {@link Order} to override when executing a stop-loss
+     * @param market {@link Market}
+     *
+     * @return the executed {@link Order}
+     */
+    private Order createMarketOrder(
+            final Market market,
+            final Order orderOverride
+    ) {
+        return createMarketOrder(null, market, orderOverride);
+    }
+
+    /**
+     * Create a market order
+     *
      * @param request {@link CreateOrderRequest}
      * @param market {@link Market}
      *
@@ -467,9 +503,6 @@ public class OrderService {
             final CreateOrderRequest request,
             final Market market
     ) {
-        if(request.getPostOnly() == null) {
-            request.setPostOnly(false);
-        }
         if(request.getPostOnly()) {
             throw new JynxProException(ErrorCode.POST_ONLY_FAILED);
         }
