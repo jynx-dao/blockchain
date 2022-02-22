@@ -219,7 +219,7 @@ public class OrderService {
                 request.getPrice(), request.getUser());
         accountService.allocateMargin(margin, request.getUser(), market.getSettlementAsset());
         order = orderRepository.save(order);
-        handleMarkPriceChange(market, market.getLastPrice()); // TODO - including this here breaks some tests
+        handleMarkPriceChange(market, market.getLastPrice());
         return order;
     }
 
