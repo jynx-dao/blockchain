@@ -129,6 +129,7 @@ public class PositionService {
             accountService.bookProfit(user, market, realisedProfit);
             BigDecimal margin = orderService.getMarginRequirement(market, user);
             accountService.allocateMargin(margin, user, market.getSettlementAsset());
+            updateLiquidationPrice(position);
         } else {
             BigDecimal averageEntryPrice = getAverageEntryPrice(position.getAverageEntryPrice(), price,
                     position.getSize(), size, dps);
@@ -232,7 +233,6 @@ public class PositionService {
             final Market market
     ) {
         List<Position> positions = positionRepository.findByMarket(market);
-        int dps = market.getSettlementAsset().getDecimalPlaces();
         for(Position position : positions) {
             if(position.getSize().doubleValue() == 0) {
                 continue;
@@ -248,27 +248,40 @@ public class PositionService {
         positions = positionRepository.saveAll(positions);
         for(Position position : positions) {
             BigDecimal margin = orderService.getMarginRequirement(market, position.getUser());
-            Account account = accountService.getAndCreate(position.getUser(), market.getSettlementAsset());
-            BigDecimal leverage = BigDecimal.ZERO;
-            BigDecimal liquidationPrice = BigDecimal.ZERO;
-            if(account.getBalance().doubleValue() > 0) {
-                leverage = (position.getSize().multiply(position.getAverageEntryPrice()))
-                        .divide(account.getBalance(), dps, RoundingMode.HALF_UP);
-            }
-            if(leverage.doubleValue() > 0) {
-                BigDecimal effectiveMargin = BigDecimal.ONE.divide(leverage, dps, RoundingMode.HALF_UP)
-                        .multiply(market.getLiquidationFee()
-                                .divide(market.getMarginRequirement(), dps, RoundingMode.HALF_UP));
-                liquidationPrice = position.getSide().equals(MarketSide.BUY) ?
-                        (BigDecimal.ONE.subtract(effectiveMargin)).multiply(position.getAverageEntryPrice()) :
-                        (BigDecimal.ONE.add(effectiveMargin)).multiply(position.getAverageEntryPrice());
-            }
-            position.setLeverage(leverage);
-            position.setLiquidationPrice(liquidationPrice);
-            position.setLatestMarkPrice(market.getMarkPrice());
             accountService.allocateMargin(margin, position.getUser(), market.getSettlementAsset());
+            updateLiquidationPrice(position);
         }
         positionRepository.saveAll(positions);
+    }
+
+    /**
+     * Update the liquidation price of given position
+     *
+     * @param position {@link Position}
+     */
+    private void updateLiquidationPrice(
+            final Position position
+    ) {
+        Market market = position.getMarket();
+        int dps = market.getSettlementAsset().getDecimalPlaces();
+        Account account = accountService.getAndCreate(position.getUser(), market.getSettlementAsset());
+        BigDecimal leverage = BigDecimal.ZERO;
+        BigDecimal liquidationPrice = BigDecimal.ZERO;
+        if(account.getBalance().doubleValue() > 0) {
+            leverage = (position.getSize().multiply(position.getAverageEntryPrice()))
+                    .divide(account.getBalance(), dps, RoundingMode.HALF_UP);
+        }
+        if(leverage.doubleValue() > 0) {
+            BigDecimal effectiveMargin = BigDecimal.ONE.divide(leverage, dps, RoundingMode.HALF_UP)
+                    .multiply(market.getLiquidationFee()
+                            .divide(market.getMarginRequirement(), dps, RoundingMode.HALF_UP));
+            liquidationPrice = position.getSide().equals(MarketSide.BUY) ?
+                    (BigDecimal.ONE.subtract(effectiveMargin)).multiply(position.getAverageEntryPrice()) :
+                    (BigDecimal.ONE.add(effectiveMargin)).multiply(position.getAverageEntryPrice());
+        }
+        position.setLeverage(leverage);
+        position.setLiquidationPrice(liquidationPrice);
+        position.setLatestMarkPrice(market.getMarkPrice());
     }
 
     /**
