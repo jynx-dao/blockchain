@@ -1,16 +1,11 @@
 package com.jynx.pro.service;
 
-import com.jynx.pro.constant.MarketSide;
-import com.jynx.pro.constant.OrderTag;
-import com.jynx.pro.constant.OrderType;
-import com.jynx.pro.constant.TransactionType;
+import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
-import com.jynx.pro.repository.AccountRepository;
-import com.jynx.pro.repository.MarketRepository;
-import com.jynx.pro.repository.PositionRepository;
-import com.jynx.pro.repository.TransactionRepository;
+import com.jynx.pro.repository.*;
+import com.jynx.pro.request.CancelOrderRequest;
 import com.jynx.pro.request.CreateOrderRequest;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -43,6 +38,8 @@ public class PositionService {
     private TransactionRepository transactionRepository;
     @Autowired
     private ConfigService configService;
+    @Autowired
+    private OrderRepository orderRepository;
     @Autowired
     private UUIDUtils uuidUtils;
 
@@ -130,8 +127,8 @@ public class PositionService {
             position.setRealisedPnl(position.getRealisedPnl().add(realisedProfit));
             position.setUnrealisedPnl(unrealisedProfitRatio.multiply(position.getUnrealisedPnl()));
             accountService.bookProfit(user, market, realisedProfit);
-            // TODO - when a loss is realised it might affect whether we have enough margin for open orders
-            // TODO - do we need to check whether any orders are under-collateralized and cancel them?
+            BigDecimal margin = orderService.getMarginRequirement(market, user);
+            accountService.allocateMargin(margin, user, market.getSettlementAsset());
         } else {
             BigDecimal averageEntryPrice = getAverageEntryPrice(position.getAverageEntryPrice(), price,
                     position.getSize(), size, dps);
@@ -383,7 +380,7 @@ public class PositionService {
                 createOrderRequest.setSide(orderService.getOtherSide(position.getSide()));
                 createOrderRequest.setSize(position.getSize());
                 orderService.create(createOrderRequest, true);
-                // TODO - when a liquidation occurs the traders open orders should be canceled
+                cancelOrders(market, position);
                 Account account = accountService.getAndCreate(
                         position.getUser(), position.getMarket().getSettlementAsset());
                 liquidatedPositions.add(position);
@@ -417,6 +414,34 @@ public class PositionService {
             position.setLatestMarkPrice(BigDecimal.ZERO);
         }
         positionRepository.saveAll(liquidatedPositions);
+    }
+
+    /**
+     * Cancel all orders when position is liquidated
+     *
+     * @param market {@link Market}
+     * @param position {@link Position}
+     */
+    private void cancelOrders(
+            final Market market,
+            final Position position
+    ) {
+        List<Order> stopOrders = orderRepository.findByStatusInAndTypeAndMarketAndUser(
+                List.of(OrderStatus.OPEN), OrderType.STOP_MARKET, market, position.getUser());
+        List<Order> limitOrders = orderRepository.findByStatusInAndTypeAndMarketAndUser(List.of(OrderStatus.OPEN,
+                OrderStatus.PARTIALLY_FILLED), OrderType.LIMIT, market, position.getUser());
+        stopOrders.forEach(order -> {
+            CancelOrderRequest request = new CancelOrderRequest();
+            request.setUser(order.getUser());
+            request.setId(order.getId());
+            orderService.cancel(request);
+        });
+        limitOrders.forEach(order -> {
+            CancelOrderRequest request = new CancelOrderRequest();
+            request.setUser(order.getUser());
+            request.setId(order.getId());
+            orderService.cancel(request);
+        });
     }
 
     /**
