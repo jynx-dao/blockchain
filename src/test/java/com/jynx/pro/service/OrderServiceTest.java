@@ -1047,7 +1047,7 @@ public class OrderServiceTest extends IntegrationTest {
                 positionDegen.getLiquidationPrice().subtract(BigDecimal.valueOf(liquidationOffset));
         orderService.create(getCreateOrderRequest(market.getId(), price, BigDecimal.valueOf(400),
                 orderService.getOtherSide(side), OrderType.LIMIT, takerUser));
-        // TODO - use the generic method for validating market state instead of all of the code below... 
+        // TODO - use the generic method for validating market state instead of all of the code below...
         positionDegenOptional = positionRepository.findByUserAndMarket(degenUser, market);
         Assertions.assertTrue(positionDegenOptional.isPresent());
         positionDegen = positionDegenOptional.get();

@@ -128,7 +128,6 @@ public class PositionService {
             BigDecimal unrealisedProfitRatio = BigDecimal.ONE.subtract(closingSize.abs()
                     .divide(originalPositionSize, dps, RoundingMode.HALF_UP));
             position.setRealisedPnl(position.getRealisedPnl().add(realisedProfit));
-            // TODO - the realised PNL needs to be added to the available balance
             position.setUnrealisedPnl(unrealisedProfitRatio.multiply(position.getUnrealisedPnl()));
             accountService.bookProfit(user, market, realisedProfit);
 
@@ -396,7 +395,7 @@ public class PositionService {
             final List<Position> winningPositions,
             final BigDecimal lossToSocialize
     ) {
-        double lossThreshold = 0.0001d;
+        double lossThreshold = 0d;
         BigDecimal remainingLoss = lossToSocialize;
         while(remainingLoss.doubleValue() > lossThreshold) {
             for (Position position : winningPositions) {
