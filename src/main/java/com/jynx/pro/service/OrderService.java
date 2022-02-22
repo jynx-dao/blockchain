@@ -1,14 +1,12 @@
 package com.jynx.pro.service;
 
-import com.jynx.pro.constant.MarketSide;
-import com.jynx.pro.constant.MarketStatus;
-import com.jynx.pro.constant.OrderStatus;
-import com.jynx.pro.constant.OrderType;
+import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.model.OrderBook;
 import com.jynx.pro.model.OrderBookItem;
+import com.jynx.pro.repository.OrderHistoryRepository;
 import com.jynx.pro.repository.OrderRepository;
 import com.jynx.pro.request.AmendOrderRequest;
 import com.jynx.pro.request.CancelOrderRequest;
@@ -38,9 +36,11 @@ public class OrderService {
     @Autowired
     private PositionService positionService;
     @Autowired
+    private UUIDUtils uuidUtils;
+    @Autowired
     private ConfigService configService;
     @Autowired
-    private UUIDUtils uuidUtils;
+    private OrderHistoryRepository orderHistoryRepository;
 
     private static final int MAX_BULK = 25;
 
@@ -161,6 +161,12 @@ public class OrderService {
         order = orderRepository.save(order);
         BigDecimal margin = getMarginRequirement(order.getMarket(), order.getUser());
         accountService.allocateMargin(margin, order.getUser(), order.getMarket().getSettlementAsset());
+        OrderHistory orderHistory = new OrderHistory()
+                .setOrder(order)
+                .setId(uuidUtils.next())
+                .setAction(OrderAction.CANCEL)
+                .setUpdated(configService.getTimestamp());
+        orderHistoryRepository.save(orderHistory);
         return order;
     }
 
@@ -236,9 +242,23 @@ public class OrderService {
             partialOrder.setStatus(OrderStatus.PARTIALLY_FILLED);
             fullOrder.setRemainingSize(BigDecimal.ZERO);
             fullOrder.setStatus(OrderStatus.FILLED);
-            tradeService.save(market, passiveOrder, order, price, size, order.getSide());
+            Trade trade = tradeService.save(market, passiveOrder, order, price, size, order.getSide());
             positionService.update(market, price, size, maker, getOtherSide(order.getSide()));
             positionService.update(market, price, size, taker, order.getSide());
+            OrderHistory passiveOrderHistory = new OrderHistory()
+                    .setOrder(passiveOrder)
+                    .setId(uuidUtils.next())
+                    .setTrade(trade)
+                    .setAction(OrderAction.FILL)
+                    .setUpdated(configService.getTimestamp());
+            OrderHistory aggressiveOrderHistory = new OrderHistory()
+                    .setOrder(order)
+                    .setTrade(trade)
+                    .setId(uuidUtils.next())
+                    .setAction(OrderAction.FILL)
+                    .setUpdated(configService.getTimestamp());
+            orderHistoryRepository.save(passiveOrderHistory);
+            orderHistoryRepository.save(aggressiveOrderHistory);
             if(order.getRemainingSize().equals(BigDecimal.ZERO)) {
                 order.setStatus(OrderStatus.FILLED);
                 break;
@@ -407,12 +427,21 @@ public class OrderService {
         if(!market.getStatus().equals(MarketStatus.ACTIVE)) {
             throw new JynxProException(ErrorCode.MARKET_NOT_ACTIVE);
         }
+        Order order;
         if(OrderType.LIMIT.equals(request.getType())) {
-            return handleLimitOrder(request, market);
+            order = handleLimitOrder(request, market);
         } else if(OrderType.STOP_MARKET.equals(request.getType())) {
             throw new JynxProException(ErrorCode.STOP_ORDER_NOT_SUPPORTED);
+        } else {
+            order = createMarketOrder(request, market);
         }
-        return createMarketOrder(request, market);
+        OrderHistory orderHistory = new OrderHistory()
+                .setOrder(order)
+                .setId(uuidUtils.next())
+                .setAction(OrderAction.CREATE)
+                .setUpdated(configService.getTimestamp());
+        orderHistoryRepository.save(orderHistory);
+        return order;
     }
 
     /**
@@ -489,7 +518,6 @@ public class OrderService {
         if(!statusList.contains(order.getStatus())) {
             throw new JynxProException(ErrorCode.INVALID_ORDER_STATUS);
         }
-        // TODO - order amend history should be saved
         if(!Objects.isNull(request.getSize()) && !request.getSize().setScale(dps, RoundingMode.HALF_UP)
                 .equals(order.getSize().setScale(dps, RoundingMode.HALF_UP))) {
             order.setSize(request.getSize());
@@ -522,6 +550,16 @@ public class OrderService {
         BigDecimal newMargin = combinedMargin.subtract(originalMargin);
         order = orderRepository.save(order);
         accountService.allocateMargin(newMargin, order.getUser(), order.getMarket().getSettlementAsset());
+        OrderHistory orderHistory = new OrderHistory()
+                .setOrder(order)
+                .setId(uuidUtils.next())
+                .setAction(OrderAction.AMEND)
+                .setFromPrice(originalPrice)
+                .setFromSize(originalSize)
+                .setToPrice(order.getPrice())
+                .setToSize(order.getSize())
+                .setUpdated(configService.getTimestamp());
+        orderHistoryRepository.save(orderHistory);
         return order;
     }
 

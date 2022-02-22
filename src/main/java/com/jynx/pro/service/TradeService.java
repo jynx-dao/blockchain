@@ -23,7 +23,7 @@ public class TradeService {
     @Autowired
     private ConfigService configService;
 
-    public void save(
+    public Trade save(
             final Market market,
             final Order passiveOrder,
             final Order takerOrder,
@@ -31,7 +31,7 @@ public class TradeService {
             final BigDecimal size,
             final MarketSide side
     ) {
-        tradeRepository.save(new Trade()
+        return tradeRepository.save(new Trade()
                 .setMakerOrder(passiveOrder)
                 .setTakerOrder(takerOrder)
                 .setMarket(market)
