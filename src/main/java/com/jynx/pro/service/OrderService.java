@@ -762,21 +762,36 @@ public class OrderService {
             final BigDecimal price,
             final User user
     ) {
-        // TODO - handle margin check including stop-loss orders
         Position position = positionService.getAndCreate(user, market);
         BigDecimal maintenanceMargin = position.getSize().multiply(position.getAverageEntryPrice())
                 .multiply(market.getMarginRequirement());
         List<OrderStatus> statusList = Arrays.asList(OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED);
-        List<Order> openOrders = orderRepository.findByStatusInAndTypeAndMarketAndUser(
+        List<Order> openLimitOrders = orderRepository.findByStatusInAndTypeAndMarketAndUser(
                 statusList, OrderType.LIMIT, market, user);
-        List<Order> buyOrders = openOrders.stream()
+        List<Order> openStopOrders = orderRepository.findByStatusInAndTypeAndMarketAndUser(
+                statusList, OrderType.STOP_MARKET, market, user);
+        List<Order> buyLimitOrders = openLimitOrders.stream()
                 .filter(o -> o.getSide().equals(MarketSide.BUY))
                 .sorted(Comparator.comparing(Order::getPrice).reversed())
                 .collect(Collectors.toList());
-        List<Order> sellOrders = openOrders.stream()
+        List<Order> sellLimitOrders = openLimitOrders.stream()
                 .filter(o -> o.getSide().equals(MarketSide.SELL))
                 .sorted(Comparator.comparing(Order::getPrice))
                 .collect(Collectors.toList());
+        List<Order> buyStopOrders = openStopOrders.stream()
+                .filter(o -> o.getSide().equals(MarketSide.BUY))
+                .sorted(Comparator.comparing(Order::getPrice).reversed())
+                .collect(Collectors.toList());
+        List<Order> sellStopOrders = openStopOrders.stream()
+                .filter(o -> o.getSide().equals(MarketSide.SELL))
+                .sorted(Comparator.comparing(Order::getPrice))
+                .collect(Collectors.toList());
+        List<Order> buyOrders = new ArrayList<>();
+        List<Order> sellOrders = new ArrayList<>();
+        buyOrders.addAll(buyLimitOrders);
+        buyOrders.addAll(buyStopOrders);
+        sellOrders.addAll(sellLimitOrders);
+        sellOrders.addAll(sellStopOrders);
         BigDecimal marginPrice = Objects.isNull(price) ? getMidPrice(market) : price;
         BigDecimal newSize = getEffectiveNewSize(position, side, size);
         BigDecimal newInitialMargin = marginPrice.multiply(newSize).multiply(market.getMarginRequirement());
