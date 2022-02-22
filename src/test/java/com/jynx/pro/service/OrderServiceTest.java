@@ -1080,12 +1080,12 @@ public class OrderServiceTest extends IntegrationTest {
 
     @Test
     public void testLiquidationShortPosition() throws InterruptedException {
-        testLiquidation(MarketSide.SELL, 1, false);
+        testLiquidation(MarketSide.SELL, 10, false);
     }
 
     @Test
     public void testLiquidationLongPosition() throws InterruptedException {
-        testLiquidation(MarketSide.BUY, 1, false);
+        testLiquidation(MarketSide.BUY, 10, false);
     }
 
     @Test

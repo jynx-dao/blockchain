@@ -419,6 +419,7 @@ public class PositionService {
             BigDecimal txSum = BigDecimal.valueOf(transactions.stream()
                     .mapToDouble(t -> t.getAmount().doubleValue()).sum());
             position.setRealisedPnl(txSum);
+            position.setUnrealisedPnl(BigDecimal.ZERO);
             position.setSide(null);
             position.setAverageEntryPrice(BigDecimal.ZERO);
             position.setLeverage(BigDecimal.ZERO);

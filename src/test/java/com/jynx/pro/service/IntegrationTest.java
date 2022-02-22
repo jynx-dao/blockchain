@@ -166,7 +166,7 @@ public abstract class IntegrationTest {
         request.setSettlementFrequency(8);
         request.setMakerFee(BigDecimal.valueOf(0.001));
         request.setTakerFee(BigDecimal.valueOf(0.001));
-        request.setLiquidationFee(BigDecimal.valueOf(0.0005));
+        request.setLiquidationFee(BigDecimal.valueOf(0.005));
         request.setSettlementAssetId(asset.getId());
         request.setUser(takerUser);
         request.setOpenTime(times[0]);
