@@ -130,7 +130,8 @@ public class PositionService {
             position.setRealisedPnl(position.getRealisedPnl().add(realisedProfit));
             position.setUnrealisedPnl(unrealisedProfitRatio.multiply(position.getUnrealisedPnl()));
             accountService.bookProfit(user, market, realisedProfit);
-
+            // TODO - when a loss is realised it might affect whether we have enough margin for open orders
+            // TODO - do we need to check whether any orders are under-collateralized and cancel them?
         } else {
             BigDecimal averageEntryPrice = getAverageEntryPrice(position.getAverageEntryPrice(), price,
                     position.getSize(), size, dps);
@@ -318,25 +319,21 @@ public class PositionService {
      *
      * @param market {@link Market}
      * @param account {@link Account}
-     * @param position {@link Position}
-     * @param winningPositions the winning {@link Position}s
      */
-    private void liquidateWithLossSocialization(
+    public void claimLossBySocialization(
             final Market market,
-            final Account account,
-            final Position position,
-            final List<Position> winningPositions
+            final Account account
     ) {
         BigDecimal insuranceFund = market.getInsuranceFund();
         BigDecimal lossToSocialize = account.getBalance().abs().subtract(insuranceFund);
         market.setInsuranceFund(BigDecimal.ZERO);
-        socializeLosses(winningPositions, lossToSocialize);
+        socializeLosses(market, lossToSocialize);
         Transaction transaction = new Transaction()
                 .setTimestamp(configService.getTimestamp())
-                .setAsset(position.getMarket().getSettlementAsset())
+                .setAsset(market.getSettlementAsset())
                 .setAmount(insuranceFund.add(lossToSocialize))
                 .setType(TransactionType.LIQUIDATION_CREDIT)
-                .setUser(position.getUser());
+                .setUser(account.getUser());
         transactionRepository.save(transaction);
     }
 
@@ -345,20 +342,18 @@ public class PositionService {
      *
      * @param market {@link Market}
      * @param account {@link Account}
-     * @param position {@link Position}
      */
-    private void liquidateWithInsuranceFund(
+    public void claimLossFromInsuranceFund(
             final Market market,
-            final Account account,
-            final Position position
+            final Account account
     ) {
         market.setInsuranceFund(market.getInsuranceFund().subtract(account.getBalance().abs()));
         Transaction transaction = new Transaction()
                 .setTimestamp(configService.getTimestamp())
-                .setAsset(position.getMarket().getSettlementAsset())
+                .setAsset(market.getSettlementAsset())
                 .setAmount(account.getBalance().multiply(BigDecimal.valueOf(-1)))
                 .setType(TransactionType.LIQUIDATION_CREDIT)
-                .setUser(position.getUser());
+                .setUser(account.getUser());
         transactionRepository.save(transaction);
     }
 
@@ -377,12 +372,6 @@ public class PositionService {
                 .filter(p -> p.getUnrealisedPnl().doubleValue() < 0)
                 .sorted(Comparator.comparing(Position::getLeverage).reversed().thenComparing(Position::getSize))
                 .collect(Collectors.toList());
-        List<Position> winningPositions = positionRepository.findByMarket(market).stream()
-                .filter(p -> p.getSize().doubleValue() > 0)
-                .filter(p -> p.getUnrealisedPnl().doubleValue() > 0)
-                .sorted(Comparator.comparing(Position::getLeverage).reversed()
-                        .thenComparing(Position::getUnrealisedPnl).reversed())
-                .collect(Collectors.toList());
         List<Position> liquidatedPositions = new ArrayList<>();
         for(Position position : losingPositions) {
             if(isDistressed(position, markPrice)) {
@@ -394,6 +383,7 @@ public class PositionService {
                 createOrderRequest.setSide(orderService.getOtherSide(position.getSide()));
                 createOrderRequest.setSize(position.getSize());
                 orderService.create(createOrderRequest, true);
+                // TODO - when a liquidation occurs the traders open orders should be canceled
                 Account account = accountService.getAndCreate(
                         position.getUser(), position.getMarket().getSettlementAsset());
                 liquidatedPositions.add(position);
@@ -401,9 +391,9 @@ public class PositionService {
                     liquidateWithExcessBalance(market, account, position);
                 } else if(account.getBalance().doubleValue() < 0) {
                     if(market.getInsuranceFund().doubleValue() < account.getBalance().abs().doubleValue()) {
-                        liquidateWithLossSocialization(market, account, position, winningPositions);
+                        claimLossBySocialization(market, account);
                     } else {
-                        liquidateWithInsuranceFund(market, account, position);
+                        claimLossFromInsuranceFund(market, account);
                     }
                 }
                 account.setBalance(BigDecimal.ZERO);
@@ -432,17 +422,17 @@ public class PositionService {
     /**
      * Close out winning positions to socialize the loss
      *
-     * @param winningPositions list of {@link Position}s
+     * @param market {@link Market}
      * @param lossToSocialize loss amount to socialize
      */
     private void socializeLosses(
-            final List<Position> winningPositions,
+            final Market market,
             final BigDecimal lossToSocialize
     ) {
         double lossThreshold = 0d;
         BigDecimal remainingLoss = lossToSocialize;
         while(remainingLoss.doubleValue() > lossThreshold) {
-            for (Position position : winningPositions) {
+            for (Position position : getLossSocializationQueue(market)) {
                 int dps = position.getMarket().getSettlementAsset().getDecimalPlaces();
                 BigDecimal positionRatio = remainingLoss.divide(position.getUnrealisedPnl(), dps, RoundingMode.HALF_UP);
                 BigDecimal lossSocializationSize = position.getSize().multiply(positionRatio);
@@ -482,6 +472,22 @@ public class PositionService {
                 }
             }
         }
+    }
+
+    /**
+     * Get a ranked list of positions to use when socializing losses
+     *
+     * @return list of {@link Position}s
+     */
+    public List<Position> getLossSocializationQueue(
+            final Market market
+    ) {
+        return positionRepository.findByMarket(market).stream()
+                .filter(p -> p.getSize().doubleValue() > 0)
+                .filter(p -> p.getUnrealisedPnl().doubleValue() > 0)
+                .sorted(Comparator.comparing(Position::getLeverage).reversed()
+                        .thenComparing(Position::getUnrealisedPnl).reversed())
+                .collect(Collectors.toList());
     }
 
     /**

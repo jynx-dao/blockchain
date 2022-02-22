@@ -170,6 +170,15 @@ public class OrderService {
         return order;
     }
 
+    /**
+     * Calculate the priority for new limit orders
+     *
+     * @param market {@link Market}
+     * @param side {@link MarketSide}
+     * @param price the limit order price
+     *
+     * @return the priority of the order
+     */
     private int getLimitOrderPriority(
             final Market market,
             final MarketSide side,
@@ -279,6 +288,24 @@ public class OrderService {
     }
 
     /**
+     * Check if a stop-loss order is triggered
+     *
+     * @param order stop-loss {@link Order}
+     * @param markPrice the current mark price
+     *
+     * @return true / false
+     */
+    private boolean isStopTriggered(
+            final Order order,
+            final BigDecimal markPrice
+    ) {
+        return (order.getSide().equals(MarketSide.SELL) &&
+                order.getPrice().doubleValue() < markPrice.doubleValue()) ||
+                (order.getSide().equals(MarketSide.BUY) &&
+                    order.getPrice().doubleValue() > markPrice.doubleValue());
+    }
+
+    /**
      * Execute all stop-loss orders
      *
      * @param market {@link Market}
@@ -286,11 +313,87 @@ public class OrderService {
     private void executeStopOrders(
             final Market market
     ) {
-        // TODO - implement this method when stop-market orders are supported
+        List<Order> stopOrders = orderRepository.findByStatusInAndTypeAndMarket(
+                List.of(OrderStatus.OPEN), OrderType.STOP_MARKET, market);
+        for(Order order : stopOrders) {
+            if(isStopTriggered(order, market.getLastPrice())) { // TODO - user should be able to choose whether to trigger on last price or mark price
+                order = createMarketOrder(null, market, order);
+                reconcileBalanceAfterStopOrder(order, market);
+            }
+        }
     }
 
     /**
-     * Create a passive market order
+     * Reconcile the user balance after a stop-loss order executes
+     *
+     * @param order {@link Order}
+     * @param market {@link Market}
+     */
+    private void reconcileBalanceAfterStopOrder(
+            final Order order,
+            final Market market
+    ) {
+        Account account = accountService.getAndCreate(order.getUser(), market.getSettlementAsset());
+        if(account.getBalance().doubleValue() < 0) {
+            if(market.getInsuranceFund().doubleValue() < account.getBalance().abs().doubleValue()) {
+                positionService.claimLossBySocialization(market, account);
+            } else {
+                positionService.claimLossFromInsuranceFund(market, account);
+            }
+        }
+    }
+
+    /**
+     * Create a market order
+     *
+     * @param request {@link CreateOrderRequest}
+     * @param market {@link Market}
+     * @param orderOverride {@link Order} to override when executing a stop-loss
+     *
+     * @return the executed {@link Order}
+     */
+    private Order createMarketOrder(
+            final CreateOrderRequest request,
+            final Market market,
+            final Order orderOverride
+    ) {
+        MarketSide side = orderOverride != null ? orderOverride.getSide() : request.getSide();
+        User user = orderOverride != null ? orderOverride.getUser() : request.getUser();
+        BigDecimal price = orderOverride != null ? orderOverride.getPrice() : request.getPrice();
+        BigDecimal size = orderOverride != null ? orderOverride.getSize() : request.getSize();
+        List<Order> passiveOrders = getSideOfBook(market, getOtherSide(side));
+        double passiveVolume = passiveOrders.stream().mapToDouble(o -> o.getRemainingSize().doubleValue()).sum();
+        Order order;
+        if(orderOverride != null) {
+            order = orderOverride;
+            order.setStatus(OrderStatus.FILLED);
+        } else {
+            order = new Order()
+                    .setTag(request.getTag())
+                    .setType(OrderType.MARKET)
+                    .setSide(side)
+                    .setMarket(market)
+                    .setStatus(OrderStatus.FILLED)
+                    .setSize(size)
+                    .setRemainingSize(size)
+                    .setId(uuidUtils.next())
+                    .setUser(user)
+                    .setPriority(0);
+        }
+        if(size.doubleValue() > passiveVolume) {
+            order.setStatus(OrderStatus.REJECTED);
+            order.setRejectedReason(ErrorCode.INSUFFICIENT_PASSIVE_VOLUME);
+            orderRepository.save(order);
+            throw new JynxProException(ErrorCode.INSUFFICIENT_PASSIVE_VOLUME);
+        }
+        order = orderRepository.save(order);
+        BigDecimal margin = getMarginRequirementWithNewOrder(market, side, size, price, user);
+        accountService.allocateMargin(margin, user, market.getSettlementAsset());
+        return matchOrders(passiveOrders, order, market);
+    }
+
+    /**
+     * Create a market order
      *
      * @param request {@link CreateOrderRequest}
      * @param market {@link Market}
@@ -301,30 +404,36 @@ public class OrderService {
             final CreateOrderRequest request,
             final Market market
     ) {
-        List<Order> passiveOrders = getSideOfBook(market, getOtherSide(request.getSide()));
-        double passiveVolume = passiveOrders.stream().mapToDouble(o -> o.getRemainingSize().doubleValue()).sum();
+        return createMarketOrder(request, market, null);
+    }
+
+    private Order handleStopOrder(
+            final CreateOrderRequest request,
+            final Market market
+    ) {
+        OrderBook orderBook = getOrderBook(market);
+        BigDecimal bestBid = orderBook.getBids().size() > 0 ? orderBook.getBids().get(0).getPrice() : BigDecimal.ZERO;
+        BigDecimal bestAsk = orderBook.getAsks().size() > 0 ? orderBook.getAsks().get(0).getPrice() : BigDecimal.ZERO;
+        BigDecimal price = request.getPrice();
         Order order = new Order()
-                .setTag(request.getTag())
-                .setType(OrderType.MARKET)
+                .setUser(request.getUser())
+                .setId(uuidUtils.next())
+                .setStatus(OrderStatus.OPEN)
+                .setType(OrderType.STOP_MARKET)
                 .setSide(request.getSide())
                 .setMarket(market)
-                .setStatus(OrderStatus.FILLED)
                 .setSize(request.getSize())
                 .setRemainingSize(request.getSize())
-                .setId(uuidUtils.next())
-                .setUser(request.getUser())
-                .setPriority(0);
-        if(request.getSize().doubleValue() > passiveVolume) {
-            order.setStatus(OrderStatus.REJECTED);
-            order.setRejectedReason(ErrorCode.INSUFFICIENT_PASSIVE_VOLUME);
-            orderRepository.save(order);
-            throw new JynxProException(ErrorCode.INSUFFICIENT_PASSIVE_VOLUME);
-        }
+                .setPrice(request.getPrice())
+                .setPriority(1)
+                .setTag(OrderTag.USER_GENERATED);
         order = orderRepository.save(order);
-        BigDecimal margin = getMarginRequirementWithNewOrder(market, order.getSide(), request.getSize(),
-                request.getPrice(), request.getUser());
-        accountService.allocateMargin(margin, request.getUser(), market.getSettlementAsset());
-        return matchOrders(passiveOrders, order, market);
+        if((request.getSide().equals(MarketSide.BUY) && price.doubleValue() > bestAsk.doubleValue()) ||
+                (request.getSide().equals(MarketSide.SELL) && price.doubleValue() < bestBid.doubleValue())) {
+            order = createMarketOrder(null, market, order);
+            reconcileBalanceAfterStopOrder(order, market);
+        }
+        return order;
     }
 
     /**
@@ -431,7 +540,7 @@ public class OrderService {
         if(OrderType.LIMIT.equals(request.getType())) {
             order = handleLimitOrder(request, market);
         } else if(OrderType.STOP_MARKET.equals(request.getType())) {
-            throw new JynxProException(ErrorCode.STOP_ORDER_NOT_SUPPORTED);
+            order = handleStopOrder(request, market);
         } else {
             order = createMarketOrder(request, market);
         }
@@ -644,6 +753,7 @@ public class OrderService {
             final BigDecimal price,
             final User user
     ) {
+        // TODO - handle margin check including stop-loss orders
         Position position = positionService.getAndCreate(user, market);
         BigDecimal maintenanceMargin = position.getSize().multiply(position.getAverageEntryPrice())
                 .multiply(market.getMarginRequirement());
