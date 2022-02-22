@@ -226,8 +226,8 @@ public class MarketService {
             market.setStepSize(market.getPendingStepSize());
             market.setPendingStepSize(null);
         }
-        // TODO - orders breaching the new step size, tick size, or decimal places will be cancelled
-        // TODO - orders breaching the new margin requirements will be cancelled
+        // TODO - orders breaching the new step size, tick size, or decimal places will be canceled
+        // TODO - orders breaching the new margin requirements will be canceled
         // TODO - positions that would breach the new margin requirements will be closed out
         // TODO - increasing liquidation fee will force out positions that become distressed
         marketRepository.save(market);
@@ -237,7 +237,7 @@ public class MarketService {
             final Proposal proposal
     ) {
         proposalService.checkEnacted(proposal);
-        // TODO - the market can only be settled (it cannot be unsuspended until it has been) and all orders will be cancelled
+        // TODO - the market can only be settled (it cannot be unsuspended until it has been) and all orders will be canceled
         updateStatus(proposal, MarketStatus.SUSPENDED);
     }
 
@@ -245,7 +245,7 @@ public class MarketService {
             final Proposal proposal
     ) {
         proposalService.checkEnacted(proposal);
-        // TODO - the market can only be unsuspended if it was settled, so when it opens again nobody will have any positions and all orders will be cancelled
+        // TODO - the market can only be unsuspended if it was settled, so when it opens again nobody will have any positions and all orders will be canceled
         updateStatus(proposal, MarketStatus.ACTIVE);
     }
 

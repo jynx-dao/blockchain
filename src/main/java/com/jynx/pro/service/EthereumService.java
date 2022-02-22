@@ -1,5 +1,6 @@
 package com.jynx.pro.service;
 
+import com.jynx.pro.entity.Withdrawal;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.ethereum.ERC20Detailed;
 import com.jynx.pro.ethereum.JynxPro_Bridge;
@@ -38,6 +39,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -295,6 +297,42 @@ public class EthereumService {
         } catch (Exception e) {
             log.error(e.getMessage(), e);
             throw new JynxProException(ErrorCode.CANNOT_GET_DECIMAL_PLACES);
+        }
+    }
+
+    /**
+     * Withdraw assets from the Jynx bridge
+     *
+     * @param destinations the destination wallet of each withdrawal
+     * @param amounts the withdrawal amounts
+     * @param assets the asset for each withdrawal
+     *
+     * @return {@link TransactionReceipt} from Ethereum
+     */
+    public TransactionReceipt withdrawAssets(
+            final List<String> destinations,
+            final List<BigInteger> amounts,
+            final List<String> assets
+    ) {
+        try {
+            Credentials credentials = Credentials.create(privateKey);
+            JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.get().getBridgeAddress(), getWeb3j(),
+                    credentials, new DefaultGasProvider());
+            BigInteger nonce = getNonce();
+            List<Utf8String> destinationsForSig = destinations.stream().map(Utf8String::new)
+                    .collect(Collectors.toList());
+            List<Uint256> amountsForSig = amounts.stream().map(Uint256::new)
+                    .collect(Collectors.toList());
+            List<Utf8String> assetsForSig = assets.stream().map(Utf8String::new)
+                    .collect(Collectors.toList());
+            List<Type> args = Arrays.asList(new DynamicArray<>(Utf8String.class, destinationsForSig),
+                    new DynamicArray<>(Uint256.class, amountsForSig), new DynamicArray<>(Utf8String.class, assetsForSig),
+                    new Uint256(nonce), new Utf8String("withdraw_assets"));
+            byte[] signature = getSignature(args, credentials);
+            return jynxProBridge.withdraw_assets(destinations, amounts, assets, nonce, signature).send();
+        } catch(Exception e) {
+            log.error(e.getMessage(), e);
+            throw new JynxProException(ErrorCode.CANNOT_WITHDRAW_ASSETS);
         }
     }
 

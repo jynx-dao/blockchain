@@ -43,4 +43,13 @@ public class ErrorCode {
     public static final String NEGATIVE_SIZE = "Size cannot be negative.";
     public static final String NEGATIVE_PRICE = "Price cannot be negative.";
     public static final String INVALID_LIQUIDATION_FEE = "Liquidation fee must be less than 50% of margin requirement.";
+    public static final String AMOUNT_MANDATORY = "Amount is mandatory.";
+    public static final String AMOUNT_NEGATIVE = "Amount cannot be negative.";
+    public static final String DESTINATION_MANDATORY = "Destination is mandatory.";
+    public static final String ASSET_ID_MANDATORY = "Asset ID is mandatory.";
+    public static final String INSUFFICIENT_BALANCE = "Insufficient balance.";
+    public static final String ID_MANDATORY = "ID is mandatory.";
+    public static final String WITHDRAWAL_NOT_FOUND = "Withdrawal was not found.";
+    public static final String WITHDRAWAL_NOT_PENDING = "Withdrawal not pending.";
+    public static final String CANNOT_WITHDRAW_ASSETS = "Cannot withdraw assets from bridge.";
 }

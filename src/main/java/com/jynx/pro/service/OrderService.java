@@ -157,7 +157,7 @@ public class OrderService {
         if(!statusList.contains(order.getStatus())) {
             throw new JynxProException(ErrorCode.INVALID_ORDER_STATUS);
         }
-        order.setStatus(OrderStatus.CANCELLED);
+        order.setStatus(OrderStatus.CANCELED);
         order = orderRepository.save(order);
         BigDecimal margin = getMarginRequirement(order.getMarket(), order.getUser());
         accountService.allocateMargin(margin, order.getUser(), order.getMarket().getSettlementAsset());
