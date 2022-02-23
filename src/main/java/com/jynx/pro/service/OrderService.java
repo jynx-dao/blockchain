@@ -396,7 +396,8 @@ public class OrderService {
         User user = orderOverride != null ? orderOverride.getUser() : request.getUser();
         BigDecimal price = orderOverride != null ? orderOverride.getPrice() : request.getPrice();
         BigDecimal size = orderOverride != null ? orderOverride.getSize() : request.getSize();
-        List<Order> passiveOrders = getSideOfBook(market, getOtherSide(side));
+        List<Order> passiveOrders = getSideOfBook(market, getOtherSide(side)).stream()
+                .filter(o -> !o.getUser().getId().equals(request.getUser().getId())).collect(Collectors.toList());
         double passiveVolume = passiveOrders.stream().mapToDouble(o -> o.getRemainingSize().doubleValue()).sum();
         Order order;
         if(orderOverride != null) {
@@ -512,7 +513,7 @@ public class OrderService {
             } else {
                 return o.getPrice().doubleValue() >= request.getPrice().doubleValue();
             }
-        }).collect(Collectors.toList());
+        }).filter(o -> !o.getUser().getId().equals(request.getUser().getId())).collect(Collectors.toList());
         Order order = new Order()
                 .setTag(request.getTag())
                 .setUser(request.getUser())

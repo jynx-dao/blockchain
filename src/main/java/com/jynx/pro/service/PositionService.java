@@ -2,8 +2,6 @@ package com.jynx.pro.service;
 
 import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.*;
-import com.jynx.pro.error.ErrorCode;
-import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.*;
 import com.jynx.pro.request.CancelOrderRequest;
 import com.jynx.pro.request.CreateOrderRequest;
@@ -455,7 +453,7 @@ public class PositionService {
     }
 
     /**
-     * Close out winning positions to socialize the loss
+     * Deduct the loss proportionally from users with a positive available balance
      *
      * @param market {@link Market}
      * @param lossToSocialize loss amount to socialize
@@ -464,66 +462,28 @@ public class PositionService {
             final Market market,
             final BigDecimal lossToSocialize
     ) {
-        double lossThreshold = 0.001d;
-        BigDecimal remainingLoss = lossToSocialize;
-        while(remainingLoss.doubleValue() > lossThreshold) {
-            List<Position> socializationQueue = getLossSocializationQueue(market);
-            for (Position position : socializationQueue) {
-                int dps = position.getMarket().getSettlementAsset().getDecimalPlaces();
-                BigDecimal positionRatio = remainingLoss.divide(position.getUnrealisedPnl(), dps, RoundingMode.HALF_UP);
-                BigDecimal lossSocializationSize = position.getSize().multiply(positionRatio);
-                BigDecimal orderSize = position.getSize().doubleValue() >= lossSocializationSize.doubleValue() ?
-                        lossSocializationSize : position.getSize();
-                CreateOrderRequest createOrderRequest = new CreateOrderRequest();
-                createOrderRequest.setTag(OrderTag.LOSS_SOCIALIZATION);
-                createOrderRequest.setUser(position.getUser());
-                createOrderRequest.setType(OrderType.MARKET);
-                createOrderRequest.setMarketId(position.getMarket().getId());
-                createOrderRequest.setSide(orderService.getOtherSide(position.getSide()));
-                createOrderRequest.setSize(orderSize);
-                orderService.create(createOrderRequest);
-                Transaction latestTx = transactionRepository.findByUserAndAsset(
-                                position.getUser(), position.getMarket().getSettlementAsset())
-                        .stream()
-                        .filter(t -> t.getType().equals(TransactionType.SETTLEMENT))
-                        .max(Comparator.comparing(Transaction::getId))
-                        .orElseThrow(() -> new JynxProException(ErrorCode.FATAL_ERROR));
-                remainingLoss = remainingLoss.subtract(latestTx.getAmount());
-                BigDecimal amountToDebit = remainingLoss.doubleValue() > 0 ?
-                        latestTx.getAmount() : latestTx.getAmount().add(remainingLoss);
-                Transaction transaction = new Transaction()
-                        .setTimestamp(configService.getTimestamp())
-                        .setAsset(position.getMarket().getSettlementAsset())
-                        .setAmount(amountToDebit.multiply(BigDecimal.valueOf(-1)))
-                        .setType(TransactionType.LOSS_SOCIALIZATION)
-                        .setUser(position.getUser());
-                transactionRepository.save(transaction);
-                Account account = accountService.getAndCreate(
-                        position.getUser(), position.getMarket().getSettlementAsset());
-                account.setBalance(account.getBalance().subtract(amountToDebit));
-                account.setAvailableBalance(account.getAvailableBalance().subtract(amountToDebit));
-                accountRepository.save(account);
-                if (remainingLoss.doubleValue() <= lossThreshold) {
-                    break;
-                }
-            }
+        int dps = market.getSettlementAsset().getDecimalPlaces();
+        List<Account> accounts = accountRepository.findByAssetAndAvailableBalanceGreaterThan(
+                market.getSettlementAsset(), BigDecimal.ZERO);
+        double sumAvailableBalance = accounts.stream().mapToDouble(a -> a.getAvailableBalance().doubleValue()).sum();
+        for(Account account : accounts) {
+            BigDecimal shareOfLoss = (account.getAvailableBalance()
+                    .divide(BigDecimal.valueOf(sumAvailableBalance), dps, RoundingMode.HALF_UP))
+                    .multiply(lossToSocialize);
+            account.setAvailableBalance(account.getAvailableBalance().subtract(shareOfLoss));
+            account.setBalance(account.getBalance().subtract(shareOfLoss));
+            Transaction transaction = new Transaction()
+                    .setTimestamp(configService.getTimestamp())
+                    .setAsset(market.getSettlementAsset())
+                    .setAmount(shareOfLoss.multiply(BigDecimal.valueOf(-1)))
+                    .setType(TransactionType.LOSS_SOCIALIZATION)
+                    .setUser(account.getUser());
+            transactionRepository.save(transaction);
         }
-    }
-
-    /**
-     * Get a ranked list of positions to use when socializing losses
-     *
-     * @return list of {@link Position}s
-     */
-    public List<Position> getLossSocializationQueue(
-            final Market market
-    ) {
-        return positionRepository.findByMarket(market).stream()
-                .filter(p -> p.getSize().doubleValue() > 0)
-                .filter(p -> p.getUnrealisedPnl().doubleValue() > 0)
-                .sorted(Comparator.comparing(Position::getLeverage).reversed()
-                        .thenComparing(Position::getUnrealisedPnl).reversed())
-                .collect(Collectors.toList());
+        // TODO - what do we do if we have no accounts with a positive balance?
+        // TODO - or when the sum of all positive balances isn't enough to cover the loss?
+        // TODO - are these scenarios even possible?
+        accountRepository.saveAll(accounts);
     }
 
     /**
