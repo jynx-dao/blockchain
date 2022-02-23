@@ -14,4 +14,5 @@ public interface PositionRepository extends JpaRepository<Position, UUID> {
     Optional<Position> findByUserAndMarket(User user, Market market);
     List<Position> findByMarket(Market market);
     List<Position> findByMarketAndSizeGreaterThan(Market market, BigDecimal size);
+    List<Position> findByIdIn(List<UUID> liquidatedPositionIds);
 }

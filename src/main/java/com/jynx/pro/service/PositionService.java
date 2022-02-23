@@ -14,10 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -382,7 +379,7 @@ public class PositionService {
                 .filter(p -> p.getUnrealisedPnl().doubleValue() < 0)
                 .sorted(Comparator.comparing(Position::getLeverage).reversed().thenComparing(Position::getSize))
                 .collect(Collectors.toList());
-        List<Position> liquidatedPositions = new ArrayList<>();
+        List<UUID> liquidatedPositionIds = new ArrayList<>();
         for(Position position : losingPositions) {
             if(isDistressed(position, markPrice)) {
                 CreateOrderRequest createOrderRequest = new CreateOrderRequest();
@@ -396,7 +393,7 @@ public class PositionService {
                 cancelOrders(market, position);
                 Account account = accountService.getAndCreate(
                         position.getUser(), position.getMarket().getSettlementAsset());
-                liquidatedPositions.add(position);
+                liquidatedPositionIds.add(position.getId());
                 if(account.getBalance().doubleValue() > 0) {
                     liquidateWithExcessBalance(market, account, position);
                 } else if(account.getBalance().doubleValue() < 0) {
@@ -410,9 +407,9 @@ public class PositionService {
                 account.setAvailableBalance(BigDecimal.ZERO);
                 account.setMarginBalance(BigDecimal.ZERO);
                 accountRepository.save(account);
-                marketRepository.save(market);
             }
         }
+        List<Position> liquidatedPositions = positionRepository.findByIdIn(liquidatedPositionIds);
         for(Position position : liquidatedPositions) {
             List<Transaction> transactions = transactionRepository.findByUserAndAsset(
                     position.getUser(), market.getSettlementAsset());

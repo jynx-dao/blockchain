@@ -11,6 +11,8 @@ import com.jynx.pro.model.OrderBookItem;
 import com.jynx.pro.request.AmendOrderRequest;
 import com.jynx.pro.request.CancelOrderRequest;
 import com.jynx.pro.request.CreateOrderRequest;
+import lombok.Data;
+import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -189,16 +191,37 @@ public class OrderServiceTest extends IntegrationTest {
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.MARKET, takerUser));
         BigDecimal positionNotionalSize = BigDecimal.valueOf(45610).multiply(BigDecimal.valueOf(0.5));
-        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()));
-        BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
+        BigDecimal takerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()));
+        BigDecimal makerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
                 .add((positionNotionalSize).multiply(market.getMarginRequirement()));
         BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
         BigDecimal takerFee = makerFee.multiply(BigDecimal.valueOf(-1));
         BigDecimal treasuryFee = BigDecimal.ZERO;
+        Trader maker = new Trader()
+                .setMargin(makerMargin)
+                .setAverageEntryPrice(BigDecimal.valueOf(45610))
+                .setUser(makerUser)
+                .setSide(MarketSide.SELL)
+                .setOpenVolume(BigDecimal.valueOf(0.5))
+                .setRealisedProfit(makerFee)
+                .setTradeCount(1)
+                .setFee(makerFee);
+        Trader taker = new Trader()
+                .setMargin(takerMargin)
+                .setAverageEntryPrice(BigDecimal.valueOf(45610))
+                .setUser(takerUser)
+                .setSide(MarketSide.BUY)
+                .setOpenVolume(BigDecimal.valueOf(0.5))
+                .setRealisedProfit(takerFee)
+                .setTradeCount(1)
+                .setFee(takerFee);
+        taker.setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(takerFee));
+        maker.setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(makerFee));
+        taker.setAvailableBalance(taker.getBalance().subtract(taker.getMargin()));
+        maker.setAvailableBalance(maker.getBalance().subtract(maker.getMargin()));
         validateMarketState(
                 market.getId(),
                 BigDecimal.valueOf(0.5),
-                BigDecimal.valueOf(45610),
                 BigDecimal.valueOf(45610),
                 BigDecimal.valueOf(45590),
                 BigDecimal.valueOf(45610),
@@ -206,16 +229,8 @@ public class OrderServiceTest extends IntegrationTest {
                 BigDecimal.valueOf(0.5),
                 1,
                 1,
-                MarketSide.SELL,
-                MarketSide.BUY,
-                1,
-                expectedTakerMargin,
-                expectedMakerMargin,
-                makerFee,
-                takerFee,
                 treasuryFee,
-                makerFee,
-                takerFee
+                List.of(maker, taker)
         );
     }
 
@@ -225,33 +240,48 @@ public class OrderServiceTest extends IntegrationTest {
         orderService.create(getCreateOrderRequest(market.getId(),
                 BigDecimal.valueOf(45611), BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.LIMIT, takerUser));
         BigDecimal positionNotionalSize = BigDecimal.valueOf(45610).multiply(BigDecimal.valueOf(0.5));
-        BigDecimal makerSize = positionNotionalSize.add(BigDecimal.valueOf(45611).multiply(BigDecimal.valueOf(1))).add(BigDecimal.valueOf(45612).multiply(BigDecimal.valueOf(1)));
-        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()));
-        BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
+        BigDecimal makerSize = positionNotionalSize.add(BigDecimal.valueOf(45611).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45612).multiply(BigDecimal.valueOf(1)));
+        BigDecimal takerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()));
+        BigDecimal makerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
                 .add(makerSize.multiply(market.getMarginRequirement()));
         BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
         BigDecimal takerFee = makerFee.multiply(BigDecimal.valueOf(-1));
         BigDecimal treasuryFee = BigDecimal.ZERO;
+        Trader maker = new Trader()
+                .setMargin(makerMargin)
+                .setAverageEntryPrice(BigDecimal.valueOf(45610))
+                .setUser(makerUser)
+                .setSide(MarketSide.SELL)
+                .setOpenVolume(BigDecimal.valueOf(0.5))
+                .setRealisedProfit(makerFee)
+                .setTradeCount(1)
+                .setFee(makerFee);
+        Trader taker = new Trader()
+                .setMargin(takerMargin)
+                .setAverageEntryPrice(BigDecimal.valueOf(45610))
+                .setUser(takerUser)
+                .setSide(MarketSide.BUY)
+                .setOpenVolume(BigDecimal.valueOf(0.5))
+                .setRealisedProfit(takerFee)
+                .setTradeCount(1)
+                .setFee(takerFee);
+        taker.setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(takerFee));
+        maker.setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(makerFee));
+        taker.setAvailableBalance(taker.getBalance().subtract(taker.getMargin()));
+        maker.setAvailableBalance(maker.getBalance().subtract(maker.getMargin()));
         validateMarketState(
                 market.getId(),
                 BigDecimal.valueOf(0.5),
                 BigDecimal.valueOf(45610),
-                BigDecimal.valueOf(45610),
                 BigDecimal.valueOf(45590),
-                BigDecimal.valueOf(45610), BigDecimal.valueOf(1),
+                BigDecimal.valueOf(45610),
+                BigDecimal.valueOf(1),
                 BigDecimal.valueOf(0.5),
                 3,
                 3,
-                MarketSide.SELL,
-                MarketSide.BUY,
-                1,
-                expectedTakerMargin,
-                expectedMakerMargin,
-                makerFee,
-                takerFee,
                 treasuryFee,
-                makerFee,
-                takerFee
+                List.of(maker, taker)
         );
         List<Order> orders = orderService.getOpenLimitOrders(market).stream()
                 .filter(o -> o.getUser().getId().equals(takerUser.getId())).collect(Collectors.toList());
@@ -267,17 +297,38 @@ public class OrderServiceTest extends IntegrationTest {
         BigDecimal positionNotionalSize = BigDecimal.valueOf(45610.5).multiply(BigDecimal.valueOf(2));
         BigDecimal makerSize = BigDecimal.valueOf(45612).multiply(BigDecimal.valueOf(1));
         BigDecimal takerSize = BigDecimal.valueOf(45611).multiply(BigDecimal.valueOf(0.5));
-        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
+        BigDecimal takerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
                 .add(takerSize.multiply(market.getMarginRequirement()));
-        BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
+        BigDecimal makerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
                 .add(makerSize.multiply(market.getMarginRequirement()));
         BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
         BigDecimal takerFee = makerFee.multiply(BigDecimal.valueOf(-1));
         BigDecimal treasuryFee = BigDecimal.ZERO;
+        Trader maker = new Trader()
+                .setMargin(makerMargin)
+                .setAverageEntryPrice(BigDecimal.valueOf(45610.5))
+                .setUser(makerUser)
+                .setSide(MarketSide.SELL)
+                .setOpenVolume(BigDecimal.valueOf(2))
+                .setRealisedProfit(makerFee)
+                .setTradeCount(2)
+                .setFee(makerFee);
+        Trader taker = new Trader()
+                .setMargin(takerMargin)
+                .setAverageEntryPrice(BigDecimal.valueOf(45610.5))
+                .setUser(takerUser)
+                .setSide(MarketSide.BUY)
+                .setOpenVolume(BigDecimal.valueOf(2))
+                .setRealisedProfit(takerFee)
+                .setTradeCount(2)
+                .setFee(takerFee);
+        taker.setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(takerFee));
+        maker.setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(makerFee));
+        taker.setAvailableBalance(taker.getBalance().subtract(taker.getMargin()));
+        maker.setAvailableBalance(maker.getBalance().subtract(maker.getMargin()));
         validateMarketState(
                 market.getId(),
                 BigDecimal.valueOf(2),
-                BigDecimal.valueOf(45610.5),
                 BigDecimal.valueOf(45611),
                 BigDecimal.valueOf(45611),
                 BigDecimal.valueOf(45612),
@@ -285,16 +336,8 @@ public class OrderServiceTest extends IntegrationTest {
                 BigDecimal.valueOf(1),
                 4,
                 1,
-                MarketSide.SELL,
-                MarketSide.BUY,
-                2,
-                expectedTakerMargin,
-                expectedMakerMargin,
-                makerFee,
-                takerFee,
                 treasuryFee,
-                makerFee,
-                takerFee
+                List.of(maker, taker)
         );
         List<Order> orders = orderService.getOpenLimitOrders(market).stream()
                 .filter(o -> o.getUser().getId().equals(takerUser.getId())).collect(Collectors.toList());
@@ -314,8 +357,8 @@ public class OrderServiceTest extends IntegrationTest {
                 null, BigDecimal.valueOf(2.5), MarketSide.BUY, OrderType.MARKET, takerUser));
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.valueOf(2.5), MarketSide.SELL, OrderType.MARKET, takerUser));
-        BigDecimal expectedTakerMargin = BigDecimal.ZERO;
-        BigDecimal expectedMakerMargin = BigDecimal.valueOf(0.5).multiply(BigDecimal.valueOf(45612))
+        BigDecimal takerMargin = BigDecimal.ZERO;
+        BigDecimal makerMargin = BigDecimal.valueOf(0.5).multiply(BigDecimal.valueOf(45612))
                 .add(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45613)))
                 .add(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45614)))
                 .multiply(market.getMarginRequirement());
@@ -337,10 +380,31 @@ public class OrderServiceTest extends IntegrationTest {
                 .divide(BigDecimal.valueOf(2.5), dps, RoundingMode.HALF_UP);;
         BigDecimal realisedProfit = ((exitPrice.subtract(entryPrice)).divide(entryPrice, dps, RoundingMode.HALF_UP))
                 .multiply(BigDecimal.valueOf(2.5).multiply(exitPrice)).abs();
+        Trader maker = new Trader()
+                .setMargin(makerMargin)
+                .setAverageEntryPrice(BigDecimal.valueOf(0))
+                .setUser(makerUser)
+                .setSide(null)
+                .setOpenVolume(BigDecimal.valueOf(0))
+                .setRealisedProfit(makerFee.add(realisedProfit))
+                .setTradeCount(6)
+                .setFee(makerFee);
+        Trader taker = new Trader()
+                .setMargin(takerMargin)
+                .setAverageEntryPrice(BigDecimal.valueOf(0))
+                .setUser(takerUser)
+                .setSide(null)
+                .setOpenVolume(BigDecimal.valueOf(0))
+                .setRealisedProfit(takerFee.subtract(realisedProfit))
+                .setTradeCount(6)
+                .setFee(takerFee);
+        taker.setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(takerFee).subtract(realisedProfit));
+        maker.setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(makerFee).add(realisedProfit));
+        taker.setAvailableBalance(taker.getBalance().subtract(taker.getMargin()));
+        maker.setAvailableBalance(maker.getBalance().subtract(maker.getMargin()));
         validateMarketState(
                 market.getId(),
-                BigDecimal.ZERO,
-                BigDecimal.ZERO,
+                BigDecimal.valueOf(0),
                 BigDecimal.valueOf(45588),
                 BigDecimal.valueOf(45588),
                 BigDecimal.valueOf(45612),
@@ -348,16 +412,8 @@ public class OrderServiceTest extends IntegrationTest {
                 BigDecimal.valueOf(0.5),
                 3,
                 3,
-                null,
-                null,
-                6,
-                expectedTakerMargin,
-                expectedMakerMargin,
-                makerFee,
-                takerFee,
                 treasuryFee,
-                realisedProfit.add(makerFee),
-                realisedProfit.multiply(BigDecimal.valueOf(-1)).add(takerFee)
+                List.of(maker, taker)
         );
     }
 
@@ -369,9 +425,9 @@ public class OrderServiceTest extends IntegrationTest {
                 null, BigDecimal.valueOf(2.5), MarketSide.BUY, OrderType.MARKET, takerUser));
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.valueOf(3.5), MarketSide.SELL, OrderType.MARKET, takerUser));
-        BigDecimal expectedTakerMargin = (BigDecimal.ONE.multiply(BigDecimal.valueOf(45587.5))
+        BigDecimal takerMargin = (BigDecimal.ONE.multiply(BigDecimal.valueOf(45587.5))
                 .multiply(market.getMarginRequirement()));
-        BigDecimal expectedMakerMargin = (BigDecimal.valueOf(0.5).multiply(BigDecimal.valueOf(45613))
+        BigDecimal makerMargin = (BigDecimal.valueOf(0.5).multiply(BigDecimal.valueOf(45613))
                 .add(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45614))))
                 .multiply(market.getMarginRequirement()).add(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45587.5)
                         .multiply(market.getMarginRequirement())));
@@ -394,10 +450,31 @@ public class OrderServiceTest extends IntegrationTest {
                 .divide(BigDecimal.valueOf(2.5), dps, RoundingMode.HALF_UP);;
         BigDecimal realisedProfit = ((exitPrice.subtract(entryPrice)).divide(entryPrice, dps, RoundingMode.HALF_UP))
                 .multiply(BigDecimal.valueOf(2.5).multiply(exitPrice)).abs();
+        Trader maker = new Trader()
+                .setMargin(makerMargin)
+                .setAverageEntryPrice(BigDecimal.valueOf(45587.5))
+                .setUser(makerUser)
+                .setSide(MarketSide.BUY)
+                .setOpenVolume(BigDecimal.valueOf(1))
+                .setRealisedProfit(makerFee.add(realisedProfit))
+                .setTradeCount(7)
+                .setFee(makerFee);
+        Trader taker = new Trader()
+                .setMargin(takerMargin)
+                .setAverageEntryPrice(BigDecimal.valueOf(45587.5))
+                .setUser(takerUser)
+                .setSide(MarketSide.SELL)
+                .setOpenVolume(BigDecimal.valueOf(1))
+                .setRealisedProfit(takerFee.subtract(realisedProfit))
+                .setTradeCount(7)
+                .setFee(takerFee);
+        taker.setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(takerFee).subtract(realisedProfit));
+        maker.setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(makerFee).add(realisedProfit));
+        taker.setAvailableBalance(taker.getBalance().subtract(taker.getMargin()));
+        maker.setAvailableBalance(maker.getBalance().subtract(maker.getMargin()));
         validateMarketState(
                 market.getId(),
-                BigDecimal.ONE,
-                BigDecimal.valueOf(45587.5),
+                BigDecimal.valueOf(1),
                 BigDecimal.valueOf(45587),
                 BigDecimal.valueOf(45587),
                 BigDecimal.valueOf(45612),
@@ -405,16 +482,8 @@ public class OrderServiceTest extends IntegrationTest {
                 BigDecimal.valueOf(0.5),
                 2,
                 3,
-                MarketSide.BUY,
-                MarketSide.SELL,
-                7,
-                expectedTakerMargin,
-                expectedMakerMargin,
-                makerFee,
-                takerFee,
                 treasuryFee,
-                realisedProfit.add(makerFee),
-                realisedProfit.multiply(BigDecimal.valueOf(-1)).add(takerFee)
+                List.of(maker, taker)
         );
     }
 
@@ -425,16 +494,37 @@ public class OrderServiceTest extends IntegrationTest {
                 null, BigDecimal.valueOf(0.5), MarketSide.SELL, OrderType.MARKET, takerUser));
         BigDecimal positionNotionalSize = BigDecimal.valueOf(45590).multiply(BigDecimal.valueOf(0.5));
         BigDecimal makerSize = BigDecimal.valueOf(45610).multiply(BigDecimal.valueOf(0.5));
-        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()));
-        BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
+        BigDecimal takerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()));
+        BigDecimal makerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
                 .add((makerSize).multiply(market.getMarginRequirement()));
         BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
         BigDecimal takerFee = makerFee.multiply(BigDecimal.valueOf(-1));
         BigDecimal treasuryFee = BigDecimal.ZERO;
+        Trader maker = new Trader()
+                .setMargin(makerMargin)
+                .setAverageEntryPrice(BigDecimal.valueOf(45590))
+                .setUser(makerUser)
+                .setSide(MarketSide.BUY)
+                .setOpenVolume(BigDecimal.valueOf(0.5))
+                .setRealisedProfit(makerFee)
+                .setTradeCount(1)
+                .setFee(makerFee);
+        Trader taker = new Trader()
+                .setMargin(takerMargin)
+                .setAverageEntryPrice(BigDecimal.valueOf(45590))
+                .setUser(takerUser)
+                .setSide(MarketSide.SELL)
+                .setOpenVolume(BigDecimal.valueOf(0.5))
+                .setRealisedProfit(takerFee)
+                .setTradeCount(1)
+                .setFee(takerFee);
+        taker.setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(takerFee));
+        maker.setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(makerFee));
+        taker.setAvailableBalance(taker.getBalance().subtract(taker.getMargin()));
+        maker.setAvailableBalance(maker.getBalance().subtract(maker.getMargin()));
         validateMarketState(
                 market.getId(),
                 BigDecimal.valueOf(0.5),
-                BigDecimal.valueOf(45590),
                 BigDecimal.valueOf(45590),
                 BigDecimal.valueOf(45590),
                 BigDecimal.valueOf(45610),
@@ -442,16 +532,8 @@ public class OrderServiceTest extends IntegrationTest {
                 BigDecimal.valueOf(1),
                 1,
                 1,
-                MarketSide.BUY,
-                MarketSide.SELL,
-                1,
-                expectedTakerMargin,
-                expectedMakerMargin,
-                makerFee,
-                takerFee,
                 treasuryFee,
-                makerFee,
-                takerFee
+                List.of(maker, taker)
         );
     }
 
@@ -462,16 +544,37 @@ public class OrderServiceTest extends IntegrationTest {
                 BigDecimal.valueOf(45589), BigDecimal.valueOf(0.5), MarketSide.SELL, OrderType.LIMIT, takerUser));
         BigDecimal positionNotionalSize = BigDecimal.valueOf(45590).multiply(BigDecimal.valueOf(0.5));
         BigDecimal makerSize = BigDecimal.valueOf(45610).multiply(BigDecimal.valueOf(0.5)).add(BigDecimal.valueOf(45611).multiply(BigDecimal.valueOf(1))).add(BigDecimal.valueOf(45612).multiply(BigDecimal.valueOf(1)));
-        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()));
-        BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
+        BigDecimal takerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()));
+        BigDecimal makerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
                 .add(makerSize.multiply(market.getMarginRequirement()));
         BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
         BigDecimal takerFee = makerFee.multiply(BigDecimal.valueOf(-1));
         BigDecimal treasuryFee = BigDecimal.ZERO;
+        Trader maker = new Trader()
+                .setMargin(makerMargin)
+                .setAverageEntryPrice(BigDecimal.valueOf(45590))
+                .setUser(makerUser)
+                .setSide(MarketSide.BUY)
+                .setOpenVolume(BigDecimal.valueOf(0.5))
+                .setRealisedProfit(makerFee)
+                .setTradeCount(1)
+                .setFee(makerFee);
+        Trader taker = new Trader()
+                .setMargin(takerMargin)
+                .setAverageEntryPrice(BigDecimal.valueOf(45590))
+                .setUser(takerUser)
+                .setSide(MarketSide.SELL)
+                .setOpenVolume(BigDecimal.valueOf(0.5))
+                .setRealisedProfit(takerFee)
+                .setTradeCount(1)
+                .setFee(takerFee);
+        taker.setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(takerFee));
+        maker.setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(makerFee));
+        taker.setAvailableBalance(taker.getBalance().subtract(taker.getMargin()));
+        maker.setAvailableBalance(maker.getBalance().subtract(maker.getMargin()));
         validateMarketState(
                 market.getId(),
                 BigDecimal.valueOf(0.5),
-                BigDecimal.valueOf(45590),
                 BigDecimal.valueOf(45590),
                 BigDecimal.valueOf(45590),
                 BigDecimal.valueOf(45610),
@@ -479,16 +582,8 @@ public class OrderServiceTest extends IntegrationTest {
                 BigDecimal.valueOf(1),
                 3,
                 3,
-                MarketSide.BUY,
-                MarketSide.SELL,
-                1,
-                expectedTakerMargin,
-                expectedMakerMargin,
-                makerFee,
-                takerFee,
                 treasuryFee,
-                makerFee,
-                takerFee
+                List.of(maker, taker)
         );
         List<Order> orders = orderService.getOpenLimitOrders(market).stream()
                 .filter(o -> o.getUser().getId().equals(takerUser.getId())).collect(Collectors.toList());
@@ -504,17 +599,38 @@ public class OrderServiceTest extends IntegrationTest {
         BigDecimal positionNotionalSize = BigDecimal.valueOf(45589.5).multiply(BigDecimal.valueOf(2));
         BigDecimal makerSize = BigDecimal.valueOf(45612).multiply(BigDecimal.valueOf(1));
         BigDecimal takerSize = BigDecimal.valueOf(45589).multiply(BigDecimal.valueOf(0.5));
-        BigDecimal expectedTakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
+        BigDecimal takerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
                 .add(takerSize.multiply(market.getMarginRequirement()));
-        BigDecimal expectedMakerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
+        BigDecimal makerMargin = (positionNotionalSize.multiply(market.getMarginRequirement()))
                 .add(makerSize.multiply(market.getMarginRequirement()));
         BigDecimal makerFee = positionNotionalSize.multiply(market.getMakerFee());
         BigDecimal takerFee = makerFee.multiply(BigDecimal.valueOf(-1));
         BigDecimal treasuryFee = BigDecimal.ZERO;
+        Trader maker = new Trader()
+                .setMargin(makerMargin)
+                .setAverageEntryPrice(BigDecimal.valueOf(45589.5))
+                .setUser(makerUser)
+                .setSide(MarketSide.BUY)
+                .setOpenVolume(BigDecimal.valueOf(2))
+                .setRealisedProfit(makerFee)
+                .setTradeCount(2)
+                .setFee(makerFee);
+        Trader taker = new Trader()
+                .setMargin(takerMargin)
+                .setAverageEntryPrice(BigDecimal.valueOf(45589.5))
+                .setUser(takerUser)
+                .setSide(MarketSide.SELL)
+                .setOpenVolume(BigDecimal.valueOf(2))
+                .setRealisedProfit(takerFee)
+                .setTradeCount(2)
+                .setFee(takerFee);
+        taker.setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(takerFee));
+        maker.setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(makerFee));
+        taker.setAvailableBalance(taker.getBalance().subtract(taker.getMargin()));
+        maker.setAvailableBalance(maker.getBalance().subtract(maker.getMargin()));
         validateMarketState(
                 market.getId(),
                 BigDecimal.valueOf(2),
-                BigDecimal.valueOf(45589.5),
                 BigDecimal.valueOf(45589),
                 BigDecimal.valueOf(45588),
                 BigDecimal.valueOf(45589),
@@ -522,16 +638,8 @@ public class OrderServiceTest extends IntegrationTest {
                 BigDecimal.valueOf(0.5),
                 1,
                 4,
-                MarketSide.BUY,
-                MarketSide.SELL,
-                2,
-                expectedTakerMargin,
-                expectedMakerMargin,
-                makerFee,
-                takerFee,
                 treasuryFee,
-                makerFee,
-                takerFee
+                List.of(maker, taker)
         );
         List<Order> orders = orderService.getOpenLimitOrders(market).stream()
                 .filter(o -> o.getUser().getId().equals(takerUser.getId())).collect(Collectors.toList());
@@ -1028,91 +1136,168 @@ public class OrderServiceTest extends IntegrationTest {
         }
     }
 
-    private void testLiquidation(
+    private BigDecimal testLiquidation(
             final MarketSide side,
             final int liquidationOffset,
-            final boolean withInsuranceFund
-    ) throws InterruptedException {
-        Market market = createOrderBook(100, 100, 100);
+            final boolean withInsuranceFund,
+            Market market
+    ) {
         if(withInsuranceFund) {
             market = market.setInsuranceFund(BigDecimal.valueOf(1000000));
             market = marketRepository.save(market);
         }
-        int dps = market.getSettlementAsset().getDecimalPlaces();
         orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1.5),
                 side, OrderType.MARKET, degenUser));
         Optional<Position> positionDegenOptional = positionRepository.findByUserAndMarket(degenUser, market);
         Assertions.assertTrue(positionDegenOptional.isPresent());
         Position positionDegen = positionDegenOptional.get();
-        BigDecimal price = side.equals(MarketSide.SELL) ? positionDegen.getLiquidationPrice().add(BigDecimal.valueOf(liquidationOffset)) :
+        BigDecimal price = side.equals(MarketSide.SELL) ?
+                positionDegen.getLiquidationPrice().add(BigDecimal.valueOf(liquidationOffset)) :
                 positionDegen.getLiquidationPrice().subtract(BigDecimal.valueOf(liquidationOffset));
         orderService.create(getCreateOrderRequest(market.getId(), price, BigDecimal.valueOf(5000),
                 orderService.getOtherSide(side), OrderType.LIMIT, takerUser));
-        // TODO - use the generic method for validating market state instead of all of the code below...
-        positionDegenOptional = positionRepository.findByUserAndMarket(degenUser, market);
-        Assertions.assertTrue(positionDegenOptional.isPresent());
-        positionDegen = positionDegenOptional.get();
-        Optional<Market> updatedMarketOptional = marketRepository.findById(market.getId());
-        Assertions.assertTrue(updatedMarketOptional.isPresent());
-        Market updatedMarket = updatedMarketOptional.get();
-        Optional<Account> degenAccountOptional = accountRepository.findByUserAndAsset(
-                degenUser, market.getSettlementAsset());
-        Assertions.assertTrue(degenAccountOptional.isPresent());
-        Account degenAccount = degenAccountOptional.get();
-        Assertions.assertEquals(degenAccount.getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
-                BigDecimal.ZERO.setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(degenAccount.getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
-                BigDecimal.ZERO.setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(degenAccount.getBalance().setScale(dps, RoundingMode.HALF_UP),
-                BigDecimal.ZERO.setScale(dps, RoundingMode.HALF_UP));
-        List<Transaction> transactions = transactionRepository.findByUserAndAsset(
-                degenUser, market.getSettlementAsset());
-        List<TransactionType> tradingTypes = Arrays.asList(TransactionType.SETTLEMENT, TransactionType.FEE);
-        double tradingSum = transactions.stream().filter(t -> tradingTypes.contains(t.getType()))
-                .mapToDouble(t -> t.getAmount().doubleValue()).sum();
-        List<TransactionType> liquidationTypes = Arrays.asList(TransactionType.LIQUIDATION_CREDIT,
-                TransactionType.LIQUIDATION_DEBIT, TransactionType.LOSS_SOCIALIZATION);
-        double liquidationSum = transactions.stream().filter(t -> liquidationTypes.contains(t.getType()))
-                .mapToDouble(t -> t.getAmount().doubleValue()).sum();
-        double txSum = tradingSum + liquidationSum;
-        Assertions.assertEquals(txSum, positionDegen.getRealisedPnl().doubleValue(), 0.001d);
-        Assertions.assertEquals(Math.abs(txSum), 1000d, 0.001d);
+        return price;
     }
 
     @Test
     public void testLiquidationShortPosition() throws InterruptedException {
-        testLiquidation(MarketSide.SELL, 10, false);
+        Market market = createOrderBook(100, 100, 100);
+        int dps = market.getSettlementAsset().getDecimalPlaces();
+        BigDecimal liqPrice = testLiquidation(MarketSide.SELL, 10, false, market);
+        BigDecimal makerAverageEntryPrice = BigDecimal.valueOf(45860);
+        BigDecimal takerAverageEntryPrice = BigDecimal.valueOf(45710);
+        BigDecimal makerFee = (BigDecimal.valueOf(45610).multiply(BigDecimal.valueOf(1))
+                .add(BigDecimal.valueOf(45710).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45810).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45910).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(46010).multiply(BigDecimal.valueOf(0.5)))
+                .add(BigDecimal.valueOf(45590).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45490).multiply(BigDecimal.valueOf(0.5))))
+                .multiply(market.getMakerFee());
+        BigDecimal takerFee = (BigDecimal.valueOf(45610).multiply(BigDecimal.valueOf(1))
+                .add(BigDecimal.valueOf(45710).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45810).multiply(BigDecimal.valueOf(1))))
+                .multiply(market.getTakerFee().multiply(BigDecimal.valueOf(-1)));
+        BigDecimal averageEntry = ((BigDecimal.valueOf(45590).multiply(BigDecimal.valueOf(1))
+                .add(BigDecimal.valueOf(45490).multiply(BigDecimal.valueOf(0.5)))))
+                .divide(BigDecimal.valueOf(1.5), dps, RoundingMode.HALF_UP);
+        BigDecimal profitPart1 = ((BigDecimal.valueOf(45610).subtract(averageEntry))
+                .divide(averageEntry, dps, RoundingMode.HALF_UP))
+                .multiply(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45610)));
+        BigDecimal profitPart2 = ((BigDecimal.valueOf(45710).subtract(averageEntry))
+                .divide(averageEntry, dps, RoundingMode.HALF_UP))
+                .multiply(BigDecimal.valueOf(0.5).multiply(BigDecimal.valueOf(45710)));
+        BigDecimal makerRealisedProfit = profitPart1.add(profitPart2).add(makerFee);
+        BigDecimal treasuryFee = BigDecimal.ZERO;
+        BigDecimal makerMargin = BigDecimal.ZERO;
+        OrderBook orderBook = orderService.getOrderBook(market);
+        for(OrderBookItem item : orderBook.getAsks()) {
+            makerMargin = makerMargin.add(item.getPrice().multiply(item.getSize().multiply(market.getMarginRequirement())));
+        }
+        makerMargin = makerMargin.add(BigDecimal.valueOf(3).multiply(makerAverageEntryPrice).multiply(market.getMarginRequirement()));
+        BigDecimal takerMargin = BigDecimal.valueOf(4997).multiply(liqPrice).multiply(market.getMarginRequirement());
+        takerMargin = takerMargin.add(BigDecimal.valueOf(3).multiply(takerAverageEntryPrice).multiply(market.getMarginRequirement()));
+        Trader maker = new Trader()
+                .setMargin(makerMargin)
+                .setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(makerRealisedProfit))
+                .setAverageEntryPrice(makerAverageEntryPrice)
+                .setUser(makerUser)
+                .setSide(MarketSide.SELL)
+                .setOpenVolume(BigDecimal.valueOf(3))
+                .setRealisedProfit(makerRealisedProfit)
+                .setTradeCount(7)
+                .setFee(makerFee);
+        Trader taker = new Trader()
+                .setMargin(takerMargin)
+                .setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(takerFee))
+                .setAverageEntryPrice(takerAverageEntryPrice)
+                .setUser(takerUser)
+                .setSide(MarketSide.BUY)
+                .setOpenVolume(BigDecimal.valueOf(3))
+                .setRealisedProfit(takerFee)
+                .setTradeCount(3)
+                .setFee(takerFee);
+        maker.setAvailableBalance(maker.getBalance().subtract(maker.getMargin()));
+        taker.setAvailableBalance(taker.getBalance().subtract(taker.getMargin()));
+        Trader degen = new Trader()
+                .setMargin(BigDecimal.ZERO)
+                .setAvailableBalance(BigDecimal.ZERO)
+                .setBalance(BigDecimal.ZERO)
+                .setAverageEntryPrice(BigDecimal.ZERO)
+                .setUser(degenUser)
+                .setSide(null)
+                .setOpenVolume(BigDecimal.valueOf(0))
+                .setRealisedProfit(BigDecimal.valueOf(-1000))
+                .setTradeCount(4)
+                .setFee(makerFee.abs().subtract(takerFee.abs()).multiply(BigDecimal.valueOf(-1)));
+        validateMarketState(
+                market.getId(),
+                BigDecimal.valueOf(3),
+                BigDecimal.valueOf(46010),
+                liqPrice,
+                BigDecimal.valueOf(46010),
+                BigDecimal.valueOf(4997),
+                BigDecimal.valueOf(0.5),
+                100,
+                96,
+                treasuryFee,
+                List.of(degen, maker, taker)
+        );
     }
 
     @Test
     public void testLiquidationLongPosition() throws InterruptedException {
-        testLiquidation(MarketSide.BUY, 10, false);
+        Market market = createOrderBook(100, 100, 100);
+        testLiquidation(MarketSide.BUY, 10, false, market);
+        // TODO - assert state (see testLiquidationShortPosition)
     }
 
     @Test
     public void testLiquidationShortPositionWithLossSocialization() throws InterruptedException {
-        testLiquidation(MarketSide.SELL, 300, false);
+        Market market = createOrderBook(100, 100, 100);
+        testLiquidation(MarketSide.SELL, 300, false, market);
+        // TODO - assert state (see testLiquidationShortPosition)
     }
 
     @Test
     public void testLiquidationShortPositionWithInsuranceFund() throws InterruptedException {
-        testLiquidation(MarketSide.SELL, 300, true);
+        Market market = createOrderBook(100, 100, 100);
+        testLiquidation(MarketSide.SELL, 300, true, market);
+        // TODO - assert state (see testLiquidationShortPosition)
     }
 
     @Test
     public void testLiquidationLongPositionWithLossSocialization() throws InterruptedException {
-        testLiquidation(MarketSide.BUY, 300, false);
+        Market market = createOrderBook(100, 100, 100);
+        testLiquidation(MarketSide.BUY, 300, false, market);
+        // TODO - assert state (see testLiquidationShortPosition)
     }
 
     @Test
     public void testLiquidationLongPositionWithInsuranceFund() throws InterruptedException {
-        testLiquidation(MarketSide.BUY, 300, true);
+        Market market = createOrderBook(100, 100, 100);
+        testLiquidation(MarketSide.BUY, 300, true, market);
+        // TODO - assert state (see testLiquidationShortPosition)
+    }
+
+    @Data
+    @Accessors(chain = true)
+    private static class Trader {
+        private MarketSide side;
+        private BigDecimal averageEntryPrice;
+        private BigDecimal margin;
+        private BigDecimal availableBalance;
+        private BigDecimal balance;
+        private BigDecimal realisedProfit;
+        private BigDecimal openVolume;
+        private int tradeCount;
+        private User user;
+        private BigDecimal fee;
     }
 
     private void validateMarketState(
             final UUID marketId,
-            final BigDecimal size,
-            final BigDecimal avgEntryPrice,
+            final BigDecimal openVolume,
             final BigDecimal lastPrice,
             final BigDecimal bidPrice,
             final BigDecimal askPrice,
@@ -1120,57 +1305,17 @@ public class OrderServiceTest extends IntegrationTest {
             final BigDecimal askSize,
             final int bidCount,
             final int askCount,
-            final MarketSide makerSide,
-            final MarketSide takerSide,
-            final int tradeCount,
-            final BigDecimal expectedTakerMargin,
-            final BigDecimal expectedMakerMargin,
-            final BigDecimal makerFee,
-            final BigDecimal takerFee,
             final BigDecimal treasuryFee,
-            final BigDecimal makerRealisedProfit,
-            final BigDecimal takerRealisedProfit
+            final List<Trader> traders
     ) {
-        Market market = marketRepository.getOne(marketId);
+        Optional<Market> marketOptional = marketRepository.findById(marketId);
+        Assertions.assertTrue(marketOptional.isPresent());
+        Market market = marketOptional.get();
         int dps = market.getSettlementAsset().getDecimalPlaces();
-        Optional<Position> positionOptionalMaker = positionRepository.findByUserAndMarket(makerUser, market);
-        Optional<Position> positionOptionalTaker = positionRepository.findByUserAndMarket(takerUser, market);
-        Assertions.assertTrue(positionOptionalMaker.isPresent());
-        Assertions.assertTrue(positionOptionalTaker.isPresent());
-        Position positionMaker = positionOptionalMaker.get();
-        Position positionTaker = positionOptionalTaker.get();
-        Assertions.assertEquals(positionMaker.getSize().setScale(dps, RoundingMode.HALF_UP),
-                size.setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(positionTaker.getSize().setScale(dps, RoundingMode.HALF_UP),
-                size.setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(positionMaker.getAverageEntryPrice().setScale(dps, RoundingMode.HALF_UP),
-                avgEntryPrice.setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(positionTaker.getAverageEntryPrice().setScale(dps, RoundingMode.HALF_UP),
-                avgEntryPrice.setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(positionMaker.getSide(), makerSide);
-        Assertions.assertEquals(positionTaker.getSide(), takerSide);
         Assertions.assertEquals(market.getOpenVolume().setScale(dps, RoundingMode.HALF_UP),
-                size.setScale(dps, RoundingMode.HALF_UP));
+                openVolume.setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(market.getLastPrice().setScale(dps, RoundingMode.HALF_UP),
                 lastPrice.setScale(dps, RoundingMode.HALF_UP));
-        List<Transaction> makerTxns = transactionRepository.findByUserAndAsset(makerUser, market.getSettlementAsset())
-                .stream().filter(t -> t.getType().equals(TransactionType.FEE)).collect(Collectors.toList());
-        List<Transaction> takerTxns = transactionRepository.findByUserAndAsset(takerUser, market.getSettlementAsset())
-                .stream().filter(t -> t.getType().equals(TransactionType.FEE)).collect(Collectors.toList());
-        Assertions.assertEquals(makerTxns.size(), tradeCount);
-        Assertions.assertEquals(takerTxns.size(), tradeCount);
-        BigDecimal makerFeeFromTxns = BigDecimal.ZERO;
-        BigDecimal takerFeeFromTxns = BigDecimal.ZERO;
-        for(int i=0; i<tradeCount; i++) {
-            makerFeeFromTxns = makerFeeFromTxns.add(makerTxns.get(i).getAmount());
-            takerFeeFromTxns = takerFeeFromTxns.add(takerTxns.get(i).getAmount());
-            Assertions.assertEquals(makerTxns.get(i).getType(), TransactionType.FEE);
-            Assertions.assertEquals(takerTxns.get(i).getType(), TransactionType.FEE);
-        }
-        Assertions.assertEquals(makerFeeFromTxns.setScale(dps, RoundingMode.HALF_UP),
-                makerFee.setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(takerFeeFromTxns.setScale(dps, RoundingMode.HALF_UP),
-                takerFee.setScale(dps, RoundingMode.HALF_UP));
         Optional<Asset> assetOptional = assetRepository.findById(market.getSettlementAsset().getId());
         Assertions.assertTrue(assetOptional.isPresent());
         Assertions.assertEquals(assetOptional.get().getTreasuryBalance().setScale(dps, RoundingMode.HALF_UP),
@@ -1186,67 +1331,68 @@ public class OrderServiceTest extends IntegrationTest {
                 bidPrice.setScale(dps, RoundingMode.HALF_UP));
         Assertions.assertEquals(orderBook.getAsks().get(0).getPrice().setScale(dps, RoundingMode.HALF_UP),
                 askPrice.setScale(dps, RoundingMode.HALF_UP));
-        List<Trade> makerTrades = tradeRepository.findByMakerOrderUserAndMarket(makerUser, market)
-                .stream().sorted(Comparator.comparing(Trade::getExecuted).reversed()).collect(Collectors.toList());
-        List<Trade> takerTrades = tradeRepository.findByTakerOrderUserAndMarket(takerUser, market)
-                .stream().sorted(Comparator.comparing(Trade::getExecuted).reversed()).collect(Collectors.toList());
-        Assertions.assertEquals(makerTrades.size(), takerTrades.size());
-        Assertions.assertEquals(makerTrades.size(), tradeCount);
-        Assertions.assertEquals(makerTrades.get(0).getId(), takerTrades.get(0).getId());
-        BigDecimal takerStartingBalance = BigDecimal.valueOf(INITIAL_BALANCE).add(takerRealisedProfit);
-        BigDecimal takerAvailableBalance = takerStartingBalance.subtract(expectedTakerMargin);
-        BigDecimal makerStartingBalance = BigDecimal.valueOf(INITIAL_BALANCE).add(makerRealisedProfit);
-        BigDecimal makerAvailableBalance = makerStartingBalance.subtract(expectedMakerMargin);
-        Optional<Account> makerAccountOptional = accountRepository.findByUserAndAsset(
-                makerUser, market.getSettlementAsset());
-        Optional<Account> takerAccountOptional = accountRepository.findByUserAndAsset(
-                takerUser, market.getSettlementAsset());
-        Assertions.assertTrue(makerAccountOptional.isPresent());
-        Assertions.assertTrue(takerAccountOptional.isPresent());
-        BigDecimal gain = BigDecimal.ZERO;
-        if(avgEntryPrice.doubleValue() > 0) {
-            gain = market.getMarkPrice().subtract(avgEntryPrice).divide(avgEntryPrice, dps, RoundingMode.HALF_UP);
+        for(Trader trader : traders) {
+            Optional<Position> positionOptional = positionRepository.findByUserAndMarket(trader.getUser(), market);
+            Assertions.assertTrue(positionOptional.isPresent());
+            Position position = positionOptional.get();
+            Optional<Account> accountOptional = accountRepository.findByUserAndAsset(
+                    trader.getUser(), market.getSettlementAsset());
+            Assertions.assertTrue(accountOptional.isPresent());
+            Assertions.assertEquals(position.getSize().setScale(dps, RoundingMode.HALF_UP),
+                    trader.getOpenVolume().setScale(dps, RoundingMode.HALF_UP));
+            Assertions.assertEquals(position.getAverageEntryPrice().setScale(dps, RoundingMode.HALF_UP),
+                    trader.getAverageEntryPrice().setScale(dps, RoundingMode.HALF_UP));
+            Assertions.assertEquals(position.getSide(), trader.getSide());
+            List<Transaction> txns = transactionRepository
+                    .findByUserAndAsset(trader.getUser(), market.getSettlementAsset())
+                    .stream()
+                    .filter(t -> t.getType().equals(TransactionType.FEE))
+                    .collect(Collectors.toList());
+            Assertions.assertEquals(txns.size(), trader.getTradeCount());
+            BigDecimal feeFromTxns = BigDecimal.ZERO;
+            for(int i=0; i<trader.getTradeCount(); i++) {
+                feeFromTxns = feeFromTxns.add(txns.get(i).getAmount());
+                Assertions.assertEquals(txns.get(i).getType(), TransactionType.FEE);
+            }
+            Assertions.assertEquals(feeFromTxns.setScale(dps, RoundingMode.HALF_UP),
+                    trader.getFee().setScale(dps, RoundingMode.HALF_UP));
+            BigDecimal gain = BigDecimal.ZERO;
+            if(trader.getAverageEntryPrice().doubleValue() > 0) {
+                gain = market.getMarkPrice().subtract(trader.getAverageEntryPrice())
+                        .divide(trader.getAverageEntryPrice(), dps, RoundingMode.HALF_UP);
+            }
+            BigDecimal unrealisedProfit = gain.multiply(trader.getOpenVolume())
+                    .multiply(trader.getAverageEntryPrice());
+            if(market.getMarkPrice().doubleValue() > position.getAverageEntryPrice().doubleValue() &&
+                    MarketSide.SELL.equals(position.getSide()) && unrealisedProfit.doubleValue() > 0) {
+                unrealisedProfit = unrealisedProfit.multiply(BigDecimal.valueOf(-1));
+            }
+            if(market.getMarkPrice().doubleValue() < position.getAverageEntryPrice().doubleValue() &&
+                    position.getSide().equals(MarketSide.BUY) && unrealisedProfit.doubleValue() > 0) {
+                unrealisedProfit = unrealisedProfit.multiply(BigDecimal.valueOf(-1));
+            }
+            if(market.getMarkPrice().doubleValue() < position.getAverageEntryPrice().doubleValue() &&
+                    MarketSide.SELL.equals(position.getSide()) && unrealisedProfit.doubleValue() < 0) {
+                unrealisedProfit = unrealisedProfit.multiply(BigDecimal.valueOf(-1));
+            }
+            if(market.getMarkPrice().doubleValue() > position.getAverageEntryPrice().doubleValue() &&
+                    MarketSide.BUY.equals(position.getSide()) && unrealisedProfit.doubleValue() < 0) {
+                unrealisedProfit = unrealisedProfit.multiply(BigDecimal.valueOf(-1));
+            }
+            Assertions.assertEquals(unrealisedProfit.setScale(dps, RoundingMode.HALF_UP),
+                    position.getUnrealisedPnl().setScale(dps, RoundingMode.HALF_UP));
+            Assertions.assertEquals(trader.getRealisedProfit().doubleValue(),
+                    position.getRealisedPnl().doubleValue(), 0.001d);
+            Assertions.assertEquals(accountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
+                    trader.getMargin().setScale(dps, RoundingMode.HALF_UP));
+            Assertions.assertEquals(accountOptional.get().getAvailableBalance().doubleValue(),
+                    trader.getAvailableBalance().doubleValue(), 0.001d);
+            Assertions.assertEquals(accountOptional.get().getBalance().doubleValue(),
+                    trader.getBalance().doubleValue(), 0.001d);
+            List<Transaction> settlementTxns = transactionRepository
+                    .findByUserAndAsset(trader.getUser(), market.getSettlementAsset());
+            double sumTxns = settlementTxns.stream().mapToDouble(t -> t.getAmount().doubleValue()).sum();
+            Assertions.assertEquals(sumTxns, position.getRealisedPnl().doubleValue(), 0.0001d);
         }
-        BigDecimal makerUnrealisedProfit = gain.multiply(size).multiply(avgEntryPrice).abs();
-        BigDecimal takerUnrealisedProfit = makerUnrealisedProfit.multiply(BigDecimal.valueOf(-1));
-        if(market.getMarkPrice().doubleValue() > positionMaker.getAverageEntryPrice().doubleValue() &&
-                MarketSide.SELL.equals(positionMaker.getSide())) {
-            makerUnrealisedProfit = makerUnrealisedProfit.multiply(BigDecimal.valueOf(-1));
-            takerUnrealisedProfit = takerUnrealisedProfit.multiply(BigDecimal.valueOf(-1));
-        }
-        if(market.getMarkPrice().doubleValue() < positionMaker.getAverageEntryPrice().doubleValue() &&
-                positionMaker.getSide().equals(MarketSide.BUY)) {
-            makerUnrealisedProfit = makerUnrealisedProfit.multiply(BigDecimal.valueOf(-1));
-            takerUnrealisedProfit = takerUnrealisedProfit.multiply(BigDecimal.valueOf(-1));
-        }
-        Assertions.assertEquals(makerUnrealisedProfit.setScale(dps, RoundingMode.HALF_UP),
-                positionMaker.getUnrealisedPnl().setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(takerUnrealisedProfit.setScale(dps, RoundingMode.HALF_UP),
-                positionTaker.getUnrealisedPnl().setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(makerRealisedProfit.doubleValue(),
-                positionMaker.getRealisedPnl().doubleValue(), 0.001d);
-        Assertions.assertEquals(takerRealisedProfit.doubleValue(),
-                positionTaker.getRealisedPnl().doubleValue(), 0.001d);
-        Assertions.assertEquals(makerAccountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
-                expectedMakerMargin.setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(makerAccountOptional.get().getAvailableBalance().doubleValue(),
-                makerAvailableBalance.doubleValue(), 0.001d);
-        Assertions.assertEquals(makerAccountOptional.get().getBalance().doubleValue(),
-                makerStartingBalance.doubleValue(), 0.001d);
-        Assertions.assertEquals(takerAccountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
-                expectedTakerMargin.setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(takerAccountOptional.get().getAvailableBalance().doubleValue(),
-                takerAvailableBalance.doubleValue(), 0.001d);
-        Assertions.assertEquals(takerAccountOptional.get().getBalance().doubleValue(),
-                takerStartingBalance.doubleValue(), 0.001d);
-        List<Transaction> makerSettlementTxns = transactionRepository
-                .findByUserAndAsset(makerUser, market.getSettlementAsset());
-        List<Transaction> takerSettlementTxns = transactionRepository
-                .findByUserAndAsset(takerUser, market.getSettlementAsset());
-        double sumTakerTxns = takerSettlementTxns.stream().mapToDouble(t -> t.getAmount().doubleValue()).sum();
-        double sumMakerTxns = makerSettlementTxns.stream().mapToDouble(t -> t.getAmount().doubleValue()).sum();
-        Assertions.assertEquals(sumTakerTxns, positionTaker.getRealisedPnl().doubleValue(), 0.0001d);
-        Assertions.assertEquals(sumMakerTxns, positionMaker.getRealisedPnl().doubleValue(), 0.0001d);
-        // TODO - check the balances across all positions and accounts are 100% reconciled
     }
 }
