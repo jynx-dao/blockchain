@@ -17,7 +17,6 @@ import org.testcontainers.utility.DockerImageName;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.List;
 import java.util.UUID;
 
 public abstract class IntegrationTest {
@@ -75,6 +74,7 @@ public abstract class IntegrationTest {
     @Autowired
     protected AccountService accountService;
 
+    protected static final String ETH_ADDRESS = "0xd7E1236C08731C3632519DCd1A581bFe6876a3B2";
     protected static final String PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
     private static final String GANACHE_CMD = String
             .format("ganache-cli --gasLimit 100000000 --account=\"%s,1000000000000000000000\"", PRIVATE_KEY);
