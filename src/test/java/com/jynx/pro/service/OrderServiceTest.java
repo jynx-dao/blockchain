@@ -1448,7 +1448,7 @@ public class OrderServiceTest extends IntegrationTest {
         );
     }
 
-    // TODO - test the result of self-trading
+    // TODO - test self-trading
 
     @Test
     public void testLiquidationShortPositionWithInsuranceFund() throws InterruptedException {
@@ -1545,15 +1545,224 @@ public class OrderServiceTest extends IntegrationTest {
     @Test
     public void testLiquidationLongPositionWithLossSocialization() throws InterruptedException {
         Market market = createOrderBook(100, 100, 100);
-        testLiquidation(MarketSide.BUY, 300, false, market);
-        // TODO - assert state (see testLiquidationShortPosition)
+        int dps = market.getSettlementAsset().getDecimalPlaces();
+        BigDecimal liqPrice = testLiquidation(MarketSide.BUY, 300, false, market);
+        BigDecimal makerAverageEntryPrice = BigDecimal.valueOf(45190);
+        BigDecimal takerAverageEntryPrice = BigDecimal.valueOf(45340);
+        BigDecimal makerFee = (BigDecimal.valueOf(45590).multiply(BigDecimal.valueOf(1))
+                .add(BigDecimal.valueOf(45490).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45390).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45290).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45190).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45090).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(44990).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(44890).multiply(BigDecimal.valueOf(0.5)))
+                .add(BigDecimal.valueOf(45610).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45710).multiply(BigDecimal.valueOf(0.5))))
+                .multiply(market.getMakerFee());
+        BigDecimal takerFee = (BigDecimal.valueOf(45590).multiply(BigDecimal.valueOf(1))
+                .add(BigDecimal.valueOf(45490).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45390).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45290).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45190).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45090).multiply(BigDecimal.valueOf(1))))
+                .multiply(market.getTakerFee().multiply(BigDecimal.valueOf(-1)));
+        BigDecimal averageEntry = ((BigDecimal.valueOf(45610).multiply(BigDecimal.valueOf(1))
+                .add(BigDecimal.valueOf(45710).multiply(BigDecimal.valueOf(0.5)))))
+                .divide(BigDecimal.valueOf(1.5), dps, RoundingMode.HALF_UP);
+        BigDecimal profitPart1 = ((BigDecimal.valueOf(45590).subtract(averageEntry))
+                .divide(averageEntry, dps, RoundingMode.HALF_UP))
+                .multiply(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45590)));
+        BigDecimal profitPart2 = ((BigDecimal.valueOf(45490).subtract(averageEntry))
+                .divide(averageEntry, dps, RoundingMode.HALF_UP))
+                .multiply(BigDecimal.valueOf(0.5).multiply(BigDecimal.valueOf(45490)));
+        BigDecimal makerRealisedProfit = profitPart1.abs().add(profitPart2.abs()).add(makerFee);
+        BigDecimal treasuryFee = BigDecimal.ZERO;
+        BigDecimal makerMargin = BigDecimal.ZERO;
+        OrderBook orderBook = orderService.getOrderBook(market);
+        int i = 0;
+        for(OrderBookItem item : orderBook.getAsks()) {
+            if(item.getSize().doubleValue() > 1) {
+                i++;
+                continue;
+            }
+            if(i <= 6) {
+                i++;
+                continue;
+            }
+            BigDecimal size = item.getSize();
+            if(i == 7) {
+                size = BigDecimal.valueOf(0.5);
+            }
+            i++;
+            makerMargin = makerMargin.add(item.getPrice().multiply(size.multiply(market.getMarginRequirement())));
+        }
+        makerMargin = makerMargin.add(BigDecimal.valueOf(6).multiply(makerAverageEntryPrice).multiply(market.getMarginRequirement()));
+        BigDecimal takerMargin = BigDecimal.valueOf(4994).multiply(liqPrice).multiply(market.getMarginRequirement());
+        takerMargin = takerMargin.add(BigDecimal.valueOf(6).multiply(takerAverageEntryPrice).multiply(market.getMarginRequirement()));
+        Trader maker = new Trader()
+                .setMargin(makerMargin)
+                .setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(makerRealisedProfit))
+                .setAverageEntryPrice(makerAverageEntryPrice)
+                .setUser(makerUser)
+                .setSide(MarketSide.BUY)
+                .setOpenVolume(BigDecimal.valueOf(6))
+                .setRealisedProfit(makerRealisedProfit)
+                .setTradeCount(10)
+                .setFee(makerFee);
+        Trader taker = new Trader()
+                .setMargin(takerMargin)
+                .setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(takerFee))
+                .setAverageEntryPrice(takerAverageEntryPrice)
+                .setUser(takerUser)
+                .setSide(MarketSide.SELL)
+                .setOpenVolume(BigDecimal.valueOf(6))
+                .setRealisedProfit(takerFee)
+                .setTradeCount(6)
+                .setFee(takerFee);
+        List<Transaction> lossSocializationTxns = transactionRepository.findAll().stream()
+                .filter(t -> t.getType().equals(TransactionType.LOSS_SOCIALIZATION)).collect(Collectors.toList());
+        BigDecimal lossSocializationTaker = lossSocializationTxns.stream()
+                .filter(t -> t.getUser().getId().equals(takerUser.getId()))
+                .findFirst().orElse(new Transaction().setAmount(BigDecimal.ZERO)).getAmount();
+        BigDecimal lossSocializationMaker = lossSocializationTxns.stream()
+                .filter(t -> t.getUser().getId().equals(takerUser.getId()))
+                .findFirst().orElse(new Transaction().setAmount(BigDecimal.ZERO)).getAmount();
+        maker.setAvailableBalance(maker.getBalance().subtract(maker.getMargin()).add(lossSocializationMaker));
+        taker.setAvailableBalance(taker.getBalance().subtract(taker.getMargin()).add(lossSocializationTaker));
+        maker.setBalance(maker.getBalance().add(lossSocializationMaker));
+        taker.setBalance(taker.getBalance().add(lossSocializationTaker));
+        Trader degen = new Trader()
+                .setMargin(BigDecimal.ZERO)
+                .setAvailableBalance(BigDecimal.ZERO)
+                .setBalance(BigDecimal.ZERO)
+                .setAverageEntryPrice(BigDecimal.ZERO)
+                .setUser(degenUser)
+                .setSide(null)
+                .setOpenVolume(BigDecimal.valueOf(0))
+                .setRealisedProfit(BigDecimal.valueOf(-1000))
+                .setTradeCount(4)
+                .setFee(makerFee.abs().subtract(takerFee.abs()).multiply(BigDecimal.valueOf(-1)));
+        validateMarketState(
+                market.getId(),
+                BigDecimal.valueOf(6),
+                BigDecimal.valueOf(44890),
+                BigDecimal.valueOf(44890),
+                liqPrice,
+                BigDecimal.valueOf(0.5),
+                BigDecimal.valueOf(4994),
+                93,
+                100,
+                treasuryFee,
+                List.of(maker, taker, degen)
+        );
     }
 
     @Test
     public void testLiquidationLongPositionWithInsuranceFund() throws InterruptedException {
         Market market = createOrderBook(100, 100, 100);
-        testLiquidation(MarketSide.BUY, 300, true, market);
-        // TODO - assert state (see testLiquidationShortPosition)
+        int dps = market.getSettlementAsset().getDecimalPlaces();
+        BigDecimal liqPrice = testLiquidation(MarketSide.BUY, 300, true, market);
+        BigDecimal makerAverageEntryPrice = BigDecimal.valueOf(45190);
+        BigDecimal takerAverageEntryPrice = BigDecimal.valueOf(45340);
+        BigDecimal makerFee = (BigDecimal.valueOf(45590).multiply(BigDecimal.valueOf(1))
+                .add(BigDecimal.valueOf(45490).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45390).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45290).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45190).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45090).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(44990).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(44890).multiply(BigDecimal.valueOf(0.5)))
+                .add(BigDecimal.valueOf(45610).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45710).multiply(BigDecimal.valueOf(0.5))))
+                .multiply(market.getMakerFee());
+        BigDecimal takerFee = (BigDecimal.valueOf(45590).multiply(BigDecimal.valueOf(1))
+                .add(BigDecimal.valueOf(45490).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45390).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45290).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45190).multiply(BigDecimal.valueOf(1)))
+                .add(BigDecimal.valueOf(45090).multiply(BigDecimal.valueOf(1))))
+                .multiply(market.getTakerFee().multiply(BigDecimal.valueOf(-1)));
+        BigDecimal averageEntry = ((BigDecimal.valueOf(45610).multiply(BigDecimal.valueOf(1))
+                .add(BigDecimal.valueOf(45710).multiply(BigDecimal.valueOf(0.5)))))
+                .divide(BigDecimal.valueOf(1.5), dps, RoundingMode.HALF_UP);
+        BigDecimal profitPart1 = ((BigDecimal.valueOf(45590).subtract(averageEntry))
+                .divide(averageEntry, dps, RoundingMode.HALF_UP))
+                .multiply(BigDecimal.valueOf(1).multiply(BigDecimal.valueOf(45590)));
+        BigDecimal profitPart2 = ((BigDecimal.valueOf(45490).subtract(averageEntry))
+                .divide(averageEntry, dps, RoundingMode.HALF_UP))
+                .multiply(BigDecimal.valueOf(0.5).multiply(BigDecimal.valueOf(45490)));
+        BigDecimal makerRealisedProfit = profitPart1.abs().add(profitPart2.abs()).add(makerFee);
+        BigDecimal treasuryFee = BigDecimal.ZERO;
+        BigDecimal makerMargin = BigDecimal.ZERO;
+        OrderBook orderBook = orderService.getOrderBook(market);
+        int i = 0;
+        for(OrderBookItem item : orderBook.getAsks()) {
+            if(item.getSize().doubleValue() > 1) {
+                i++;
+                continue;
+            }
+            if(i <= 6) {
+                i++;
+                continue;
+            }
+            BigDecimal size = item.getSize();
+            if(i == 7) {
+                size = BigDecimal.valueOf(0.5);
+            }
+            i++;
+            makerMargin = makerMargin.add(item.getPrice().multiply(size.multiply(market.getMarginRequirement())));
+        }
+        makerMargin = makerMargin.add(BigDecimal.valueOf(6).multiply(makerAverageEntryPrice).multiply(market.getMarginRequirement()));
+        BigDecimal takerMargin = BigDecimal.valueOf(4994).multiply(liqPrice).multiply(market.getMarginRequirement());
+        takerMargin = takerMargin.add(BigDecimal.valueOf(6).multiply(takerAverageEntryPrice).multiply(market.getMarginRequirement()));
+        Trader maker = new Trader()
+                .setMargin(makerMargin)
+                .setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(makerRealisedProfit))
+                .setAverageEntryPrice(makerAverageEntryPrice)
+                .setUser(makerUser)
+                .setSide(MarketSide.BUY)
+                .setOpenVolume(BigDecimal.valueOf(6))
+                .setRealisedProfit(makerRealisedProfit)
+                .setTradeCount(10)
+                .setFee(makerFee);
+        Trader taker = new Trader()
+                .setMargin(takerMargin)
+                .setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(takerFee))
+                .setAverageEntryPrice(takerAverageEntryPrice)
+                .setUser(takerUser)
+                .setSide(MarketSide.SELL)
+                .setOpenVolume(BigDecimal.valueOf(6))
+                .setRealisedProfit(takerFee)
+                .setTradeCount(6)
+                .setFee(takerFee);
+        maker.setAvailableBalance(maker.getBalance().subtract(maker.getMargin()));
+        taker.setAvailableBalance(taker.getBalance().subtract(taker.getMargin()));
+        Trader degen = new Trader()
+                .setMargin(BigDecimal.ZERO)
+                .setAvailableBalance(BigDecimal.ZERO)
+                .setBalance(BigDecimal.ZERO)
+                .setAverageEntryPrice(BigDecimal.ZERO)
+                .setUser(degenUser)
+                .setSide(null)
+                .setOpenVolume(BigDecimal.valueOf(0))
+                .setRealisedProfit(BigDecimal.valueOf(-1000))
+                .setTradeCount(4)
+                .setFee(makerFee.abs().subtract(takerFee.abs()).multiply(BigDecimal.valueOf(-1)));
+        validateMarketState(
+                market.getId(),
+                BigDecimal.valueOf(6),
+                BigDecimal.valueOf(44890),
+                BigDecimal.valueOf(44890),
+                liqPrice,
+                BigDecimal.valueOf(0.5),
+                BigDecimal.valueOf(4994),
+                93,
+                100,
+                treasuryFee,
+                List.of(maker, taker, degen)
+        );
+
     }
 
     @Data
