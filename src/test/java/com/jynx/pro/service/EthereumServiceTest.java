@@ -1,10 +1,14 @@
 package com.jynx.pro.service;
 
 import com.jynx.pro.Application;
+import com.jynx.pro.constant.WithdrawalStatus;
 import com.jynx.pro.entity.*;
+import com.jynx.pro.request.CreateWithdrawalRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.Ignore;
-import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -64,14 +68,7 @@ public class EthereumServiceTest extends IntegrationTest {
                 BigDecimal.valueOf(expectedStake).setScale(2, RoundingMode.HALF_UP));
     }
 
-    @Test
-    public void testStakeAndRemoveTokens() throws InterruptedException {
-        stakeTokens(100, false);
-        stakeTokens(0, true);
-    }
-
-    @Test
-    public void testDepositAsset() throws Exception {
+    private Asset depositAsset() throws Exception {
         Asset asset = createAndEnactAsset(true);
         boolean assetActive = ethereumHelper.getJynxProBridge().assets(asset.getAddress()).send();
         Assertions.assertTrue(assetActive);
@@ -92,5 +89,43 @@ public class EthereumServiceTest extends IntegrationTest {
                 BigDecimal.TEN.setScale(2, RoundingMode.HALF_UP));
         Assertions.assertEquals(account.get().getMarginBalance().setScale(2, RoundingMode.HALF_UP),
                 BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+        return asset;
+    }
+
+    private void withdrawAsset(
+            final Asset asset
+    ) {
+        Optional<User> user = userRepository.findByPublicKey(JYNX_KEY);
+        Assertions.assertTrue(user.isPresent());
+        CreateWithdrawalRequest request = new CreateWithdrawalRequest();
+        request.setUser(user.get());
+        request.setAssetId(asset.getId());
+        request.setAmount(BigDecimal.TEN);
+        request.setDestination(ethereumHelper.getJynxToken().getContractAddress());
+        Withdrawal withdrawal = accountService.createWithdrawal(request);
+        accountService.processWithdrawals();
+        Optional<Withdrawal> withdrawalOptional = withdrawalRepository.findById(withdrawal.getId());
+        Assertions.assertTrue(withdrawalOptional.isPresent());
+        Assertions.assertEquals(withdrawalOptional.get().getStatus(), WithdrawalStatus.DEBITED);
+        Optional<Account> account = accountRepository.findByUserAndAsset(user.get(), asset);
+        Assertions.assertTrue(account.isPresent());
+        Assertions.assertEquals(account.get().getBalance().setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+        Assertions.assertEquals(account.get().getAvailableBalance().setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+        Assertions.assertEquals(account.get().getMarginBalance().setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+    }
+
+    @Test
+    public void testStakeAndRemoveTokens() throws InterruptedException {
+        stakeTokens(100, false);
+        stakeTokens(0, true);
+    }
+
+    @Test
+    public void testDepositAndWithdrawAsset() throws Exception {
+        Asset asset = depositAsset();
+        withdrawAsset(asset);
     }
 }

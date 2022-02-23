@@ -70,6 +70,10 @@ public abstract class IntegrationTest {
     protected PositionRepository positionRepository;
     @Autowired
     protected OrderHistoryRepository orderHistoryRepository;
+    @Autowired
+    protected WithdrawalRepository withdrawalRepository;
+    @Autowired
+    protected AccountService accountService;
 
     protected static final String PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
     private static final String GANACHE_CMD = String
@@ -203,6 +207,7 @@ public abstract class IntegrationTest {
         accountRepository.deleteAll();
         depositRepository.deleteAll();
         transactionRepository.deleteAll();
+        withdrawalRepository.deleteAll();
         assetRepository.deleteAll();
         voteRepository.deleteAll();
         proposalRepository.deleteAll();

@@ -319,14 +319,14 @@ public class EthereumService {
             JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.get().getBridgeAddress(), getWeb3j(),
                     credentials, new DefaultGasProvider());
             BigInteger nonce = getNonce();
-            List<Utf8String> destinationsForSig = destinations.stream().map(Utf8String::new)
+            List<Address> destinationsForSig = destinations.stream().map(Address::new)
                     .collect(Collectors.toList());
             List<Uint256> amountsForSig = amounts.stream().map(Uint256::new)
                     .collect(Collectors.toList());
-            List<Utf8String> assetsForSig = assets.stream().map(Utf8String::new)
+            List<Address> assetsForSig = assets.stream().map(Address::new)
                     .collect(Collectors.toList());
-            List<Type> args = Arrays.asList(new DynamicArray<>(Utf8String.class, destinationsForSig),
-                    new DynamicArray<>(Uint256.class, amountsForSig), new DynamicArray<>(Utf8String.class, assetsForSig),
+            List<Type> args = Arrays.asList(new DynamicArray<>(Address.class, destinationsForSig),
+                    new DynamicArray<>(Uint256.class, amountsForSig), new DynamicArray<>(Address.class, assetsForSig),
                     new Uint256(nonce), new Utf8String("withdraw_assets"));
             byte[] signature = getSignature(args, credentials);
             return jynxProBridge.withdraw_assets(destinations, amounts, assets, nonce, signature).send();
