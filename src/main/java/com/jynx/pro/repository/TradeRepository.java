@@ -11,4 +11,6 @@ import java.util.UUID;
 public interface TradeRepository extends JpaRepository<Trade, Long> {
     List<Trade> findByMakerOrderUserAndMarket(User user, Market market);
     List<Trade> findByTakerOrderUserAndMarket(User user, Market market);
+    List<Trade> findByMarketId(UUID marketId);
+    List<Trade> findByTakerOrderUserIdAndMarketId(UUID userId, UUID marketId);
 }

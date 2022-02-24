@@ -102,6 +102,19 @@ public class OrderService {
     }
 
     /**
+     * Gets the current {@link OrderBook} of given market ID
+     *
+     * @param market the market ID
+     *
+     * @return the {@link OrderBook}
+     */
+    public OrderBook getOrderBook(
+            final UUID marketId
+    ) {
+        return getOrderBook(marketService.get(marketId));
+    }
+
+    /**
      * Gets the current {@link OrderBook} of given {@link Market}
      *
      * @param market the {@link Market}

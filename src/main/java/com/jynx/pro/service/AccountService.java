@@ -330,4 +330,31 @@ public class AccountService {
     ) {
         return accountRepository.findById(id).orElseThrow(() -> new JynxProException(ErrorCode.ACCOUNT_NOT_FOUND));
     }
+
+    public List<Deposit> getDeposits(
+            final UUID accountId,
+            final UUID userId
+    ) {
+        Account account = getById(accountId);
+        // TODO - pagination
+        return depositRepository.findByAssetIdAndUserId(account.getAsset().getId(), userId);
+    }
+
+    public List<Withdrawal> getWithdrawals(
+            final UUID accountId,
+            final UUID userId
+    ) {
+        Account account = getById(accountId);
+        // TODO - pagination
+        return withdrawalRepository.findByAssetIdAndUserId(account.getAsset().getId(), userId);
+    }
+
+    public List<Transaction> getTransactions(
+            final UUID accountId,
+            final UUID userId
+    ) {
+        Account account = getById(accountId);
+        // TODO - pagination
+        return transactionRepository.findByUserIdAndAssetId(userId, account.getAsset().getId());
+    }
 }

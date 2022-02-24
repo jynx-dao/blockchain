@@ -10,4 +10,5 @@ import java.util.UUID;
 
 public interface TransactionRepository extends JpaRepository<Transaction, UUID> {
     List<Transaction> findByUserAndAsset(User makerUser, Asset settlementAsset);
+    List<Transaction> findByUserIdAndAssetId(UUID userId, UUID assetId);
 }

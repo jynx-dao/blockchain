@@ -1,21 +1,16 @@
 package com.jynx.pro.controller;
 
-import com.jynx.pro.entity.Account;
-import com.jynx.pro.entity.Order;
-import com.jynx.pro.entity.Position;
-import com.jynx.pro.entity.User;
+import com.jynx.pro.entity.*;
 import com.jynx.pro.response.MultipleItemResponse;
 import com.jynx.pro.response.SingleItemResponse;
-import com.jynx.pro.service.AccountService;
-import com.jynx.pro.service.OrderService;
-import com.jynx.pro.service.PositionService;
-import com.jynx.pro.service.UserService;
+import com.jynx.pro.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.UUID;
 
@@ -31,6 +26,8 @@ public class UserController {
     private OrderService orderService;
     @Autowired
     private PositionService positionService;
+    @Autowired
+    private TradeService tradeService;
 
     @GetMapping("/{id}")
     public ResponseEntity<SingleItemResponse<User>> getById(
@@ -46,24 +43,32 @@ public class UserController {
         return ResponseEntity.ok(new SingleItemResponse<User>().setItem(userService.getByPublicKey(publicKey)));
     }
 
-    @GetMapping("/{userId}/accounts")
+    @GetMapping("/{id}/accounts")
     public ResponseEntity<MultipleItemResponse<Account>> getAccounts(
-            @PathVariable("userId") UUID userId
+            @PathVariable("id") UUID id
     ) {
-        return ResponseEntity.ok(new MultipleItemResponse<Account>().setItems(accountService.getByUserId(userId)));
+        return ResponseEntity.ok(new MultipleItemResponse<Account>().setItems(accountService.getByUserId(id)));
     }
 
-    @GetMapping("/{userId}/orders")
+    @GetMapping("/{id}/orders")
     public ResponseEntity<MultipleItemResponse<Order>> getOrders(
-            @PathVariable("userId") UUID userId
+            @PathVariable("id") UUID id
     ) {
-        return ResponseEntity.ok(new MultipleItemResponse<Order>().setItems(orderService.getByUserId(userId)));
+        return ResponseEntity.ok(new MultipleItemResponse<Order>().setItems(orderService.getByUserId(id)));
     }
 
-    @GetMapping("/{userId}/positions")
-    public ResponseEntity<MultipleItemResponse<Position>> getPositions(
-            @PathVariable("userId") UUID userId
+    @GetMapping("/{id}/trades")
+    public ResponseEntity<MultipleItemResponse<Trade>> getTrades(
+            @PathVariable("id") UUID id,
+            @RequestParam("marketId") UUID marketId
     ) {
-        return ResponseEntity.ok(new MultipleItemResponse<Position>().setItems(positionService.getByUserId(userId)));
+        return ResponseEntity.ok(new MultipleItemResponse<Trade>().setItems(tradeService.getByUserIdAndMarketId(id, marketId)));
+    }
+
+    @GetMapping("/{id}/positions")
+    public ResponseEntity<MultipleItemResponse<Position>> getPositions(
+            @PathVariable("id") UUID id
+    ) {
+        return ResponseEntity.ok(new MultipleItemResponse<Position>().setItems(positionService.getByUserId(id)));
     }
 }

@@ -9,4 +9,5 @@ import java.util.UUID;
 
 public interface WithdrawalRepository extends JpaRepository<Withdrawal, UUID> {
     List<Withdrawal> findByStatus(WithdrawalStatus status);
+    List<Withdrawal> findByAssetIdAndUserId(UUID assetId, UUID userId);
 }

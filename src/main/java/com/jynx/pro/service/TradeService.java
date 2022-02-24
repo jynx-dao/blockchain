@@ -11,6 +11,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -40,5 +42,18 @@ public class TradeService {
                 .setExecuted(configService.getTimestamp())
                 .setSize(size)
                 .setSide(side));
+    }
+
+    public List<Trade> getByMarketId(
+            final UUID marketId
+    ) {
+        return tradeRepository.findByMarketId(marketId);
+    }
+
+    public List<Trade> getByUserIdAndMarketId(
+            final UUID userId,
+            final UUID marketId
+    ) {
+        return tradeRepository.findByTakerOrderUserIdAndMarketId(userId, marketId);
     }
 }

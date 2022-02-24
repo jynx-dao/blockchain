@@ -1,6 +1,10 @@
 package com.jynx.pro.controller;
 
 import com.jynx.pro.entity.Account;
+import com.jynx.pro.entity.Deposit;
+import com.jynx.pro.entity.Transaction;
+import com.jynx.pro.entity.Withdrawal;
+import com.jynx.pro.response.MultipleItemResponse;
 import com.jynx.pro.response.SingleItemResponse;
 import com.jynx.pro.service.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -9,6 +13,7 @@ import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.UUID;
 
@@ -23,6 +28,34 @@ public class AccountController {
     public ResponseEntity<SingleItemResponse<Account>> getById(
             @PathVariable("id") UUID id
     ) {
-        return ResponseEntity.ok(new SingleItemResponse<Account>().setItem(accountService.getById(id)));
+        return ResponseEntity.ok(new SingleItemResponse<Account>()
+                .setItem(accountService.getById(id)));
+    }
+
+    @GetMapping("/{id}/deposits")
+    public ResponseEntity<MultipleItemResponse<Deposit>> getDeposits(
+            @PathVariable("id") UUID id,
+            @RequestParam("userId") UUID userId
+    ) {
+        return ResponseEntity.ok(new MultipleItemResponse<Deposit>()
+                .setItems(accountService.getDeposits(id, userId)));
+    }
+
+    @GetMapping("/{id}/withdrawals")
+    public ResponseEntity<MultipleItemResponse<Withdrawal>> getWithdrawals(
+            @PathVariable("id") UUID id,
+            @RequestParam("userId") UUID userId
+    ) {
+        return ResponseEntity.ok(new MultipleItemResponse<Withdrawal>()
+                .setItems(accountService.getWithdrawals(id, userId)));
+    }
+
+    @GetMapping("/{id}/transactions")
+    public ResponseEntity<MultipleItemResponse<Transaction>> getTransactions(
+            @PathVariable("id") UUID id,
+            @RequestParam("userId") UUID userId
+    ) {
+        return ResponseEntity.ok(new MultipleItemResponse<Transaction>()
+                .setItems(accountService.getTransactions(id, userId)));
     }
 }
