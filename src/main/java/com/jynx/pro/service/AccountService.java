@@ -8,6 +8,7 @@ import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.*;
+import com.jynx.pro.repository.cache.AccountCacheRepository;
 import com.jynx.pro.request.CreateWithdrawalRequest;
 import com.jynx.pro.request.SingleItemRequest;
 import com.jynx.pro.utils.PriceUtils;
@@ -22,6 +23,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -30,6 +32,8 @@ public class AccountService {
 
     private static final int WITHDRAWAL_BATCH_SIZE = 100;
 
+    @Autowired
+    private AccountCacheRepository accountCacheRepository;
     @Autowired
     private AccountRepository accountRepository;
     @Autowired

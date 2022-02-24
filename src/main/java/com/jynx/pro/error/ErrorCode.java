@@ -53,4 +53,5 @@ public class ErrorCode {
     public static final String CANNOT_GET_BINANCE_PRICE = "Cannot get price from Binance.";
     public static final String CANNOT_GET_COINBASE_PRICE = "Cannot get price from Coinbase.";
     public static final String CANNOT_GET_POLYGON_PRICE = "Cannot get price from Polygon.";
+    public static final String USER_NOT_FOUND = "User was not found.";
 }

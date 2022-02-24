@@ -14,4 +14,5 @@ import java.util.UUID;
 public interface AccountRepository extends JpaRepository<Account, UUID> {
     Optional<Account> findByUserAndAsset(User user, Asset asset);
     List<Account> findByAssetAndAvailableBalanceGreaterThan(Asset asset, BigDecimal availableBalance);
+    List<Account> findByUser(User user);
 }
