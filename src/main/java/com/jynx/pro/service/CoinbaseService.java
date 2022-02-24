@@ -34,16 +34,17 @@ public class CoinbaseService implements ExchangeService {
             final String symbol,
             final Long time
     ) {
-        String fromStr = LocalDateTime.ofEpochSecond(time - 60, 0, ZoneOffset.UTC)
+        String fromStr = LocalDateTime.ofEpochSecond(time - 120, 0, ZoneOffset.UTC)
                 .format(DateTimeFormatter.ISO_DATE_TIME);
-        String toStr = LocalDateTime.ofEpochSecond(time + 60, 0, ZoneOffset.UTC)
+        String toStr = LocalDateTime.ofEpochSecond(time + 120, 0, ZoneOffset.UTC)
                 .format(DateTimeFormatter.ISO_DATE_TIME);
         String path = "products/%s/candles?start=%s&end=%s&granularity=60";
         String url = String.format(API_URL, String.format(path, symbol,
                 URLEncoder.encode(fromStr, StandardCharsets.UTF_8),
                 URLEncoder.encode(toStr, StandardCharsets.UTF_8)));
+        HttpResponse<JsonNode> response = null;
         try {
-            HttpResponse<JsonNode> response = Unirest.get(url).asJson();
+            response = Unirest.get(url).asJson();
             int size = response.getBody().getArray().length();
             if(size == 0) {
                 throw new JynxProException(ErrorCode.CANNOT_GET_COINBASE_PRICE);
@@ -51,6 +52,7 @@ public class CoinbaseService implements ExchangeService {
             double price = response.getBody().getArray().getJSONArray(0).getDouble(4);
             return BigDecimal.valueOf(price);
         } catch(Exception e) {
+            log.info(response != null ? response.getBody().toString() : e.getMessage());
             throw new JynxProException(ErrorCode.CANNOT_GET_COINBASE_PRICE);
         }
     }

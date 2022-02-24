@@ -29,12 +29,13 @@ public class BinanceService implements ExchangeService {
             final String symbol,
             final Long time
     ) {
-        long from = (time - 60) * 1000;
-        long to = (time + 60) * 1000;
+        long from = (time - 120) * 1000;
+        long to = (time + 120) * 1000;
         String path = "api/v3/klines?symbol=%s&interval=1m&startTime=%s&endTime=%s&limit=1";
         String url = String.format(API_URL, String.format(path, symbol, from, to));
+        HttpResponse<JsonNode> response = null;
         try {
-            HttpResponse<JsonNode> response = Unirest.get(url).asJson();
+            response = Unirest.get(url).asJson();
             int size = response.getBody().getArray().length();
             if(size == 0) {
                 throw new JynxProException(ErrorCode.CANNOT_GET_BINANCE_PRICE);
@@ -42,6 +43,7 @@ public class BinanceService implements ExchangeService {
             double price = response.getBody().getArray().getJSONArray(size-1).getDouble(4);
             return BigDecimal.valueOf(price);
         } catch(Exception e) {
+            log.info(response != null ? response.getBody().toString() : e.getMessage());
             throw new JynxProException(ErrorCode.CANNOT_GET_BINANCE_PRICE);
         }
     }

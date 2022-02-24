@@ -38,12 +38,13 @@ public class PolygonService implements ExchangeService {
             final String symbol,
             final Long time
     ) {
-        long from = (time - 60) * 1000;
-        long to = (time + 60) * 1000;
+        long from = (time - 120) * 1000;
+        long to = (time + 120) * 1000;
         String path = "v2/aggs/ticker/%s/range/1/minute/%s/%s?apiKey=%s";
         String url = String.format(API_URL, String.format(path, symbol, from, to, apiKey));
+        HttpResponse<JsonNode> response = null;
         try {
-            HttpResponse<JsonNode> response = Unirest.get(url).asJson();
+            response = Unirest.get(url).asJson();
             int size = response.getBody().getObject().getJSONArray("results").length();
             if(size == 0) {
                 throw new JynxProException(ErrorCode.CANNOT_GET_POLYGON_PRICE);
@@ -52,6 +53,7 @@ public class PolygonService implements ExchangeService {
                     .getJSONObject(size-1).getDouble("c");
             return BigDecimal.valueOf(price);
         } catch(Exception e) {
+            log.info(response != null ? response.getBody().toString() : e.getMessage());
             throw new JynxProException(ErrorCode.CANNOT_GET_POLYGON_PRICE);
         }
     }
