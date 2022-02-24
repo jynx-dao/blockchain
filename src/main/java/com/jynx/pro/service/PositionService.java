@@ -175,7 +175,7 @@ public class PositionService {
      *
      * @return the updated gain %
      */
-    private BigDecimal flipGain(
+    public BigDecimal flipGain(
             final Position position,
             final BigDecimal gain,
             final BigDecimal price

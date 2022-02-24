@@ -124,12 +124,16 @@ public class ProposalService {
     public void reject() {
         List<Proposal> proposals = proposalRepository.findByStatus(ProposalStatus.OPEN)
                 .stream().filter(p -> p.getClosingTime() < configService.getTimestamp()).collect(Collectors.toList());
+        List<ProposalType> marketProposalTypes = List.of(ProposalType.ADD_MARKET, ProposalType.AMEND_MARKET,
+                ProposalType.SUSPEND_MARKET, ProposalType.UNSUSPEND_MARKET);
+        List<ProposalType> assetProposalTypes = List.of(ProposalType.ADD_ASSET, ProposalType.SUSPEND_ASSET,
+                ProposalType.UNSUSPEND_ASSET);
         for(Proposal proposal : proposals) {
             if(!isAboveThreshold(proposal)) {
                 proposal.setStatus(ProposalStatus.REJECTED);
-                if(ProposalType.ADD_ASSET.equals(proposal.getType())) {
+                if(assetProposalTypes.contains(proposal.getType())) {
                     assetService.reject(proposal);
-                } else if(ProposalType.ADD_MARKET.equals(proposal.getType())) {
+                } else if(marketProposalTypes.contains(proposal.getType())) {
                     marketService.reject(proposal);
                 }
             }

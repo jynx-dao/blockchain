@@ -1449,6 +1449,9 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     // TODO - test self-trading
+    // TODO - test liquidation with open orders (orders should be canceled)
+    // TODO - test stop market order
+    // TODO - test reduce only orders
 
     @Test
     public void testLiquidationShortPositionWithInsuranceFund() throws InterruptedException {

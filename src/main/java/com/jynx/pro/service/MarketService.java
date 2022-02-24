@@ -163,7 +163,7 @@ public class MarketService {
             throw new JynxProException(ErrorCode.MARKET_NOT_ACTIVE);
         }
         if(!Objects.isNull(request.getMarginRequirement())) {
-            market.setMarginRequirement(request.getMarginRequirement());
+            market.setPendingMarginRequirement(request.getMarginRequirement());
         }
         if(!Objects.isNull(request.getMakerFee())) {
             market.setPendingMakerFee(request.getMakerFee());
@@ -255,7 +255,7 @@ public class MarketService {
         Market market = get(proposal.getLinkedId());
         if(!Objects.isNull(market.getPendingMarginRequirement())) {
             market.setMarginRequirement(market.getPendingMarginRequirement());
-            market.setMarginRequirement(null);
+            market.setPendingMarginRequirement(null);
         }
         if(!Objects.isNull(market.getPendingMakerFee())) {
             market.setMakerFee(market.getPendingMakerFee());
@@ -265,8 +265,8 @@ public class MarketService {
             market.setTakerFee(market.getPendingTakerFee());
             market.setPendingTakerFee(null);
         }
-        if(!Objects.isNull(market.getLiquidationFee())) {
-            market.setLiquidationFee(market.getLiquidationFee());
+        if(!Objects.isNull(market.getPendingLiquidationFee())) {
+            market.setLiquidationFee(market.getPendingLiquidationFee());
             market.setPendingLiquidationFee(null);
         }
         if(!Objects.isNull(market.getPendingSettlementFrequency())) {
@@ -306,10 +306,11 @@ public class MarketService {
 
     public void updateLastPrice(
             final BigDecimal lastPrice,
+            final BigDecimal markPrice,
             final Market market
     ) {
         market.setLastPrice(lastPrice);
-        market.setMarkPrice(orderService.getMidPrice(market));
+        market.setMarkPrice(markPrice);
         market.setOpenVolume(positionService.calculateOpenVolume(market));
         marketRepository.save(market);
         positionService.updateUnrealisedProfit(market);

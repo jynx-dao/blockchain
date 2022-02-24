@@ -300,8 +300,9 @@ public class OrderService {
         // TODO - we can significantly improve performance by doing this on a time loop instead of after every trade
         BigDecimal originalMarkPrice = market.getMarkPrice();
         int dps = market.getSettlementAsset().getDecimalPlaces();
+        // TODO - should the mark price come from the settlement price source?
         BigDecimal markPrice = getMidPrice(market);
-        marketService.updateLastPrice(lastPrice, market);
+        marketService.updateLastPrice(lastPrice, markPrice, market);
         auctionService.checkTriggers(market);
         if(!markPrice.setScale(dps, RoundingMode.HALF_UP)
                 .equals(originalMarkPrice.setScale(dps, RoundingMode.HALF_UP))) {
@@ -585,10 +586,6 @@ public class OrderService {
         Market market = marketService.get(request.getMarketId());
         if(!skipMarginCheck) {
             performMarginCheck(market, request.getSide(), request.getSize(), request.getPrice(), request.getUser());
-        } else {
-            if(!request.getType().equals(OrderType.MARKET)) {
-                performMarginCheck(market, request.getSide(), request.getSize(), request.getPrice(), request.getUser());
-            }
         }
         if(!market.getStatus().equals(MarketStatus.ACTIVE)) {
             throw new JynxProException(ErrorCode.MARKET_NOT_ACTIVE);
