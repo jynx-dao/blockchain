@@ -1,6 +1,9 @@
 package com.jynx.pro.service;
 
-import com.jynx.pro.constant.*;
+import com.jynx.pro.constant.AssetStatus;
+import com.jynx.pro.constant.AssetType;
+import com.jynx.pro.constant.MarketStatus;
+import com.jynx.pro.constant.OracleType;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.helper.EthereumHelper;
 import com.jynx.pro.repository.*;
@@ -17,7 +20,6 @@ import org.testcontainers.utility.DockerImageName;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.util.UUID;
 
 public abstract class IntegrationTest {
 
@@ -126,13 +128,6 @@ public abstract class IntegrationTest {
     ) throws InterruptedException {
         Asset asset = createAndEnactAsset(true);
         Market market = marketService.proposeToAdd(getAddMarketRequest(asset));
-        Oracle oracle = new Oracle()
-                .setId(UUID.randomUUID())
-                .setType(OracleType.SIGNED_DATA)
-                .setUser(makerUser)
-                .setMarket(market)
-                .setStatus(OracleStatus.ACTIVE);
-        oracleRepository.save(oracle);
         Assertions.assertEquals(market.getStatus(), MarketStatus.PENDING);
         Thread.sleep(100L);
         if(activate) {
@@ -181,7 +176,8 @@ public abstract class IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
-        request.setMinOracleCount(1);
+        request.setOracleKey("BTC-USDT");
+        request.setOracleType(OracleType.BINANCE);
         return request;
     }
 
@@ -198,12 +194,12 @@ public abstract class IntegrationTest {
     }
 
     protected void clearState() {
-        oracleRepository.deleteAll();
         orderHistoryRepository.deleteAll();
         tradeRepository.deleteAll();
         orderRepository.deleteAll();
         positionRepository.deleteAll();
         marketRepository.deleteAll();
+        oracleRepository.deleteAll();
         accountRepository.deleteAll();
         depositRepository.deleteAll();
         transactionRepository.deleteAll();

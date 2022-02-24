@@ -32,13 +32,11 @@ public class ErrorCode {
     public static final String TOO_MANY_DECIMAL_PLACES = "The maximum precision is 8 decimal places.";
     public static final String CANNOT_GET_DECIMAL_PLACES = "Failed to get the decimal places for the ERC20 token.";
     public static final String CANNOT_AMEND_WOULD_EXECUTE = "Cannot amend order as would immediately execute.";
-    public static final String STOP_ORDER_NOT_SUPPORTED = "Stop loss orders are not supported.";
     public static final String ORDER_SIZE_MANDATORY = "Order size is mandatory.";
     public static final String ORDER_TYPE_MANDATORY = "Order type is mandatory.";
     public static final String ORDER_MARKET_MANDATORY = "Order market ID is mandatory.";
     public static final String ORDER_SIDE_MANDATORY = "Order side is mandatory.";
     public static final String ORDER_PRICE_MANDATORY = "Order price is mandatory when type is LIMIT.";
-    public static final String FATAL_ERROR = "Fatal error occurred.";
     public static final String NEGATIVE_SIZE = "Size cannot be negative.";
     public static final String NEGATIVE_PRICE = "Price cannot be negative.";
     public static final String INVALID_LIQUIDATION_FEE = "Liquidation fee must be less than 50% of margin requirement.";
@@ -51,4 +49,7 @@ public class ErrorCode {
     public static final String WITHDRAWAL_NOT_FOUND = "Withdrawal was not found.";
     public static final String WITHDRAWAL_NOT_PENDING = "Withdrawal not pending.";
     public static final String CANNOT_WITHDRAW_ASSETS = "Cannot withdraw assets from bridge.";
+    public static final String SIGNED_DATA_UNSUPPORTED = "Signed data oracles are not supported.";
+    public static final String CANNOT_GET_BINANCE_PRICE = "Cannot get price from Binance.";
+    public static final String CANNOT_GET_COINBASE_PRICE = "Cannot get price from Coinbase.";
 }

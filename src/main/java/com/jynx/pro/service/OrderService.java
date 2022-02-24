@@ -41,6 +41,8 @@ public class OrderService {
     private ConfigService configService;
     @Autowired
     private OrderHistoryRepository orderHistoryRepository;
+    @Autowired
+    private AuctionService auctionService;
 
     private static final int MAX_BULK = 25;
 
@@ -295,10 +297,12 @@ public class OrderService {
             final Market market,
             final BigDecimal lastPrice
     ) {
+        // TODO - we can significantly improve performance by doing this on a time loop instead of after every trade
         BigDecimal originalMarkPrice = market.getMarkPrice();
         int dps = market.getSettlementAsset().getDecimalPlaces();
         BigDecimal markPrice = getMidPrice(market);
         marketService.updateLastPrice(lastPrice, market);
+        auctionService.checkTriggers(market);
         if(!markPrice.setScale(dps, RoundingMode.HALF_UP)
                 .equals(originalMarkPrice.setScale(dps, RoundingMode.HALF_UP))) {
             executeStopOrders(market);

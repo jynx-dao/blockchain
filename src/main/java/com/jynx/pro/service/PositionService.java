@@ -463,8 +463,12 @@ public class PositionService {
             final BigDecimal lossToSocialize
     ) {
         int dps = market.getSettlementAsset().getDecimalPlaces();
+        List<Position> marketPositions = positionRepository.findByMarketAndSizeGreaterThan(market, BigDecimal.ZERO);
+        List<UUID> validUserIds = marketPositions.stream().map(p -> p.getUser().getId()).collect(Collectors.toList());
         List<Account> accounts = accountRepository.findByAssetAndAvailableBalanceGreaterThan(
-                market.getSettlementAsset(), BigDecimal.ZERO);
+                market.getSettlementAsset(), BigDecimal.ZERO).stream()
+                .filter(a -> validUserIds.contains(a.getUser().getId()))
+                .collect(Collectors.toList());
         double sumAvailableBalance = accounts.stream().mapToDouble(a -> a.getAvailableBalance().doubleValue()).sum();
         for(Account account : accounts) {
             BigDecimal shareOfLoss = (account.getAvailableBalance()

@@ -69,6 +69,7 @@ public class Market {
     private BigDecimal oracleBond;
     @Column(name = "oracle_slashing_ratio", scale = 8, precision = 18)
     private BigDecimal oracleSlashingRatio;
-    @Column(name = "min_oracle_count", nullable = false)
-    private Integer minOracleCount;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "oracle_id", nullable = false)
+    private Oracle oracle;
 }

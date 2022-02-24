@@ -15,16 +15,15 @@ import java.util.UUID;
 public class Oracle {
     @Id
     private UUID id;
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "market_id", nullable = false)
-    private Market market;
     @Column(name = "type", nullable = false)
     @Enumerated(EnumType.STRING)
     private OracleType type;
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
+    @JoinColumn(name = "user_id")
     private User user;
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private OracleStatus status;
+    @Column(name = "key", nullable = false)
+    private String key;
 }

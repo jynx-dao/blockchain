@@ -10,14 +10,14 @@ import com.jynx.pro.request.AmendMarketRequest;
 import com.jynx.pro.request.SingleItemRequest;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.math3.stat.descriptive.rank.Percentile;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.List;
+import java.util.Objects;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -63,9 +63,9 @@ public class MarketService {
     private void settlePosition(
             final Position position,
             final Market market,
-            final BigDecimal settlementDelta
+            final BigDecimal value
     ) {
-        BigDecimal settlementAmount = position.getSize().multiply(settlementDelta);
+        BigDecimal settlementAmount = position.getSize().multiply(value);
         position.setRealisedPnl(position.getRealisedPnl().add(settlementAmount));
         Account account = accountService.getAndCreate(
                 position.getUser(), market.getSettlementAsset());
@@ -86,52 +86,15 @@ public class MarketService {
         for(Market market : markets) {
             int dps = market.getSettlementAsset().getDecimalPlaces();
             long timeSinceSettlement = configService.getTimestamp() - market.getLastSettlement();
-            if(timeSinceSettlement > (60 * 60 * 9)) {
-                List<Settlement> settlementData = settlementRepository.findBySettlementInterval(market.getSettlementCount() + 1);
-                List<Oracle> oracles = oracleRepository.findByMarketAndStatus(market, OracleStatus.ACTIVE);
-                slashOffendingOracles(settlementData, oracles);
-                if(settlementData.size() >= (oracles.size() * 0.667)) {
-                    List<Position> positions = positionRepository
-                            .findByMarketAndSizeGreaterThan(market, BigDecimal.ZERO);
-                    BigDecimal value = BigDecimal.valueOf(settlementData.stream()
-                            .mapToDouble(d -> d.getValue().doubleValue()).average().orElse(0d));
-                    if(value.doubleValue() > 0d) {
-                        BigDecimal settlementDelta = (value.subtract(market.getMarkPrice()))
-                                .divide(market.getMarkPrice(), dps, RoundingMode.HALF_UP);
-                        positions.forEach(position -> settlePosition(position, market, settlementDelta));
-                        positionRepository.saveAll(positions);
-                        market.setLastSettlement(configService.getTimestamp());
-                        market.setSettlementCount(market.getSettlementCount() + 1);
-                        marketRepository.save(market);
-                    }
-                }
+            if(timeSinceSettlement > (60 * 60 * 8.5)) {
+                List<Position> positions = positionRepository
+                        .findByMarketAndSizeGreaterThan(market, BigDecimal.ZERO);
+                BigDecimal value = oracleService.getSettlementValue(market);
+                BigDecimal settlementDelta = (value.subtract(market.getMarkPrice()))
+                        .divide(market.getMarkPrice(), dps, RoundingMode.HALF_UP);
+                positions.forEach(position -> settlePosition(position, market, settlementDelta));
             }
         }
-    }
-
-    private void slashOffendingOracles(
-            final List<Settlement> settlementData,
-            final List<Oracle> oracles
-    ) {
-        List<UUID> presentOracleIds = settlementData.stream()
-                .map(d -> d.getOracle().getId()).collect(Collectors.toList());
-        List<Oracle> missingOracles = oracles.stream().filter(o -> !presentOracleIds.contains(o.getId()))
-                .collect(Collectors.toList());
-        double[] oracleValues = settlementData.stream().mapToDouble(d -> d.getValue().doubleValue()).toArray();
-        double lowerLimit = new Percentile().evaluate(oracleValues, 0.15);
-        double upperLimit = new Percentile().evaluate(oracleValues, 0.85);
-        List<Oracle> outlierOracles = settlementData
-                .stream()
-                .filter(d -> d.getValue().doubleValue() < lowerLimit ||
-                        d.getValue().doubleValue() > upperLimit)
-                .map(Settlement::getOracle)
-                .collect(Collectors.toList());
-        List<Oracle> oraclesToSlash = new ArrayList<>();
-        oraclesToSlash.addAll(missingOracles);
-        oraclesToSlash.addAll(outlierOracles);
-        HashSet<Object> seen = new HashSet<>();
-        oraclesToSlash.removeIf(o -> !seen.add(o.getId()));
-        oracleService.slash(oraclesToSlash);
     }
 
     public Market proposeToAdd(
@@ -149,7 +112,17 @@ public class MarketService {
         if(request.getLiquidationFee().doubleValue() > request.getMarginRequirement().doubleValue() * 0.5) {
             throw new JynxProException(ErrorCode.INVALID_LIQUIDATION_FEE);
         }
+        Oracle oracle = new Oracle()
+                .setStatus(OracleStatus.ACTIVE)
+                .setType(request.getOracleType())
+                .setId(uuidUtils.next())
+                .setKey(request.getOracleKey());
+        if(oracle.getType().equals(OracleType.SIGNED_DATA)) {
+            throw new JynxProException(ErrorCode.SIGNED_DATA_UNSUPPORTED);
+        }
+        oracle = oracleRepository.save(oracle);
         Market market = new Market()
+                .setOracle(oracle)
                 .setName(request.getName())
                 .setSettlementAsset(settlementAsset)
                 .setMarginRequirement(request.getMarginRequirement())
@@ -161,8 +134,7 @@ public class MarketService {
                 .setLiquidationFee(request.getLiquidationFee())
                 .setStatus(MarketStatus.PENDING)
                 .setId(uuidUtils.next())
-                .setLastSettlement(0L)
-                .setMinOracleCount(request.getMinOracleCount());
+                .setLastSettlement(0L);
         market = marketRepository.save(market);
         proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
                 request.getEnactmentTime(), market.getId(), ProposalType.ADD_MARKET);
@@ -267,11 +239,7 @@ public class MarketService {
             final Proposal proposal
     ) {
         proposalService.checkEnacted(proposal);
-        Market market = get(proposal.getLinkedId());
-        List<Oracle> oracles = oracleRepository.findByMarketAndStatus(market, OracleStatus.ACTIVE);
-        if(oracles.size() >= market.getMinOracleCount()) {
-            updateStatus(proposal, MarketStatus.ACTIVE);
-        }
+        updateStatus(proposal, MarketStatus.ACTIVE);
     }
 
     public void reject(

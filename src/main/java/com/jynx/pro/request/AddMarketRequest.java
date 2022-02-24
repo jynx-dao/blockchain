@@ -1,5 +1,6 @@
 package com.jynx.pro.request;
 
+import com.jynx.pro.constant.OracleType;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
@@ -20,5 +21,7 @@ public class AddMarketRequest extends ProposalRequest {
     private BigDecimal makerFee;
     private BigDecimal takerFee;
     private BigDecimal liquidationFee;
-    private Integer minOracleCount;
+    private String oracleKey;
+    private OracleType oracleType;
+    private UUID oracleProvider;
 }

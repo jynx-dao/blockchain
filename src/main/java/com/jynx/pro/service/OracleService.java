@@ -1,8 +1,7 @@
 package com.jynx.pro.service;
 
-import com.jynx.pro.constant.OracleStatus;
-import com.jynx.pro.entity.Account;
-import com.jynx.pro.entity.Oracle;
+import com.jynx.pro.constant.OracleType;
+import com.jynx.pro.entity.Market;
 import com.jynx.pro.repository.AccountRepository;
 import com.jynx.pro.repository.OracleRepository;
 import com.jynx.pro.utils.UUIDUtils;
@@ -11,7 +10,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 @Slf4j
 @Service
@@ -25,33 +23,48 @@ public class OracleService {
     private AccountRepository accountRepository;
     @Autowired
     private UUIDUtils uuidUtils;
+    @Autowired
+    private BinanceService binanceService;
+    @Autowired
+    private PolygonService polygonService;
+    @Autowired
+    private CoinbaseService coinbaseService;
+    @Autowired
+    private UniswapService uniswapService;
 
-    public void slash(
-            final List<Oracle> oracles
+    /**
+     * Get the settlement price for given market
+     *
+     * @param market {@link Market}
+     *
+     * @return the settlement price
+     */
+    public BigDecimal getSettlementValue(
+            final Market market
     ) {
-        for(Oracle oracle : oracles) {
-            BigDecimal ratio = oracle.getMarket().getOracleSlashingRatio();
-            BigDecimal amountToSlash = oracle.getMarket().getOracleBond().multiply(ratio);
-            Account account = accountService.getAndCreate(oracle.getUser(), oracle.getMarket().getSettlementAsset());
-            // TODO - do we need a Transaction for this because we're debiting funds?
-            account.setOracleBond(account.getOracleBond().subtract(amountToSlash));
-            if(account.getOracleBond().doubleValue() == 0d) {
-                oracle.setStatus(OracleStatus.SUSPENDED);
-                oracleRepository.save(oracle);
-            }
-            accountRepository.save(account);
+        OracleType oracleType = market.getOracle().getType();
+        if(oracleType.equals(OracleType.POLYGON)) {
+            return polygonService.getPriceAt(market.getOracle().getKey(), getSettlementTime(market));
+        } else if(oracleType.equals(OracleType.COINBASE)) {
+            return coinbaseService.getPriceAt(market.getOracle().getKey(), getSettlementTime(market));
+        } else if(oracleType.equals(OracleType.BINANCE)) {
+            return binanceService.getPriceAt(market.getOracle().getKey(), getSettlementTime(market));
+        } else if(oracleType.equals(OracleType.UNISWAP)) {
+            return uniswapService.getPriceAt(market.getOracle().getKey(), getSettlementTime(market));
         }
+        return getSettlementValueFromSignedData(market);
     }
 
-    public void joinMarket() {
-        // TODO - allow user to become an oracle provider
+    private BigDecimal getSettlementValueFromSignedData(
+            final Market market
+    ) {
+        // TODO - if the signed data has not been provided then the oracle provider must be slashed
+        return BigDecimal.ZERO;
     }
 
-    public void leaveMarket() {
-        // TODO - allow user to quit as oracle provider
-    }
-
-    public void topUpBond() {
-        // TODO - allow an old oracle provider to top-up their bond
+    private long getSettlementTime(
+            final Market market
+    ) {
+        return market.getLastSettlement() + (60 * 60 * 8);
     }
 }

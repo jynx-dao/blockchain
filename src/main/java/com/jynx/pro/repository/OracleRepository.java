@@ -9,5 +9,4 @@ import java.util.List;
 import java.util.UUID;
 
 public interface OracleRepository extends JpaRepository<Oracle, UUID> {
-    List<Oracle> findByMarketAndStatus(Market market, OracleStatus status);
 }
