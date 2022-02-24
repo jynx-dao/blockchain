@@ -16,4 +16,5 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     List<Order> findByStatusInAndTypeAndMarket(List<OrderStatus> statusList, OrderType type, Market market);
     List<Order> findByStatusInAndTypeAndMarketAndUser(List<OrderStatus> statusList, OrderType type, Market market, User user);
     int countByMarketAndPriceAndSideAndStatusInAndType(Market market, BigDecimal price, MarketSide side, List<OrderStatus> statusList, OrderType limit);
+    List<Order> findByUser(User user);
 }

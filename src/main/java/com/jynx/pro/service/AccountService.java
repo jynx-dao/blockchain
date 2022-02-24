@@ -8,7 +8,6 @@ import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.*;
-import com.jynx.pro.repository.cache.AccountCacheRepository;
 import com.jynx.pro.request.CreateWithdrawalRequest;
 import com.jynx.pro.request.SingleItemRequest;
 import com.jynx.pro.utils.PriceUtils;
@@ -32,8 +31,6 @@ public class AccountService {
 
     private static final int WITHDRAWAL_BATCH_SIZE = 100;
 
-    @Autowired
-    private AccountCacheRepository accountCacheRepository;
     @Autowired
     private AccountRepository accountRepository;
     @Autowired
@@ -320,5 +317,17 @@ public class AccountService {
                 .setAsset(market.getSettlementAsset())
                 .setTimestamp(configService.getTimestamp());
         transactionRepository.save(tx);
+    }
+
+    public List<Account> getByUserId(
+            final UUID userId
+    ) {
+        return accountRepository.findByUser(userService.getById(userId));
+    }
+
+    public Account getById(
+            final UUID id
+    ) {
+        return accountRepository.findById(id).orElseThrow(() -> new JynxProException(ErrorCode.ACCOUNT_NOT_FOUND));
     }
 }

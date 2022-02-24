@@ -28,7 +28,7 @@ public class PositionService {
     @Autowired
     private AccountRepository accountRepository;
     @Autowired
-    private MarketRepository marketRepository;
+    private UserService userService;
     @Autowired
     private TransactionRepository transactionRepository;
     @Autowired
@@ -512,5 +512,14 @@ public class PositionService {
             final Position position
     ) {
         return positionRepository.save(position);
+    }
+
+
+    public List<Position> getByUserId(
+            final UUID userId
+    ) {
+        // TODO - filter by market
+        // TODO - paginate
+        return positionRepository.findByUser(userService.getById(userId));
     }
 }

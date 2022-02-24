@@ -1,7 +1,8 @@
 package com.jynx.pro.controller;
 
-import com.jynx.pro.response.MultipleItemResponse;
-import com.jynx.pro.service.cache.AccountCacheService;
+import com.jynx.pro.entity.Account;
+import com.jynx.pro.response.SingleItemResponse;
+import com.jynx.pro.service.AccountService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -16,12 +17,12 @@ import java.util.UUID;
 public class AccountController {
 
     @Autowired
-    private AccountCacheService accountCacheService;
+    private AccountService accountService;
 
-    @GetMapping("/{userId}")
-    public ResponseEntity<MultipleItemResponse> getMany(
-            @PathVariable("userId") UUID userId
+    @GetMapping("/{id}")
+    public ResponseEntity<SingleItemResponse<Account>> getById(
+            @PathVariable("id") UUID id
     ) {
-        return ResponseEntity.ok(new MultipleItemResponse().setItems(accountCacheService.getByUserId(userId)));
+        return ResponseEntity.ok(new SingleItemResponse<Account>().setItem(accountService.getById(id)));
     }
 }

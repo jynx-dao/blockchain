@@ -43,6 +43,8 @@ public class OrderService {
     private OrderHistoryRepository orderHistoryRepository;
     @Autowired
     private AuctionService auctionService;
+    @Autowired
+    private UserService userService;
 
     private static final int MAX_BULK = 25;
 
@@ -954,5 +956,13 @@ public class OrderService {
         if(account.getBalance().doubleValue() < margin.doubleValue()) {
             throw new JynxProException(ErrorCode.INSUFFICIENT_MARGIN);
         }
+    }
+
+    public List<Order> getByUserId(
+            final UUID userId
+    ) {
+        // TODO - filter by status, market, etc...
+        // TODO - paginate
+        return orderRepository.findByUser(userService.getById(userId));
     }
 }
