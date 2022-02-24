@@ -12,7 +12,7 @@ import java.math.BigDecimal;
 
 @Slf4j
 @Service
-public class BinanceService {
+public class BinanceService implements ExchangeService {
 
     private static final String API_URL = "https://api.binance.com/%s";
 
@@ -24,12 +24,13 @@ public class BinanceService {
      *
      * @return the price
      */
+    @Override
     public BigDecimal getPriceAt(
             final String symbol,
             final Long time
     ) {
-        Long from = (time - 60) * 1000;
-        Long to = (time + 60) * 1000;
+        long from = (time - 60) * 1000;
+        long to = (time + 60) * 1000;
         String path = "api/v3/klines?symbol=%s&interval=1m&startTime=%s&endTime=%s&limit=1";
         String url = String.format(API_URL, String.format(path, symbol, from, to));
         try {

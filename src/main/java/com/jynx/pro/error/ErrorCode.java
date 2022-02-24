@@ -52,4 +52,5 @@ public class ErrorCode {
     public static final String SIGNED_DATA_UNSUPPORTED = "Signed data oracles are not supported.";
     public static final String CANNOT_GET_BINANCE_PRICE = "Cannot get price from Binance.";
     public static final String CANNOT_GET_COINBASE_PRICE = "Cannot get price from Coinbase.";
+    public static final String CANNOT_GET_POLYGON_PRICE = "Cannot get price from Polygon.";
 }

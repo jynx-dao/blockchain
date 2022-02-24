@@ -1,5 +1,5 @@
 package com.jynx.pro.constant;
 
 public enum OracleType {
-    SIGNED_DATA, UNISWAP, BINANCE, COINBASE, POLYGON;
+    BINANCE, COINBASE, POLYGON, SIGNED_DATA;
 }

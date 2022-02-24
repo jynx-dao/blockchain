@@ -29,8 +29,6 @@ public class OracleService {
     private PolygonService polygonService;
     @Autowired
     private CoinbaseService coinbaseService;
-    @Autowired
-    private UniswapService uniswapService;
 
     /**
      * Get the settlement price for given market
@@ -49,8 +47,6 @@ public class OracleService {
             return coinbaseService.getPriceAt(market.getOracle().getKey(), getSettlementTime(market));
         } else if(oracleType.equals(OracleType.BINANCE)) {
             return binanceService.getPriceAt(market.getOracle().getKey(), getSettlementTime(market));
-        } else if(oracleType.equals(OracleType.UNISWAP)) {
-            return uniswapService.getPriceAt(market.getOracle().getKey(), getSettlementTime(market));
         }
         return getSettlementValueFromSignedData(market);
     }

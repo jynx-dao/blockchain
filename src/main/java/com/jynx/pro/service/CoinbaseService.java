@@ -17,7 +17,7 @@ import java.time.format.DateTimeFormatter;
 
 @Slf4j
 @Service
-public class CoinbaseService {
+public class CoinbaseService implements ExchangeService {
 
     private static final String API_URL = "https://api.exchange.coinbase.com/%s";
 
@@ -29,6 +29,7 @@ public class CoinbaseService {
      *
      * @return the price
      */
+    @Override
     public BigDecimal getPriceAt(
             final String symbol,
             final Long time
