@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 @Controller
 @RequestMapping("/blockchain")
-public class BlockchainController {
+public class BlockchainController extends AbstractController {
 
     @Autowired
     private ConfigService configService;

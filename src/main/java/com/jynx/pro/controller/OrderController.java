@@ -4,60 +4,53 @@ import com.jynx.pro.entity.Order;
 import com.jynx.pro.request.AmendOrderRequest;
 import com.jynx.pro.request.CancelOrderRequest;
 import com.jynx.pro.request.CreateOrderRequest;
-import com.jynx.pro.service.OrderService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
-
 @Controller
 @RequestMapping("/order")
-public class OrderController {
-
-    @Autowired
-    private OrderService orderService;
+public class OrderController extends AbstractController {
 
     @PostMapping
     public ResponseEntity<Order> create(
             @RequestBody CreateOrderRequest request
     ) {
-        return ResponseEntity.ok(orderService.create(request));
+        return ResponseEntity.ok(tendermintClient.createOrder(request).getItem());
     }
 
     @DeleteMapping
     public ResponseEntity<Order> cancel(
             @RequestBody CancelOrderRequest request
     ) {
-        return ResponseEntity.ok(orderService.cancel(request));
+        return ResponseEntity.ok(tendermintClient.cancelOrder(request).getItem());
     }
 
     @PutMapping
     public ResponseEntity<Order> amend(
             @RequestBody AmendOrderRequest request
     ) {
-        return ResponseEntity.ok(orderService.amend(request));
+        return ResponseEntity.ok(tendermintClient.amendOrder(request).getItem());
     }
 
-    @PostMapping("/batch")
-    public ResponseEntity<List<Order>> createMany(
-            @RequestBody List<CreateOrderRequest> request
-    ) {
-        return ResponseEntity.ok(orderService.createMany(request));
-    }
-
-    @DeleteMapping("/batch")
-    public ResponseEntity<List<Order>> cancelMany(
-            @RequestBody List<CancelOrderRequest> request
-    ) {
-        return ResponseEntity.ok(orderService.cancelMany(request));
-    }
-
-    @PutMapping("/batch")
-    public ResponseEntity<List<Order>> amendMany(
-            @RequestBody List<AmendOrderRequest> request
-    ) {
-        return ResponseEntity.ok(orderService.amendMany(request));
-    }
+//    @PostMapping("/batch")
+//    public ResponseEntity<List<Order>> createMany(
+//            @RequestBody CreateManyOrdersRequest request
+//    ) {
+//        return ResponseEntity.ok(tendermintClient.createManyOrders(request));
+//    }
+//
+//    @DeleteMapping("/batch")
+//    public ResponseEntity<List<Order>> cancelMany(
+//            @RequestBody CancelManyOrdersRequest request
+//    ) {
+//        return ResponseEntity.ok(orderService.cancelMany(request));
+//    }
+//
+//    @PutMapping("/batch")
+//    public ResponseEntity<List<Order>> amendMany(
+//            @RequestBody AmendManyOrdersRequest request
+//    ) {
+//        return ResponseEntity.ok(orderService.amendMany(request));
+//    }
 }

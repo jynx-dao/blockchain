@@ -61,4 +61,10 @@ public class ErrorCode {
     public static final String MARKET_ID_MANDATORY = "Market ID is mandatory.";
     public static final String INTERVAL_MANDATORY = "Interval is mandatory.";
     public static final String TX_NOT_CREATED = "Write transaction not created.";
+    public static final String FAILED_TO_BUILD_URL = "Could not build Tendermint request URL.";
+    public static final String CREATE_WITHDRAWAL_FAILED = "Failed to create withdrawal.";
+    public static final String CANCEL_WITHDRAWAL_FAILED = "Failed to cancel withdrawal.";
+    public static final String CREATE_ORDER_FAILED = "Failed to create order.";
+    public static final String CANCEL_ORDER_FAILED = "Failed to cancel order.";
+    public static final String AMEND_ORDER_FAILED = "Failed to amend order.";
 }

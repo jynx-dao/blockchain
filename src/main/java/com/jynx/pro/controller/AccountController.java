@@ -6,11 +6,8 @@ import com.jynx.pro.entity.Transaction;
 import com.jynx.pro.entity.Withdrawal;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
-import com.jynx.pro.repository.ReadOnlyRepository;
 import com.jynx.pro.request.CreateWithdrawalRequest;
 import com.jynx.pro.request.SingleItemRequest;
-import com.jynx.pro.service.AccountService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
@@ -20,12 +17,7 @@ import java.util.UUID;
 
 @Controller
 @RequestMapping("/account")
-public class AccountController {
-
-    @Autowired
-    private AccountService accountService;
-    @Autowired
-    private ReadOnlyRepository readOnlyRepository;
+public class AccountController extends AbstractController {
 
     @GetMapping("/{id}")
     public ResponseEntity<Account> getById(
@@ -63,13 +55,13 @@ public class AccountController {
     public ResponseEntity<Withdrawal> createWithdrawal(
             @RequestBody CreateWithdrawalRequest request
     ) {
-        return ResponseEntity.ok(accountService.createWithdrawal(request));
+        return ResponseEntity.ok(tendermintClient.createWithdrawal(request).getItem());
     }
 
     @DeleteMapping("/withdraw")
     public ResponseEntity<Withdrawal> cancelWithdrawal(
             @RequestBody SingleItemRequest request
     ) {
-        return ResponseEntity.ok(accountService.cancelWithdrawal(request));
+        return ResponseEntity.ok(tendermintClient.cancelWithdrawal(request).getItem());
     }
 }

@@ -5,5 +5,5 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 @Controller
 @RequestMapping("/asset")
-public class AssetController {
+public class AssetController extends AbstractController {
 }

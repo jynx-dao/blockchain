@@ -3,8 +3,6 @@ package com.jynx.pro.controller;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
-import com.jynx.pro.repository.ReadOnlyRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,10 +15,7 @@ import java.util.UUID;
 
 @Controller
 @RequestMapping("/user")
-public class UserController {
-
-    @Autowired
-    private ReadOnlyRepository readOnlyRepository;
+public class UserController extends AbstractController {
 
     @GetMapping("/{id}")
     public ResponseEntity<User> getById(

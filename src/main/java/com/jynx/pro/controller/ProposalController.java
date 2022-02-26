@@ -5,5 +5,5 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 @Controller
 @RequestMapping("/proposal")
-public class ProposalController {
+public class ProposalController extends AbstractController {
 }

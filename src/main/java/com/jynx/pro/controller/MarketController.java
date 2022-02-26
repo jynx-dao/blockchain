@@ -9,8 +9,6 @@ import com.jynx.pro.model.Kline;
 import com.jynx.pro.model.MarketStatistics;
 import com.jynx.pro.model.OrderBook;
 import com.jynx.pro.model.Quote;
-import com.jynx.pro.repository.ReadOnlyRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,10 +21,7 @@ import java.util.UUID;
 
 @Controller
 @RequestMapping("/market")
-public class MarketController {
-
-    @Autowired
-    private ReadOnlyRepository readOnlyRepository;
+public class MarketController extends AbstractController {
 
     @GetMapping("/{id}/order-book")
     public ResponseEntity<OrderBook> getOrderBook(
