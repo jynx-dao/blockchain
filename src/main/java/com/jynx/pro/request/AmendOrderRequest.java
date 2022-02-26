@@ -13,5 +13,5 @@ import java.util.UUID;
 public class AmendOrderRequest extends SignedRequest {
     private UUID id;
     private BigDecimal price;
-    private BigDecimal size;
+    private BigDecimal quantity;
 }

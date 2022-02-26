@@ -1,9 +1,12 @@
 package com.jynx.pro.repository;
 
 import com.jynx.pro.entity.Delegation;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
-import java.util.UUID;
-
-public interface DelegationRepository extends JpaRepository<Delegation, UUID> {
+@Repository
+public class DelegationRepository extends EntityRepository<Delegation> {
+    @Override
+    public Class<Delegation> getType() {
+        return Delegation.class;
+    }
 }

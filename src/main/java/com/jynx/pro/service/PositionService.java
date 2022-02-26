@@ -2,7 +2,10 @@ package com.jynx.pro.service;
 
 import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.*;
-import com.jynx.pro.repository.*;
+import com.jynx.pro.repository.AccountRepository;
+import com.jynx.pro.repository.OrderRepository;
+import com.jynx.pro.repository.PositionRepository;
+import com.jynx.pro.repository.TransactionRepository;
 import com.jynx.pro.request.CancelOrderRequest;
 import com.jynx.pro.request.CreateOrderRequest;
 import com.jynx.pro.utils.UUIDUtils;
@@ -27,8 +30,6 @@ public class PositionService {
     private AccountService accountService;
     @Autowired
     private AccountRepository accountRepository;
-    @Autowired
-    private UserService userService;
     @Autowired
     private TransactionRepository transactionRepository;
     @Autowired
@@ -55,7 +56,7 @@ public class PositionService {
                         .setId(uuidUtils.next())
                         .setUser(user)
                         .setMarket(market)
-                        .setSize(BigDecimal.ZERO)
+                        .setQuantity(BigDecimal.ZERO)
                         .setAllocatedMargin(BigDecimal.ZERO)
                         .setAverageEntryPrice(BigDecimal.ZERO)
                         .setBankruptcyPrice(BigDecimal.ZERO)
@@ -85,14 +86,14 @@ public class PositionService {
      *
      * @param market {@link Market}
      * @param price the price of the trade
-     * @param size the size of the trade
+     * @param quantity the quantity of the trade
      * @param user {@link User}
      * @param side the {@link MarketSide} of the trade
      */
     public void update(
             final Market market,
             final BigDecimal price,
-            final BigDecimal size,
+            final BigDecimal quantity,
             final User user,
             final MarketSide side
     ) {
@@ -100,25 +101,25 @@ public class PositionService {
         if(position.getSide() == null) {
             position.setSide(side);
         }
-        BigDecimal originalPositionSize = position.getSize();
+        BigDecimal originalPositionQuantity = position.getQuantity();
         int dps = market.getSettlementAsset().getDecimalPlaces();
-        BigDecimal sizeDelta = side.equals(position.getSide()) ? size : size.multiply(BigDecimal.valueOf(-1));
-        if(sizeDelta.doubleValue() < 0) {
-            BigDecimal closingSize = sizeDelta.abs().doubleValue() < position.getSize().doubleValue() ?
-                    sizeDelta.abs() : position.getSize();
-            BigDecimal closingNotionalSize = closingSize.multiply(price);
+        BigDecimal quantityDelta = side.equals(position.getSide()) ? quantity : quantity.multiply(BigDecimal.valueOf(-1));
+        if(quantityDelta.doubleValue() < 0) {
+            BigDecimal closingQuantity = quantityDelta.abs().doubleValue() < position.getQuantity().doubleValue() ?
+                    quantityDelta.abs() : position.getQuantity();
+            BigDecimal closingNotionalQuantity = closingQuantity.multiply(price);
             BigDecimal gain = price.subtract(position.getAverageEntryPrice()).abs()
                     .divide(position.getAverageEntryPrice(), dps, RoundingMode.HALF_UP);
             gain = flipGain(position, gain, price);
-            BigDecimal realisedProfit = gain.multiply(closingNotionalSize);
-            position.setSize(position.getSize().add(sizeDelta));
-            if(position.getSize().doubleValue() < 0) {
-                position.setSize(position.getSize().multiply(BigDecimal.valueOf(-1)));
+            BigDecimal realisedProfit = gain.multiply(closingNotionalQuantity);
+            position.setQuantity(position.getQuantity().add(quantityDelta));
+            if(position.getQuantity().doubleValue() < 0) {
+                position.setQuantity(position.getQuantity().multiply(BigDecimal.valueOf(-1)));
                 position.setSide(orderService.getOtherSide(position.getSide()));
                 position.setAverageEntryPrice(price);
             }
-            BigDecimal unrealisedProfitRatio = BigDecimal.ONE.subtract(closingSize.abs()
-                    .divide(originalPositionSize, dps, RoundingMode.HALF_UP));
+            BigDecimal unrealisedProfitRatio = BigDecimal.ONE.subtract(closingQuantity.abs()
+                    .divide(originalPositionQuantity, dps, RoundingMode.HALF_UP));
             position.setRealisedPnl(position.getRealisedPnl().add(realisedProfit));
             position.setUnrealisedPnl(unrealisedProfitRatio.multiply(position.getUnrealisedPnl()));
             accountService.bookProfit(user, market, realisedProfit);
@@ -127,11 +128,11 @@ public class PositionService {
             updateLiquidationPrice(position);
         } else {
             BigDecimal averageEntryPrice = getAverageEntryPrice(position.getAverageEntryPrice(), price,
-                    position.getSize(), size, dps);
-            position.setSize(position.getSize().add(sizeDelta));
+                    position.getQuantity(), quantity, dps);
+            position.setQuantity(position.getQuantity().add(quantityDelta));
             position.setAverageEntryPrice(averageEntryPrice);
         }
-        if(position.getSize().setScale(dps, RoundingMode.HALF_UP)
+        if(position.getQuantity().setScale(dps, RoundingMode.HALF_UP)
                 .equals(BigDecimal.ZERO.setScale(dps, RoundingMode.HALF_UP))) {
             position.setSide(null);
             position.setAverageEntryPrice(BigDecimal.ZERO);
@@ -147,8 +148,8 @@ public class PositionService {
      *
      * @param price1 the first price
      * @param price2 the second price
-     * @param size1 the first size
-     * @param size2 the second size
+     * @param quantity1 the first quantity
+     * @param quantity2 the second quantity
      * @param dps decimal places to use
      *
      * @return the volume-weighted average price
@@ -156,14 +157,14 @@ public class PositionService {
     private BigDecimal getAverageEntryPrice(
             final BigDecimal price1,
             final BigDecimal price2,
-            final BigDecimal size1,
-            final BigDecimal size2,
+            final BigDecimal quantity1,
+            final BigDecimal quantity2,
             final int dps
     ) {
-        BigDecimal product1 = price1.multiply(size1);
-        BigDecimal product2 = price2.multiply(size2);
+        BigDecimal product1 = price1.multiply(quantity1);
+        BigDecimal product2 = price2.multiply(quantity2);
         BigDecimal sumProduct = product1.add(product2);
-        return sumProduct.divide(size1.add(size2), dps, RoundingMode.HALF_UP);
+        return sumProduct.divide(quantity1.add(quantity2), dps, RoundingMode.HALF_UP);
     }
 
     /**
@@ -214,9 +215,9 @@ public class PositionService {
             final Market market
     ) {
         List<Position> positions = positionRepository.findByMarket(market).stream()
-                .filter(p -> p.getSize().doubleValue() > 0 && p.getSide().equals(MarketSide.BUY))
+                .filter(p -> p.getQuantity().doubleValue() > 0 && p.getSide().equals(MarketSide.BUY))
                 .collect(Collectors.toList());
-        return BigDecimal.valueOf(positions.stream().mapToDouble(p -> p.getSize().doubleValue()).sum());
+        return BigDecimal.valueOf(positions.stream().mapToDouble(p -> p.getQuantity().doubleValue()).sum());
     }
 
     /**
@@ -229,14 +230,14 @@ public class PositionService {
     ) {
         List<Position> positions = positionRepository.findByMarket(market);
         for(Position position : positions) {
-            if(position.getSize().doubleValue() == 0) {
+            if(position.getQuantity().doubleValue() == 0) {
                 continue;
             }
             BigDecimal gain = position.getAverageEntryPrice().subtract(market.getMarkPrice())
                     .divide(position.getAverageEntryPrice(),
                             market.getSettlementAsset().getDecimalPlaces(), RoundingMode.HALF_UP);
             gain = flipGain(position, gain, market.getMarkPrice());
-            BigDecimal unrealisedProfit = gain.multiply(position.getSize().multiply(position.getAverageEntryPrice()))
+            BigDecimal unrealisedProfit = gain.multiply(position.getQuantity().multiply(position.getAverageEntryPrice()))
                     .setScale(market.getSettlementAsset().getDecimalPlaces(), RoundingMode.HALF_UP);
             position.setUnrealisedPnl(unrealisedProfit);
         }
@@ -263,7 +264,7 @@ public class PositionService {
         BigDecimal leverage = BigDecimal.ZERO;
         BigDecimal liquidationPrice = BigDecimal.ZERO;
         if(account.getBalance().doubleValue() > 0) {
-            leverage = (position.getSize().multiply(position.getAverageEntryPrice()))
+            leverage = (position.getQuantity().multiply(position.getAverageEntryPrice()))
                     .divide(account.getBalance(), dps, RoundingMode.HALF_UP);
         }
         if(leverage.doubleValue() > 0) {
@@ -373,9 +374,9 @@ public class PositionService {
             final Market market
     ) {
         List<Position> losingPositions = positionRepository.findByMarket(market).stream()
-                .filter(p -> p.getSize().doubleValue() > 0)
+                .filter(p -> p.getQuantity().doubleValue() > 0)
                 .filter(p -> p.getUnrealisedPnl().doubleValue() < 0)
-                .sorted(Comparator.comparing(Position::getLeverage).reversed().thenComparing(Position::getSize))
+                .sorted(Comparator.comparing(Position::getLeverage).reversed().thenComparing(Position::getQuantity))
                 .collect(Collectors.toList());
         List<UUID> liquidatedPositionIds = new ArrayList<>();
         for(Position position : losingPositions) {
@@ -386,7 +387,7 @@ public class PositionService {
                 createOrderRequest.setType(OrderType.MARKET);
                 createOrderRequest.setMarketId(position.getMarket().getId());
                 createOrderRequest.setSide(orderService.getOtherSide(position.getSide()));
-                createOrderRequest.setSize(position.getSize());
+                createOrderRequest.setQuantity(position.getQuantity());
                 orderService.create(createOrderRequest, true);
                 cancelOrders(market, position);
                 Account account = accountService.getAndCreate(
@@ -463,7 +464,7 @@ public class PositionService {
             final BigDecimal lossToSocialize
     ) {
         int dps = market.getSettlementAsset().getDecimalPlaces();
-        List<Position> marketPositions = positionRepository.findByMarketAndSizeGreaterThan(market, BigDecimal.ZERO);
+        List<Position> marketPositions = positionRepository.findByMarketAndQuantityGreaterThan(market, BigDecimal.ZERO);
         List<UUID> validUserIds = marketPositions.stream().map(p -> p.getUser().getId()).collect(Collectors.toList());
         List<Account> accounts = accountRepository.findByAssetAndAvailableBalanceGreaterThan(
                 market.getSettlementAsset(), BigDecimal.ZERO).stream()
@@ -512,14 +513,5 @@ public class PositionService {
             final Position position
     ) {
         return positionRepository.save(position);
-    }
-
-
-    public List<Position> getByUserId(
-            final UUID userId
-    ) {
-        // TODO - filter by market
-        // TODO - paginate
-        return positionRepository.findByUser(userService.getById(userId));
     }
 }

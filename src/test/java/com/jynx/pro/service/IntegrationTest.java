@@ -6,6 +6,7 @@ import com.jynx.pro.constant.MarketStatus;
 import com.jynx.pro.constant.OracleType;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.helper.EthereumHelper;
+import com.jynx.pro.manager.DatabaseTransactionManager;
 import com.jynx.pro.repository.*;
 import com.jynx.pro.request.AddAssetRequest;
 import com.jynx.pro.request.AddMarketRequest;
@@ -75,6 +76,8 @@ public abstract class IntegrationTest {
     protected WithdrawalRepository withdrawalRepository;
     @Autowired
     protected AccountService accountService;
+    @Autowired
+    protected DatabaseTransactionManager databaseTransactionManager;
 
     protected static final String ETH_ADDRESS = "0xd7E1236C08731C3632519DCd1A581bFe6876a3B2";
     protected static final String PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
@@ -194,6 +197,8 @@ public abstract class IntegrationTest {
     }
 
     protected void clearState() {
+        databaseTransactionManager.commit();
+        databaseTransactionManager.createTransaction();
         orderHistoryRepository.deleteAll();
         tradeRepository.deleteAll();
         orderRepository.deleteAll();
@@ -211,9 +216,11 @@ public abstract class IntegrationTest {
         stakeRepository.deleteAll();
         userRepository.deleteAll();
         configRepository.deleteAll();
+        databaseTransactionManager.commit();
     }
 
     protected void initializeState() {
+        databaseTransactionManager.createTransaction();
         if(!setupComplete) {
             ethereumHelper.deploy(ganache.getHost(), ganache.getFirstMappedPort(), PRIVATE_KEY);
             ethereumService.setRpcHost(ganache.getHost());

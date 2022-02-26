@@ -1,9 +1,12 @@
 package com.jynx.pro.repository;
 
 import com.jynx.pro.entity.Validator;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
-import java.util.UUID;
-
-public interface ValidatorRepository extends JpaRepository<Validator, UUID> {
+@Repository
+public class ValidatorRepository extends EntityRepository<Validator> {
+    @Override
+    public Class<Validator> getType() {
+        return Validator.class;
+    }
 }

@@ -1,0 +1,19 @@
+package com.jynx.pro.constant;
+
+public enum TendermintTransaction {
+    CREATE_ORDER,
+    CANCEL_ORDER,
+    AMEND_ORDER,
+    CREATE_ORDER_MANY,
+    CANCEL_ORDER_MANY,
+    AMEND_ORDER_MANY,
+    ADD_MARKET,
+    AMEND_MARKET,
+    SUSPEND_MARKET,
+    UNSUSPEND_MARKET,
+    ADD_ASSET,
+    SUSPEND_ASSET,
+    UNSUSPEND_ASSET,
+    CREATE_WITHDRAWAL,
+    CANCEL_WITHDRAWAL;
+}

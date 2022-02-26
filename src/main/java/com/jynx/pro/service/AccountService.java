@@ -22,7 +22,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -259,14 +258,14 @@ public class AccountService {
     }
 
     public void processFees(
-            final BigDecimal size,
+            final BigDecimal quantity,
             final BigDecimal price,
             final User maker,
             final User taker,
             final Market market
     ) {
-        BigDecimal takerAmount = size.multiply(price).multiply(market.getTakerFee());
-        BigDecimal makerAmount = size.multiply(price).multiply(market.getMakerFee());
+        BigDecimal takerAmount = quantity.multiply(price).multiply(market.getTakerFee());
+        BigDecimal makerAmount = quantity.multiply(price).multiply(market.getMakerFee());
         Account takerAccount = getAndCreate(taker, market.getSettlementAsset());
         Account makerAccount = getAndCreate(maker, market.getSettlementAsset());
         takerAccount.setBalance(takerAccount.getBalance().subtract(takerAmount));
@@ -317,44 +316,5 @@ public class AccountService {
                 .setAsset(market.getSettlementAsset())
                 .setTimestamp(configService.getTimestamp());
         transactionRepository.save(tx);
-    }
-
-    public List<Account> getByUserId(
-            final UUID userId
-    ) {
-        return accountRepository.findByUser(userService.getById(userId));
-    }
-
-    public Account getById(
-            final UUID id
-    ) {
-        return accountRepository.findById(id).orElseThrow(() -> new JynxProException(ErrorCode.ACCOUNT_NOT_FOUND));
-    }
-
-    public List<Deposit> getDeposits(
-            final UUID accountId,
-            final UUID userId
-    ) {
-        Account account = getById(accountId);
-        // TODO - pagination
-        return depositRepository.findByAssetIdAndUserId(account.getAsset().getId(), userId);
-    }
-
-    public List<Withdrawal> getWithdrawals(
-            final UUID accountId,
-            final UUID userId
-    ) {
-        Account account = getById(accountId);
-        // TODO - pagination
-        return withdrawalRepository.findByAssetIdAndUserId(account.getAsset().getId(), userId);
-    }
-
-    public List<Transaction> getTransactions(
-            final UUID accountId,
-            final UUID userId
-    ) {
-        Account account = getById(accountId);
-        // TODO - pagination
-        return transactionRepository.findByUserIdAndAssetId(userId, account.getAsset().getId());
     }
 }

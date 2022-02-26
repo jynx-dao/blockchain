@@ -15,8 +15,8 @@ import java.util.UUID;
 public class Trade {
     @Id
     private UUID id;
-    @Column(name = "size", nullable = false, scale = 8, precision = 18)
-    private BigDecimal size;
+    @Column(name = "quantity", nullable = false, scale = 8, precision = 18)
+    private BigDecimal quantity;
     @Column(name = "price", nullable = false, scale = 8, precision = 18)
     private BigDecimal price;
     @ManyToOne(fetch = FetchType.LAZY)

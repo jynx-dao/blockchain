@@ -65,7 +65,7 @@ public class MarketService {
             final Market market,
             final BigDecimal value
     ) {
-        BigDecimal settlementAmount = position.getSize().multiply(value);
+        BigDecimal settlementAmount = position.getQuantity().multiply(value);
         position.setRealisedPnl(position.getRealisedPnl().add(settlementAmount));
         Account account = accountService.getAndCreate(
                 position.getUser(), market.getSettlementAsset());
@@ -88,7 +88,7 @@ public class MarketService {
             long timeSinceSettlement = configService.getTimestamp() - market.getLastSettlement();
             if(timeSinceSettlement > (60 * 60 * 8.5)) {
                 List<Position> positions = positionRepository
-                        .findByMarketAndSizeGreaterThan(market, BigDecimal.ZERO);
+                        .findByMarketAndQuantityGreaterThan(market, BigDecimal.ZERO);
                 BigDecimal value = oracleService.getSettlementValue(market);
                 BigDecimal settlementDelta = (value.subtract(market.getMarkPrice()))
                         .divide(market.getMarkPrice(), dps, RoundingMode.HALF_UP);

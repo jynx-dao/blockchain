@@ -5,6 +5,7 @@ import com.jynx.pro.exception.JynxProException;
 import com.mashape.unirest.http.Unirest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -25,6 +26,7 @@ public class PolygonServiceTest {
     }
 
     @Test
+    @Disabled
     public void testGetPrice() {
         long time = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
         BigDecimal price = polygonService.getPriceAt("C:EURUSD", time);
@@ -44,7 +46,7 @@ public class PolygonServiceTest {
 
     @Test
     public void testGetPriceFailsWhenError() {
-        try (MockedStatic mocked = mockStatic(Unirest.class)) {
+        try (MockedStatic<Unirest> mocked = mockStatic(Unirest.class)) {
             mocked.when(() -> Unirest.get(Mockito.anyString())).thenReturn(null);
             try {
                 long time = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);

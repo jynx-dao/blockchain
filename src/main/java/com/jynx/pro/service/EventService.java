@@ -89,7 +89,7 @@ public class EventService {
             event.setConfirmed(true);
             eventRepository.save(event);
         } else if(assetEvents.contains(event.getType())) {
-            Deposit deposit = depositRepository.findByEvent(event)
+            Deposit deposit = depositRepository.findByEventId(event.getId())
                     .orElseThrow(() -> new JynxProException(ErrorCode.DEPOSIT_NOT_FOUND));
             accountService.credit(deposit);
             event.setConfirmed(true);

@@ -28,10 +28,10 @@ public class OrderHistory {
     private BigDecimal fromPrice;
     @Column(name = "to_price", scale = 8, precision = 18)
     private BigDecimal toPrice;
-    @Column(name = "from_size", scale = 8, precision = 18)
-    private BigDecimal fromSize;
-    @Column(name = "to_size", scale = 8, precision = 18)
-    private BigDecimal toSize;
+    @Column(name = "from_quantity", scale = 8, precision = 18)
+    private BigDecimal fromQuantity;
+    @Column(name = "to_quantity", scale = 8, precision = 18)
+    private BigDecimal toQuantity;
     @Column(name = "updated", nullable = false)
     private Long updated;
 }

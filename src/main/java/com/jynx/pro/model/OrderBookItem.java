@@ -9,5 +9,5 @@ import java.math.BigDecimal;
 @Accessors(chain = true)
 public class OrderBookItem {
     private BigDecimal price;
-    private BigDecimal size;
+    private BigDecimal quantity;
 }

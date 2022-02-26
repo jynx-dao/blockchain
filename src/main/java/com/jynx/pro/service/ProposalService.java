@@ -181,44 +181,6 @@ public class ProposalService {
     }
 
     /**
-     * Get {@link Proposal}s with given {@link ProposalStatus}
-     *
-     * @param status the {@link ProposalStatus}
-     * @param page the page number
-     * @param size the page size
-     * @param sortBy the sort field
-     * @param direction the sort direction
-     * @return list of {@link Proposal}
-     */
-    public List<Proposal> getByStatus(
-            final ProposalStatus status,
-            final int page,
-            final int size,
-            final String sortBy,
-            final Sort.Direction direction
-    ) {
-        return proposalRepository.findByStatus(status, PageRequest.of(page, size, Sort.by(direction, sortBy)));
-    }
-
-    /**
-     * Get all {@link Proposal}s
-     *
-     * @param page the page number
-     * @param size the page size
-     * @param sortBy the sort field
-     * @param direction the sort direction
-     * @return list of {@link Proposal}
-     */
-    public List<Proposal> getAll(
-            final int page,
-            final int size,
-            final String sortBy,
-            final Sort.Direction direction
-    ) {
-        return proposalRepository.findAll(PageRequest.of(page, size, Sort.by(direction, sortBy))).toList();
-    }
-
-    /**
      * Check the {@link Proposal} times are valid
      *
      * @param openTime opening time

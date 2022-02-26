@@ -1,12 +1,12 @@
 package com.jynx.pro.repository;
 
-import com.jynx.pro.constant.OracleStatus;
-import com.jynx.pro.entity.Market;
 import com.jynx.pro.entity.Oracle;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
-import java.util.List;
-import java.util.UUID;
-
-public interface OracleRepository extends JpaRepository<Oracle, UUID> {
+@Repository
+public class OracleRepository extends EntityRepository<Oracle> {
+    @Override
+    public Class<Oracle> getType() {
+        return Oracle.class;
+    }
 }

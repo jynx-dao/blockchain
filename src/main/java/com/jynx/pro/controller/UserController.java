@@ -1,9 +1,9 @@
 package com.jynx.pro.controller;
 
 import com.jynx.pro.entity.*;
-import com.jynx.pro.response.MultipleItemResponse;
-import com.jynx.pro.response.SingleItemResponse;
-import com.jynx.pro.service.*;
+import com.jynx.pro.error.ErrorCode;
+import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.repository.ReadOnlyRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.util.List;
 import java.util.UUID;
 
 @Controller
@@ -19,56 +20,50 @@ import java.util.UUID;
 public class UserController {
 
     @Autowired
-    private UserService userService;
-    @Autowired
-    private AccountService accountService;
-    @Autowired
-    private OrderService orderService;
-    @Autowired
-    private PositionService positionService;
-    @Autowired
-    private TradeService tradeService;
+    private ReadOnlyRepository readOnlyRepository;
 
     @GetMapping("/{id}")
-    public ResponseEntity<SingleItemResponse<User>> getById(
+    public ResponseEntity<User> getById(
             @PathVariable("id") UUID userId
     ) {
-        return ResponseEntity.ok(new SingleItemResponse<User>().setItem(userService.getById(userId)));
+        return ResponseEntity.ok(readOnlyRepository.getUserById(userId)
+                .orElseThrow(() -> new JynxProException(ErrorCode.USER_NOT_FOUND)));
     }
 
     @GetMapping("/{publicKey}")
-    public ResponseEntity<SingleItemResponse<User>> getByPublicKey(
+    public ResponseEntity<User> getByPublicKey(
             @PathVariable("publicKey") String publicKey
     ) {
-        return ResponseEntity.ok(new SingleItemResponse<User>().setItem(userService.getByPublicKey(publicKey)));
+        return ResponseEntity.ok(readOnlyRepository.getUserByPublicKey(publicKey)
+                .orElseThrow(() -> new JynxProException(ErrorCode.USER_NOT_FOUND)));
     }
 
     @GetMapping("/{id}/accounts")
-    public ResponseEntity<MultipleItemResponse<Account>> getAccounts(
+    public ResponseEntity<List<Account>> getAccounts(
             @PathVariable("id") UUID id
     ) {
-        return ResponseEntity.ok(new MultipleItemResponse<Account>().setItems(accountService.getByUserId(id)));
+        return ResponseEntity.ok(readOnlyRepository.getAccountsByUserId(id));
     }
 
     @GetMapping("/{id}/orders")
-    public ResponseEntity<MultipleItemResponse<Order>> getOrders(
+    public ResponseEntity<List<Order>> getOrders(
             @PathVariable("id") UUID id
     ) {
-        return ResponseEntity.ok(new MultipleItemResponse<Order>().setItems(orderService.getByUserId(id)));
+        return ResponseEntity.ok(readOnlyRepository.getOrdersByUserId(id));
     }
 
     @GetMapping("/{id}/trades")
-    public ResponseEntity<MultipleItemResponse<Trade>> getTrades(
+    public ResponseEntity<List<Trade>> getTrades(
             @PathVariable("id") UUID id,
             @RequestParam("marketId") UUID marketId
     ) {
-        return ResponseEntity.ok(new MultipleItemResponse<Trade>().setItems(tradeService.getByUserIdAndMarketId(id, marketId)));
+        return ResponseEntity.ok(readOnlyRepository.getTradesByUserIdAndMarketId(id, marketId));
     }
 
     @GetMapping("/{id}/positions")
-    public ResponseEntity<MultipleItemResponse<Position>> getPositions(
+    public ResponseEntity<List<Position>> getPositions(
             @PathVariable("id") UUID id
     ) {
-        return ResponseEntity.ok(new MultipleItemResponse<Position>().setItems(positionService.getByUserId(id)));
+        return ResponseEntity.ok(readOnlyRepository.getPositionsByUserId(id));
     }
 }

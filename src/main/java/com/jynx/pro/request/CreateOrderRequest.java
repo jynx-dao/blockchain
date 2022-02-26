@@ -17,7 +17,7 @@ import java.util.UUID;
 public class CreateOrderRequest extends SignedRequest {
     private OrderType type;
     private BigDecimal price;
-    private BigDecimal size;
+    private BigDecimal quantity;
     private UUID marketId;
     private MarketSide side;
     private Boolean postOnly;

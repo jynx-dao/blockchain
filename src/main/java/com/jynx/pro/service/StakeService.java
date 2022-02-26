@@ -50,7 +50,8 @@ public class StakeService {
     public void checkProposerStake(
             final User user
     ) {
-        if(getStakeForUser(user).doubleValue() < configService.get().getMinProposerStake()) {
+        double stake = getStakeForUser(user).doubleValue();
+        if(stake < configService.get().getMinProposerStake()) {
             throw new JynxProException(ErrorCode.INSUFFICIENT_PROPOSER_STAKE);
         }
     }

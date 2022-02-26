@@ -32,12 +32,12 @@ public class ErrorCode {
     public static final String TOO_MANY_DECIMAL_PLACES = "The maximum precision is 8 decimal places.";
     public static final String CANNOT_GET_DECIMAL_PLACES = "Failed to get the decimal places for the ERC20 token.";
     public static final String CANNOT_AMEND_WOULD_EXECUTE = "Cannot amend order as would immediately execute.";
-    public static final String ORDER_SIZE_MANDATORY = "Order size is mandatory.";
+    public static final String ORDER_QUANTITY_MANDATORY = "Order quantity is mandatory.";
     public static final String ORDER_TYPE_MANDATORY = "Order type is mandatory.";
     public static final String ORDER_MARKET_MANDATORY = "Order market ID is mandatory.";
     public static final String ORDER_SIDE_MANDATORY = "Order side is mandatory.";
     public static final String ORDER_PRICE_MANDATORY = "Order price is mandatory when type is LIMIT.";
-    public static final String NEGATIVE_SIZE = "Size cannot be negative.";
+    public static final String NEGATIVE_QUANTITY = "Quantity cannot be negative.";
     public static final String NEGATIVE_PRICE = "Price cannot be negative.";
     public static final String INVALID_LIQUIDATION_FEE = "Liquidation fee must be less than 50% of margin requirement.";
     public static final String AMOUNT_MANDATORY = "Amount is mandatory.";
@@ -55,4 +55,10 @@ public class ErrorCode {
     public static final String CANNOT_GET_POLYGON_PRICE = "Cannot get price from Polygon.";
     public static final String USER_NOT_FOUND = "User was not found.";
     public static final String ACCOUNT_NOT_FOUND = "Account was not found.";
+    public static final String FROM_AFTER_TO = "From timestamp cannot be after to timestamp.";
+    public static final String FROM_MANDATORY = "From timestamp is mandatory.";
+    public static final String TO_MANDATORY = "To timestamp is mandatory.";
+    public static final String MARKET_ID_MANDATORY = "Market ID is mandatory.";
+    public static final String INTERVAL_MANDATORY = "Interval is mandatory.";
+    public static final String TX_NOT_CREATED = "Write transaction not created.";
 }

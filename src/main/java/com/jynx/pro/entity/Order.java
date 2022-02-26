@@ -28,10 +28,10 @@ public class Order {
     private User user;
     @Column(name = "price", scale = 8, precision = 18)
     private BigDecimal price;
-    @Column(name = "size", nullable = false, scale = 8, precision = 18)
-    private BigDecimal size;
-    @Column(name = "remaining_size", nullable = false, scale = 8, precision = 18)
-    private BigDecimal remainingSize;
+    @Column(name = "quantity", nullable = false, scale = 8, precision = 18)
+    private BigDecimal quantity;
+    @Column(name = "remaining_quantity", nullable = false, scale = 8, precision = 18)
+    private BigDecimal remainingQuantity;
     @Enumerated(EnumType.STRING)
     @Column(name = "side", nullable = false)
     private MarketSide side;
@@ -45,7 +45,7 @@ public class Order {
     @Column(name = "reduce_only")
     private Boolean reduceOnly = false;
     @Column(name = "priority", nullable = false)
-    private Integer priority;
+    private Long priority;
     @Enumerated(EnumType.STRING)
     @Column(name = "tag", nullable = false)
     private OrderTag tag;

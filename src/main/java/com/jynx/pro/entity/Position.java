@@ -26,8 +26,8 @@ public class Position {
     @Enumerated(EnumType.STRING)
     @Column(name = "side")
     private MarketSide side;
-    @Column(name = "size", nullable = false, scale = 8, precision = 18)
-    private BigDecimal size;
+    @Column(name = "quantity", nullable = false, scale = 8, precision = 18)
+    private BigDecimal quantity;
     @Column(name = "allocated_margin", nullable = false, scale = 8, precision = 18)
     private BigDecimal allocatedMargin;
     @Column(name = "liquidation_price", nullable = false, scale = 8, precision = 18)

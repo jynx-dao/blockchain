@@ -1,9 +1,12 @@
 package com.jynx.pro.repository;
 
 import com.jynx.pro.entity.Config;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
-import java.util.UUID;
-
-public interface ConfigRepository extends JpaRepository<Config, UUID> {
+@Repository
+public class ConfigRepository extends EntityRepository<Config> {
+    @Override
+    public Class<Config> getType() {
+        return Config.class;
+    }
 }

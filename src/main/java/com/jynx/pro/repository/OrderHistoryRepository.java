@@ -1,9 +1,12 @@
 package com.jynx.pro.repository;
 
 import com.jynx.pro.entity.OrderHistory;
-import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
-import java.util.UUID;
-
-public interface OrderHistoryRepository extends JpaRepository<OrderHistory, UUID> {
+@Repository
+public class OrderHistoryRepository extends EntityRepository<OrderHistory> {
+    @Override
+    public Class<OrderHistory> getType() {
+        return OrderHistory.class;
+    }
 }

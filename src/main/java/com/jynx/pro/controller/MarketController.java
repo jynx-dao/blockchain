@@ -1,20 +1,24 @@
 package com.jynx.pro.controller;
 
+import com.jynx.pro.constant.KlineInterval;
 import com.jynx.pro.entity.Market;
 import com.jynx.pro.entity.Trade;
+import com.jynx.pro.error.ErrorCode;
+import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.model.Kline;
+import com.jynx.pro.model.MarketStatistics;
 import com.jynx.pro.model.OrderBook;
-import com.jynx.pro.response.MultipleItemResponse;
-import com.jynx.pro.response.SingleItemResponse;
-import com.jynx.pro.service.MarketService;
-import com.jynx.pro.service.OrderService;
-import com.jynx.pro.service.TradeService;
+import com.jynx.pro.model.Quote;
+import com.jynx.pro.repository.ReadOnlyRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 
+import java.util.List;
 import java.util.UUID;
 
 @Controller
@@ -22,51 +26,51 @@ import java.util.UUID;
 public class MarketController {
 
     @Autowired
-    private OrderService orderService;
-    @Autowired
-    private MarketService marketService;
-    @Autowired
-    private TradeService tradeService;
+    private ReadOnlyRepository readOnlyRepository;
 
     @GetMapping("/{id}/order-book")
-    public ResponseEntity<SingleItemResponse<OrderBook>> getOrderBook(
+    public ResponseEntity<OrderBook> getOrderBook(
             @PathVariable("id") UUID id
     ) {
-        return ResponseEntity.ok(new SingleItemResponse<OrderBook>().setItem(orderService.getOrderBook(id)));
+        return ResponseEntity.ok(readOnlyRepository.getOrderBookByMarketId(id));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<SingleItemResponse<Market>> getById(
+    public ResponseEntity<Market> getById(
             @PathVariable("id") UUID id
     ) {
-        return ResponseEntity.ok(new SingleItemResponse<Market>().setItem(marketService.get(id)));
+        return ResponseEntity.ok(readOnlyRepository.getMarketById(id)
+                .orElseThrow(() -> new JynxProException(ErrorCode.MARKET_NOT_FOUND)));
     }
 
     @GetMapping("/{id}/trades")
-    public ResponseEntity<MultipleItemResponse<Trade>> getTrades(
+    public ResponseEntity<List<Trade>> getTrades(
             @PathVariable("id") UUID id
     ) {
-        return ResponseEntity.ok(new MultipleItemResponse<Trade>().setItems(tradeService.getByMarketId(id)));
+        return ResponseEntity.ok(readOnlyRepository.getTradesByMarketId(id));
     }
 
     @GetMapping("/{id}/kline")
-    public ResponseEntity<MultipleItemResponse<Object>> getKline(
-            @PathVariable("id") UUID id
+    public ResponseEntity<List<Kline>> getKline(
+            @PathVariable("id") UUID id,
+            @RequestParam("from") Long from,
+            @RequestParam("to") Long to,
+            @RequestParam("interval") KlineInterval interval
     ) {
-        return ResponseEntity.ok(new MultipleItemResponse<Object>()); // TODO - implement this
+        return ResponseEntity.ok(readOnlyRepository.getKline(id, from, to, interval));
     }
 
     @GetMapping("/{id}/quote")
-    public ResponseEntity<MultipleItemResponse<Object>> getQuote(
+    public ResponseEntity<Quote> getQuote(
             @PathVariable("id") UUID id
     ) {
-        return ResponseEntity.ok(new MultipleItemResponse<Object>()); // TODO - implement this
+        return ResponseEntity.ok(readOnlyRepository.getQuoteByMarketId(id));
     }
 
     @GetMapping("/{id}/statistics")
-    public ResponseEntity<MultipleItemResponse<Object>> getStatistics(
+    public ResponseEntity<MarketStatistics> getStatistics(
             @PathVariable("id") UUID id
     ) {
-        return ResponseEntity.ok(new MultipleItemResponse<Object>()); // TODO - implement this
+        return ResponseEntity.ok(readOnlyRepository.getStatisticsByMarketId(id));
     }
 }
