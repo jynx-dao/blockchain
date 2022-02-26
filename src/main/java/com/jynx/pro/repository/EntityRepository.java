@@ -15,12 +15,29 @@ public abstract class EntityRepository<T> {
     @Autowired
     protected DatabaseTransactionManager databaseTransactionManager;
 
+    /**
+     * Return the type of the entity
+     *
+     * @return {@link Class<T>}
+     */
     public abstract Class<T> getType();
 
+    /**
+     * Get the appropriate {@link EntityManager}
+     *
+     * @return {@link EntityManager}
+     */
     protected EntityManager getEntityManager() {
         return databaseTransactionManager.getWriteEntityManager();
     }
 
+    /**
+     * Generic method to retrieve entity by ID
+     *
+     * @param id the entity ID
+     *
+     * @return {@link Optional<T>}
+     */
     public Optional<T> findById(
             final UUID id
     ) {
@@ -35,6 +52,13 @@ public abstract class EntityRepository<T> {
         }
     }
 
+    /**
+     * Generic method to save an entity
+     *
+     * @param item {@link T}
+     *
+     * @return {@link T}
+     */
     public T save(
             final T item
     ) {
@@ -42,6 +66,13 @@ public abstract class EntityRepository<T> {
         return item;
     }
 
+    /**
+     * Generic method to save multiple entities
+     *
+     * @param items {@link List<T>}
+     *
+     * @return {@link List<T>}
+     */
     public List<T> saveAll(
             final List<T> items
     ) {
@@ -49,6 +80,11 @@ public abstract class EntityRepository<T> {
         return items;
     }
 
+    /**
+     * Generic method to return all entities
+     *
+     * @return {@link List<T>}
+     */
     public List<T> findAll() {
         CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
         CriteriaQuery<T> cq = cb.createQuery(getType());
@@ -58,6 +94,9 @@ public abstract class EntityRepository<T> {
         return allQuery.getResultList();
     }
 
+    /**
+     * Generic method to delete all entities
+     */
     public void deleteAll() {
         CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
         CriteriaDelete<T> query = cb.createCriteriaDelete(getType());

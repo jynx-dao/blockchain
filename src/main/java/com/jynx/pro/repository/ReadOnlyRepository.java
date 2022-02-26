@@ -13,6 +13,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import javax.persistence.EntityManager;
+import javax.persistence.criteria.CriteriaBuilder;
+import javax.persistence.criteria.CriteriaQuery;
+import javax.persistence.criteria.Path;
+import javax.persistence.criteria.Root;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -37,12 +41,13 @@ public class ReadOnlyRepository {
     public Optional<Account> getAccountById(
             final UUID id
     ) {
-        String query = "select Account from Account where user = ?1";
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Account> query = cb.createQuery(Account.class);
+        Root<Account> rootType = query.from(Account.class);
+        Path<UUID> account_id = rootType.get("id");
+        query = query.select(rootType).where(cb.equal(account_id, id));
         try {
-            Account account = getEntityManager().createQuery(query, Account.class)
-                    .setParameter(1, id)
-                    .getSingleResult();
-            return Optional.of(account);
+            return Optional.of(getEntityManager().createQuery(query).getSingleResult());
         } catch(Exception e) {
             return Optional.empty();
         }
@@ -60,13 +65,13 @@ public class ReadOnlyRepository {
             final UUID accountId,
             final UUID userId
     ) {
-        Account account = getAccountById(accountId)
-                .orElseThrow(() -> new JynxProException(ErrorCode.ACCOUNT_NOT_FOUND));
-        String query = "select Deposit from Deposit where user.id = ?1 and asset.id = ?2";
-        return getEntityManager().createQuery(query, Deposit.class)
-                .setParameter(1, userId)
-                .setParameter(2, account.getAsset().getId())
-                .getResultList();
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Deposit> query = cb.createQuery(Deposit.class);
+        Root<Deposit> rootType = query.from(Deposit.class);
+        Path<UUID> account_id = rootType.join("account").get("id");
+        Path<UUID> user_id = rootType.join("user").get("id");
+        query = query.select(rootType).where(cb.equal(account_id, accountId), cb.equal(user_id, userId));
+        return getEntityManager().createQuery(query).getResultList();
     }
 
     /**
@@ -81,13 +86,13 @@ public class ReadOnlyRepository {
             final UUID accountId,
             final UUID userId
     ) {
-        Account account = getAccountById(accountId)
-                .orElseThrow(() -> new JynxProException(ErrorCode.ACCOUNT_NOT_FOUND));
-        String query = "select Withdrawal from Withdrawal where user.id = ?1 and asset.id = ?2";
-        return getEntityManager().createQuery(query, Withdrawal.class)
-                .setParameter(1, userId)
-                .setParameter(2, account.getAsset().getId())
-                .getResultList();
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Withdrawal> query = cb.createQuery(Withdrawal.class);
+        Root<Withdrawal> rootType = query.from(Withdrawal.class);
+        Path<UUID> account_id = rootType.join("account").get("id");
+        Path<UUID> user_id = rootType.join("user").get("id");
+        query = query.select(rootType).where(cb.equal(account_id, accountId), cb.equal(user_id, userId));
+        return getEntityManager().createQuery(query).getResultList();
     }
 
     /**
@@ -102,13 +107,13 @@ public class ReadOnlyRepository {
             final UUID accountId,
             final UUID userId
     ) {
-        Account account = getAccountById(accountId)
-                .orElseThrow(() -> new JynxProException(ErrorCode.ACCOUNT_NOT_FOUND));
-        String query = "select Transaction from Transaction where user.id = ?1 and asset.id = ?2";
-        return getEntityManager().createQuery(query, Transaction.class)
-                .setParameter(1, userId)
-                .setParameter(2, account.getAsset().getId())
-                .getResultList();
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Transaction> query = cb.createQuery(Transaction.class);
+        Root<Transaction> rootType = query.from(Transaction.class);
+        Path<UUID> account_id = rootType.join("account").get("id");
+        Path<UUID> user_id = rootType.join("user").get("id");
+        query = query.select(rootType).where(cb.equal(account_id, accountId), cb.equal(user_id, userId));
+        return getEntityManager().createQuery(query).getResultList();
     }
 
     /**
@@ -146,12 +151,13 @@ public class ReadOnlyRepository {
     public Optional<Market> getMarketById(
             final UUID id
     ) {
-        String query = "select Market from Market where id = ?1";
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Market> query = cb.createQuery(Market.class);
+        Root<Market> rootType = query.from(Market.class);
+        Path<UUID> market_id = rootType.get("id");
+        query = query.select(rootType).where(cb.equal(market_id, id));
         try {
-            Market market = getEntityManager().createQuery(query, Market.class)
-                    .setParameter(1, id)
-                    .getSingleResult();
-            return Optional.of(market);
+            return Optional.of(getEntityManager().createQuery(query).getSingleResult());
         } catch(Exception e) {
             return Optional.empty();
         }
@@ -167,10 +173,12 @@ public class ReadOnlyRepository {
     public List<Trade> getTradesByMarketId(
             final UUID marketId
     ) {
-        String query = "select Trade from Trade where market.id = ?1";
-        return getEntityManager().createQuery(query, Trade.class)
-                .setParameter(1, marketId)
-                .getResultList();
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Trade> query = cb.createQuery(Trade.class);
+        Root<Trade> rootType = query.from(Trade.class);
+        Path<UUID> market_id = rootType.join("market").get("id");
+        query = query.select(rootType).where(cb.equal(market_id, marketId));
+        return getEntityManager().createQuery(query).getResultList();
     }
 
     public List<Kline> getKline(
@@ -226,12 +234,13 @@ public class ReadOnlyRepository {
     public Optional<User> getUserById(
             final UUID id
     ) {
-        String query = "select User from User where id = ?1";
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<User> query = cb.createQuery(User.class);
+        Root<User> rootType = query.from(User.class);
+        Path<UUID> user_id = rootType.get("id");
+        query = query.select(rootType).where(cb.equal(user_id, id));
         try {
-            User user = getEntityManager().createQuery(query, User.class)
-                    .setParameter(1, id)
-                    .getSingleResult();
-            return Optional.of(user);
+            return Optional.of(getEntityManager().createQuery(query).getSingleResult());
         } catch(Exception e) {
             return Optional.empty();
         }
@@ -247,12 +256,13 @@ public class ReadOnlyRepository {
     public Optional<User> getUserByPublicKey(
             final String publicKey
     ) {
-        String query = "select User from User where publicKey = ?1";
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<User> query = cb.createQuery(User.class);
+        Root<User> rootType = query.from(User.class);
+        Path<String> userPublicKey = rootType.get("publicKey");
+        query = query.select(rootType).where(cb.equal(userPublicKey, publicKey));
         try {
-            User user = getEntityManager().createQuery(query, User.class)
-                    .setParameter(1, publicKey)
-                    .getSingleResult();
-            return Optional.of(user);
+            return Optional.of(getEntityManager().createQuery(query).getSingleResult());
         } catch(Exception e) {
             return Optional.empty();
         }
@@ -268,10 +278,12 @@ public class ReadOnlyRepository {
     public List<Account> getAccountsByUserId(
             final UUID userId
     ) {
-        String query = "select Account from Account where user.id = ?1";
-        return getEntityManager().createQuery(query, Account.class)
-                .setParameter(1, userId)
-                .getResultList();
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Account> query = cb.createQuery(Account.class);
+        Root<Account> rootType = query.from(Account.class);
+        Path<UUID> user_id = rootType.join("user").get("id");
+        query = query.select(rootType).where(cb.equal(user_id, userId));
+        return getEntityManager().createQuery(query).getResultList();
     }
 
     /**
@@ -284,13 +296,15 @@ public class ReadOnlyRepository {
     public List<Order> getOpenLimitOrdersByMarketId(
             final UUID marketId
     ) {
-        String query = "select Order from Order where market.id = ?1 and status in (?2, ?3) and type = ?4";
-        return getEntityManager().createQuery(query, Order.class)
-                .setParameter(1, marketId)
-                .setParameter(2, OrderStatus.OPEN)
-                .setParameter(3, OrderStatus.PARTIALLY_FILLED)
-                .setParameter(4, OrderType.LIMIT)
-                .getResultList();
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Order> query = cb.createQuery(Order.class);
+        Root<Order> rootType = query.from(Order.class);
+        Path<UUID> market_id = rootType.join("market").get("id");
+        Path<OrderStatus> orderStatus = rootType.get("status");
+        Path<OrderType> orderType = rootType.get("type");
+        query = query.select(rootType).where(cb.equal(market_id, marketId), cb.equal(orderType, OrderType.LIMIT),
+                orderStatus.in(List.of(OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED)));
+        return getEntityManager().createQuery(query).getResultList();
     }
 
     /**
@@ -303,10 +317,12 @@ public class ReadOnlyRepository {
     public List<Order> getOrdersByUserId(
             final UUID userId
     ) {
-        String query = "select Order from Order where user.id = ?1";
-        return getEntityManager().createQuery(query, Order.class)
-                .setParameter(1, userId)
-                .getResultList();
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Order> query = cb.createQuery(Order.class);
+        Root<Order> rootType = query.from(Order.class);
+        Path<UUID> user_id = rootType.join("user").get("id");
+        query = query.select(rootType).where(cb.equal(user_id, userId));
+        return getEntityManager().createQuery(query).getResultList();
     }
 
     /**
@@ -321,11 +337,13 @@ public class ReadOnlyRepository {
             final UUID userId,
             final UUID marketId
     ) {
-        String query = "select Trade from Trade where takerOrder.user.id = ?1 and market.id = ?2";
-        return getEntityManager().createQuery(query, Trade.class)
-                .setParameter(1, userId)
-                .setParameter(2, marketId)
-                .getResultList();
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Trade> query = cb.createQuery(Trade.class);
+        Root<Trade> rootType = query.from(Trade.class);
+        Path<UUID> user_id = rootType.join("user").get("id");
+        Path<UUID> market_id = rootType.join("market").get("id");
+        query = query.select(rootType).where(cb.equal(user_id, userId), cb.equal(market_id, marketId));
+        return getEntityManager().createQuery(query).getResultList();
     }
 
     /**
@@ -338,9 +356,11 @@ public class ReadOnlyRepository {
     public List<Position> getPositionsByUserId(
             final UUID userId
     ) {
-        String query = "select Position from Position where user.id = ?1";
-        return getEntityManager().createQuery(query, Position.class)
-                .setParameter(1, userId)
-                .getResultList();
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Position> query = cb.createQuery(Position.class);
+        Root<Position> rootType = query.from(Position.class);
+        Path<UUID> user_id = rootType.join("user").get("id");
+        query = query.select(rootType).where(cb.equal(user_id, userId));
+        return getEntityManager().createQuery(query).getResultList();
     }
 }
