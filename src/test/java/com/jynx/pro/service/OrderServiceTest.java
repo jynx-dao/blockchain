@@ -964,7 +964,6 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    @Disabled
     public void testAmendOrderFailsWithInsufficientMargin() throws InterruptedException {
         Market market = createOrderBook(1, 1);
         int dps = market.getSettlementAsset().getDecimalPlaces();
@@ -984,7 +983,7 @@ public class OrderServiceTest extends IntegrationTest {
         Optional<Account> accountOptional = accountRepository.findByUserAndAsset(takerUser, market.getSettlementAsset());
         Assertions.assertTrue(accountOptional.isPresent());
         BigDecimal startingBalance = BigDecimal.valueOf(INITIAL_BALANCE);
-        BigDecimal marginBalance = order.getPrice().multiply(order.getQuantity()).multiply(market.getMarginRequirement());
+        BigDecimal marginBalance = order.getPrice().multiply(BigDecimal.ONE).multiply(market.getMarginRequirement());
         BigDecimal availableBalance = startingBalance.subtract(marginBalance);
         Assertions.assertEquals(accountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
                 marginBalance.setScale(dps, RoundingMode.HALF_UP));

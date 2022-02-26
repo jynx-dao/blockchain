@@ -966,7 +966,7 @@ public class OrderService {
         positionService.getAndCreate(user, market);
         Account account = accountService.getAndCreate(user, market.getSettlementAsset());
         BigDecimal margin = getMarginRequirementWithNewOrder(market, side, quantity, price, user);
-        if(account.getBalance().doubleValue() < margin.doubleValue()) {
+        if(account.getBalance().compareTo(margin) < 0) {
             throw new JynxProException(ErrorCode.INSUFFICIENT_MARGIN);
         }
     }
