@@ -67,4 +67,6 @@ public class ErrorCode {
     public static final String CREATE_ORDER_FAILED = "Failed to create order.";
     public static final String CANCEL_ORDER_FAILED = "Failed to cancel order.";
     public static final String AMEND_ORDER_FAILED = "Failed to amend order.";
+    public static final String PARSE_JSON_ERROR = "Failed to parse JSON.";
+    public static final String UNRECOGNISED_TENDERMINT_TX = "Unrecognised Tendermint transaction.";
 }
