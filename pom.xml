@@ -149,11 +149,9 @@
                             <protocVersion>3.7.1</protocVersion>
                             <includeDirectories>
                                 <include>src/main/proto</include>
-                                <include>/usr/local/include</include>
                             </includeDirectories>
                             <inputDirectories>
                                 <include>src/main/proto</include>
-                                <include>/usr/local/include</include>
                             </inputDirectories>
                         </configuration>
                     </execution>
