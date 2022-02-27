@@ -73,7 +73,7 @@ public class EventService {
         return save(user, blockNumber, txHash, amount, type, null);
     }
 
-    public void confirm(
+    public Event confirm(
             final Event event
     ) {
         List<EventType> stakeEvents = List.of(EventType.ADD_STAKE, EventType.REMOVE_STAKE);
@@ -87,14 +87,15 @@ public class EventService {
             }
             stakeRepository.save(stake);
             event.setConfirmed(true);
-            eventRepository.save(event);
+            return eventRepository.save(event);
         } else if(assetEvents.contains(event.getType())) {
             Deposit deposit = depositRepository.findByEventId(event.getId())
                     .orElseThrow(() -> new JynxProException(ErrorCode.DEPOSIT_NOT_FOUND));
             accountService.credit(deposit);
             event.setConfirmed(true);
-            eventRepository.save(event);
+            return eventRepository.save(event);
         }
+        return event;
     }
 
     public List<Event> getUnconfirmed() {

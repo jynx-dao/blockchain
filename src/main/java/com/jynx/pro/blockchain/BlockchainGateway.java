@@ -6,10 +6,7 @@ import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.manager.AppStateManager;
 import com.jynx.pro.manager.DatabaseTransactionManager;
 import com.jynx.pro.request.*;
-import com.jynx.pro.service.AccountService;
-import com.jynx.pro.service.AssetService;
-import com.jynx.pro.service.MarketService;
-import com.jynx.pro.service.OrderService;
+import com.jynx.pro.service.*;
 import com.jynx.pro.utils.JSONUtils;
 import io.grpc.stub.StreamObserver;
 import lombok.Data;
@@ -35,6 +32,8 @@ import java.util.function.Function;
 public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBase {
 
     @Autowired
+    private TendermintClient tendermintClient;
+    @Autowired
     private OrderService orderService;
     @Autowired
     private MarketService marketService;
@@ -42,6 +41,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private AssetService assetService;
     @Autowired
     private AccountService accountService;
+    @Autowired
+    private EthereumService ethereumService;
     @Autowired
     private AppStateManager appStateManager;
     @Autowired
@@ -68,6 +69,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         deliverTransactions.put(TendermintTransaction.ADD_ASSET, this::addAsset);
         deliverTransactions.put(TendermintTransaction.SUSPEND_ASSET, this::suspendAsset);
         deliverTransactions.put(TendermintTransaction.UNSUSPEND_ASSET, this::unsuspendAsset);
+        deliverTransactions.put(TendermintTransaction.CONFIRM_ETHEREUM_EVENTS, this::confirmEthereumEvents);
         checkTransactions.put(TendermintTransaction.CREATE_ORDER, this::checkCreateOrder);
         checkTransactions.put(TendermintTransaction.CANCEL_ORDER, this::checkCancelOrder);
         checkTransactions.put(TendermintTransaction.AMEND_ORDER, this::checkAmendOrder);
@@ -80,6 +82,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         checkTransactions.put(TendermintTransaction.ADD_ASSET, this::checkAddAsset);
         checkTransactions.put(TendermintTransaction.SUSPEND_ASSET, this::checkSuspendAsset);
         checkTransactions.put(TendermintTransaction.UNSUSPEND_ASSET, this::checkUnsuspendAsset);
+        checkTransactions.put(TendermintTransaction.CONFIRM_ETHEREUM_EVENTS, this::checkConfirmEthereumEvents);
     }
 
     @Data
@@ -97,6 +100,12 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         } catch(Exception e) {
             return TendermintTransaction.UNKNOWN;
         }
+    }
+
+    private void checkConfirmEthereumEvents(
+            final String txAsJson
+    ) {
+        // TODO
     }
 
     private void checkCreateWithdrawal(
@@ -169,6 +178,12 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         // TODO
+    }
+
+    private int confirmEthereumEvents(
+            final String txAsJson
+    ) {
+        return ethereumService.confirmEvents().hashCode();
     }
 
     private int createWithdrawal(
@@ -297,8 +312,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         databaseTransactionManager.createTransaction();
         String proposerAddress = req.getHeader().getProposerAddress().toStringUtf8();
         if(validatorAddress.equals(proposerAddress)) {
-            // TODO - if we're the proposer, we should broadcast app-level transactions through consensus
-            // TODO - these transactions will need to be signed [and verified as coming from a validator on deliverTx]
+            tendermintClient.confirmEthereumEvents();
+            // TODO - risk management / liquidations?? [if we decide it's better to do it once per block...]
+            // TODO - update proposals via deliverTx [open, reject, approve, enact]
         }
         responseObserver.onNext(resp);
         responseObserver.onCompleted();

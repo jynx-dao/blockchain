@@ -34,10 +34,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.security.SecureRandom;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -138,7 +135,8 @@ public class EthereumService {
     /**
      * Processes confirmed events (i.e. after sufficient Ethereum blocks have been mined)
      */
-    public void confirmEvents() {
+    public List<com.jynx.pro.entity.Event> confirmEvents() {
+        List<com.jynx.pro.entity.Event> confirmedEvents = new ArrayList<>();
         try {
             BigInteger blockNumber = getWeb3j().ethBlockNumber().send().getBlockNumber();
             List<com.jynx.pro.entity.Event> events = eventService.getUnconfirmed();
@@ -148,20 +146,18 @@ public class EthereumService {
                 long confirmations = blockNumber.longValue() - event.getBlockNumber();
                 if(transactionOptional.isPresent() && confirmations >= configService.get().getEthConfirmations()) {
                     if(matchEvent(transactionOptional.get().getLogs(), event)) {
-                        // TODO - this should be propagated via deliverTx [or at the end of a block (??)]
-                        // TODO - it should be propagated by the leader [??]
-                        eventService.confirm(event);
+                        confirmedEvents.add(eventService.confirm(event));
                     } else {
                         log.warn("Cannot reconcile the event !!");
                     }
                 } else if(transactionOptional.isEmpty() && confirmations >= configService.get().getEthConfirmations()) {
-                    // TODO - the TX has been dropped after sufficient blocks were mined
                     log.warn("This event cannot be processed: {}", event);
                 }
             }
         } catch(Exception e) {
             log.error("Failed to confirm events", e);
         }
+        return confirmedEvents;
     }
 
     /**
@@ -215,12 +211,12 @@ public class EthereumService {
     public void initializeFilters() {
         EthFilter bridgeFilter = new EthFilter(DefaultBlockParameterName.EARLIEST,
                 DefaultBlockParameterName.LATEST, configService.get().getBridgeAddress());
-        // TODO - these events should be propagated via deliverTx when Tendermint is added
-        // TODO - should only propagate them if this node is the leader
         getWeb3j().ethLogFlowable(bridgeFilter).subscribe(ethLog -> {
             String eventHash = ethLog.getTopics().get(0);
             String txHash = ethLog.getTransactionHash();
             BigInteger blockNumber = ethLog.getBlockNumber();
+            // TODO - the proposer should deliver these events via deliverTx [??]
+            // TODO - else this is effectively happening "off-chain"
             if(eventHash.equals(ADD_STAKE_HASH)) {
                 BigInteger amount = decodeUint256(ethLog, 1);
                 String jynxKey = decodeBytes32(ethLog, 2);
@@ -244,6 +240,7 @@ public class EthereumService {
      * @return {@link Web3j} interface
      */
     private Web3j getWeb3j() {
+        // TODO - allow https or http
         String provider = String.format("http://%s:%s", rpcHost, rpcPort);
         return Web3j.build(new HttpService(provider));
     }

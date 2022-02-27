@@ -101,6 +101,12 @@ public class TendermintClient {
         throw new JynxProException(errorCode);
     }
 
+    public TransactionResponse<Object> confirmEthereumEvents() {
+        // TODO - handle requests with no payload
+        return processTransaction(new SingleItemRequest(), Object.class,
+                TendermintTransaction.CONFIRM_ETHEREUM_EVENTS, ErrorCode.CONFIRM_ETHEREUM_EVENTS_FAILED);
+    }
+
     public TransactionResponse<Withdrawal> createWithdrawal(
             final CreateWithdrawalRequest request
     ) {

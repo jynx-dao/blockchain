@@ -18,8 +18,6 @@ public enum TendermintTransaction {
     CANCEL_WITHDRAWAL,
     CAST_VOTE,
     UPDATE_DELEGATION,
-    CREDIT_DEPOSIT,
-    ADD_STAKE,
-    REMOVE_STAKE,
+    CONFIRM_ETHEREUM_EVENTS,
     UNKNOWN;
 }
