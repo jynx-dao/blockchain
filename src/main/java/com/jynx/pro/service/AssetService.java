@@ -117,7 +117,7 @@ public class AssetService {
         return asset;
     }
 
-    public void proposeToSuspend(
+    public Proposal proposeToSuspend(
             final SingleItemRequest request
     ) {
         stakeService.checkProposerStake(request.getUser());
@@ -126,11 +126,11 @@ public class AssetService {
         if(!asset.getStatus().equals(AssetStatus.ACTIVE)) {
             throw new JynxProException(ErrorCode.ASSET_NOT_ACTIVE);
         }
-        proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
+        return proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
                 request.getEnactmentTime(), asset.getId(), ProposalType.SUSPEND_ASSET);
     }
 
-    public void proposeToUnsuspend(
+    public Proposal proposeToUnsuspend(
             final SingleItemRequest request
     ) {
         stakeService.checkProposerStake(request.getUser());
@@ -139,7 +139,7 @@ public class AssetService {
         if(!asset.getStatus().equals(AssetStatus.SUSPENDED)) {
             throw new JynxProException(ErrorCode.ASSET_NOT_SUSPENDED);
         }
-        proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
+        return proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
                 request.getEnactmentTime(), asset.getId(), ProposalType.UNSUSPEND_ASSET);
     }
 }

@@ -16,5 +16,6 @@ public enum TendermintTransaction {
     UNSUSPEND_ASSET,
     CREATE_WITHDRAWAL,
     CANCEL_WITHDRAWAL,
+    CAST_VOTE,
     UNKNOWN;
 }

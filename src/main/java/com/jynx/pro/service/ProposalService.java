@@ -12,8 +12,6 @@ import com.jynx.pro.repository.VoteRepository;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -261,7 +259,7 @@ public class ProposalService {
      * @param linkedId the linked object
      * @param type the {@link ProposalType}
      */
-    public void create(
+    public Proposal create(
             final User user,
             final Long openTime,
             final Long closingTime,
@@ -280,5 +278,6 @@ public class ProposalService {
                 .setStatus(ProposalStatus.CREATED);
         proposal = proposalRepository.save(proposal);
         vote(true, proposal.getId(), user);
+        return proposal;
     }
 }
