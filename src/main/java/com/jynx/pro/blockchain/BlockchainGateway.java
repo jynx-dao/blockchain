@@ -17,6 +17,7 @@ import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import tendermint.abci.types.ABCIApplicationGrpc;
 import tendermint.abci.types.Types;
@@ -47,6 +48,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private DatabaseTransactionManager databaseTransactionManager;
     @Autowired
     private JSONUtils jsonUtils;
+    @Value("${validator.address}")
+    private String validatorAddress;
 
     private final Map<TendermintTransaction, Function<String, Integer>> deliverTransactions = new HashMap<>();
     private final Map<TendermintTransaction, Consumer<String>> checkTransactions = new HashMap<>();
@@ -292,6 +295,11 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     public void beginBlock(Types.RequestBeginBlock req, StreamObserver<Types.ResponseBeginBlock> responseObserver) {
         Types.ResponseBeginBlock resp = Types.ResponseBeginBlock.newBuilder().build();
         databaseTransactionManager.createTransaction();
+        String proposerAddress = req.getHeader().getProposerAddress().toStringUtf8();
+        if(validatorAddress.equals(proposerAddress)) {
+            // TODO - if we're the proposer, we should broadcast app-level transactions through consensus
+            // TODO - these transactions will need to be signed [and verified as coming from a validator on deliverTx]
+        }
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
@@ -299,7 +307,6 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Override
     public void endBlock(Types.RequestEndBlock req, StreamObserver<Types.ResponseEndBlock> responseObserver) {
         // TODO - update validators
-        // TODO - deliver end of block transactions [??]
         Types.ResponseEndBlock resp = Types.ResponseEndBlock.newBuilder().build();
         responseObserver.onNext(resp);
         responseObserver.onCompleted();

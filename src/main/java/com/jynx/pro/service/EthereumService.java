@@ -1,6 +1,5 @@
 package com.jynx.pro.service;
 
-import com.jynx.pro.entity.Withdrawal;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.ethereum.ERC20Detailed;
 import com.jynx.pro.ethereum.JynxPro_Bridge;
@@ -150,6 +149,7 @@ public class EthereumService {
                 if(transactionOptional.isPresent() && confirmations >= configService.get().getEthConfirmations()) {
                     if(matchEvent(transactionOptional.get().getLogs(), event)) {
                         // TODO - this should be propagated via deliverTx [or at the end of a block (??)]
+                        // TODO - it should be propagated by the leader [??]
                         eventService.confirm(event);
                     } else {
                         log.warn("Cannot reconcile the event !!");
@@ -216,6 +216,7 @@ public class EthereumService {
         EthFilter bridgeFilter = new EthFilter(DefaultBlockParameterName.EARLIEST,
                 DefaultBlockParameterName.LATEST, configService.get().getBridgeAddress());
         // TODO - these events should be propagated via deliverTx when Tendermint is added
+        // TODO - should only propagate them if this node is the leader
         getWeb3j().ethLogFlowable(bridgeFilter).subscribe(ethLog -> {
             String eventHash = ethLog.getTopics().get(0);
             String txHash = ethLog.getTransactionHash();
