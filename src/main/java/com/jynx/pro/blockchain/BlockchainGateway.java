@@ -51,7 +51,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         try {
             if (tendermintTx.equals(TendermintTransaction.CREATE_ORDER)) {
                 CreateOrderRequest request = objectMapper.readValue(txAsJson, CreateOrderRequest.class);
-//                orderService.create(request);
+                orderService.create(request);
             }
         } catch(JsonProcessingException e) {
             log.error(ErrorCode.PARSE_JSON_ERROR, e);
