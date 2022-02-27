@@ -1,4 +1,5 @@
 language: java
+install: false
 jdk:
   - openjdk11
 script:
