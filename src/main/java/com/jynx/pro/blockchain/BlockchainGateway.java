@@ -14,8 +14,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
-import tendermint.abci.ABCIApplicationGrpc;
-import tendermint.abci.Types;
+import tendermint.abci.types.ABCIApplicationGrpc;
+import tendermint.abci.types.Types;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
@@ -51,7 +51,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         try {
             if (tendermintTx.equals(TendermintTransaction.CREATE_ORDER)) {
                 CreateOrderRequest request = objectMapper.readValue(txAsJson, CreateOrderRequest.class);
-                orderService.create(request);
+//                orderService.create(request);
             }
         } catch(JsonProcessingException e) {
             log.error(ErrorCode.PARSE_JSON_ERROR, e);
@@ -73,8 +73,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     }
 
     @Override
-    public void initChain(tendermint.abci.Types.RequestInitChain request,
-                          io.grpc.stub.StreamObserver<tendermint.abci.Types.ResponseInitChain> responseObserver) {
+    public void initChain(tendermint.abci.types.Types.RequestInitChain request,
+                          io.grpc.stub.StreamObserver<tendermint.abci.types.Types.ResponseInitChain> responseObserver) {
         Types.ResponseInitChain resp = Types.ResponseInitChain.newBuilder().build();
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
