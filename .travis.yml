@@ -1,5 +1,5 @@
 language: java
-install: echo "hello"
+install: echo "skip default install"
 jdk:
   - openjdk11
 script:
