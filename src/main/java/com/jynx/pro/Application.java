@@ -9,15 +9,22 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 @Slf4j
 @SpringBootApplication
 public class Application implements CommandLineRunner {
+
+    private final ExecutorService executorService = Executors.newCachedThreadPool();
 
     @Autowired
     private BlockchainGateway gateway;
 
     @Value("${grpc.enabled}")
     private Boolean grpcEnabled;
+    @Value("${grpc.block.enabled}")
+    private Boolean grpcBlockEnabled;
 
     public static void main(String[] args) {
         SpringApplication.run(Application.class, args);
@@ -28,7 +35,9 @@ public class Application implements CommandLineRunner {
         if(grpcEnabled) {
             GRPCServer server = new GRPCServer(gateway, 26658);
             server.start();
-            server.blockUntilShutdown();
+            if(grpcBlockEnabled) {
+                server.blockUntilShutdown();
+            }
         }
     }
 }
