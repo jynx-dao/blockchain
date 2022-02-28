@@ -68,4 +68,13 @@ public class ErrorCode {
     public static final String CANCEL_ORDER_FAILED = "Failed to cancel order.";
     public static final String AMEND_ORDER_FAILED = "Failed to amend order.";
     public static final String CONFIRM_ETHEREUM_EVENTS_FAILED = "Failed to confirm Ethereum events.";
+    public static final String ADD_MARKET_FAILED = "Failed to add market.";
+    public static final String AMEND_MARKET_FAILED = "Failed to amend market.";
+    public static final String SUSPEND_MARKET_FAILED = "Failed to suspend market.";
+    public static final String UNSUSPEND_MARKET_FAILED = "Failed to unsuspend market.";
+    public static final String ADD_ASSET_FAILED = "Failed to add asset.";
+    public static final String SUSPEND_ASSET_FAILED = "Failed to suspend asset.";
+    public static final String UNSUSPEND_ASSET_FAILED = "Failed to unsuspend asset.";
+    public static final String SETTLE_MARKETS_FAILED = "Failed to settle markets.";
+    public static final String SYNC_PROPOSALS_FAILED = "Failed to sync proposals.";
 }

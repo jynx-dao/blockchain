@@ -81,7 +81,7 @@ public class MarketService {
         accountRepository.save(account);
     }
 
-    public void settleMarkets() {
+    public List<Market> settleMarkets() {
         List<Market> markets = marketRepository.findByStatusIn(List.of(MarketStatus.ACTIVE, MarketStatus.SUSPENDED));
         for(Market market : markets) {
             int dps = market.getSettlementAsset().getDecimalPlaces();
@@ -95,6 +95,7 @@ public class MarketService {
                 positions.forEach(position -> settlePosition(position, market, settlementDelta));
             }
         }
+        return markets;
     }
 
     public Market proposeToAdd(

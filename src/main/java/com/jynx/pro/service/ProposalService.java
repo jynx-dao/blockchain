@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -41,9 +42,23 @@ public class ProposalService {
     private UUIDUtils uuidUtils;
 
     /**
+     * Synchronise the state of {@link Proposal}s
+     *
+     * @return the updated {@link List<Proposal>}
+     */
+    public List<Proposal> sync() {
+        List<Proposal> proposals = new ArrayList<>();
+        proposals.addAll(open());
+        proposals.addAll(approve());
+        proposals.addAll(reject());
+        proposals.addAll(enact());
+        return proposals;
+    }
+
+    /**
      * Enact {@link Proposal}s
      */
-    public void enact() {
+    public List<Proposal> enact() {
         List<Proposal> proposals = proposalRepository.findByStatus(ProposalStatus.APPROVED)
                 .stream().filter(p -> p.getEnactmentTime() < configService.getTimestamp()).collect(Collectors.toList());
         for(Proposal proposal : proposals) {
@@ -72,7 +87,7 @@ public class ProposalService {
                     break;
             }
         }
-        proposalRepository.saveAll(proposals);
+        return proposalRepository.saveAll(proposals);
     }
 
     private BigDecimal getTotalVotes(
@@ -106,20 +121,20 @@ public class ProposalService {
     /**
      * Approve {@link Proposal}s
      */
-    public void approve() {
+    public List<Proposal> approve() {
         List<Proposal> proposals = proposalRepository.findByStatus(ProposalStatus.OPEN);
         for(Proposal proposal : proposals) {
             if(isAboveThreshold(proposal)) {
                 proposal.setStatus(ProposalStatus.APPROVED);
             }
         }
-        proposalRepository.saveAll(proposals);
+        return proposalRepository.saveAll(proposals);
     }
 
     /**
      * Reject {@link Proposal}s
      */
-    public void reject() {
+    public List<Proposal> reject() {
         List<Proposal> proposals = proposalRepository.findByStatus(ProposalStatus.OPEN)
                 .stream().filter(p -> p.getClosingTime() < configService.getTimestamp()).collect(Collectors.toList());
         List<ProposalType> marketProposalTypes = List.of(ProposalType.ADD_MARKET, ProposalType.AMEND_MARKET,
@@ -136,17 +151,17 @@ public class ProposalService {
                 }
             }
         }
-        proposalRepository.saveAll(proposals);
+        return proposalRepository.saveAll(proposals);
     }
 
     /**
      * Open {@link Proposal}s
      */
-    public void open() {
+    public List<Proposal> open() {
         List<Proposal> proposals = proposalRepository.findByStatus(ProposalStatus.CREATED)
                 .stream().filter(p -> p.getOpenTime() < configService.getTimestamp()).collect(Collectors.toList());
         proposals.forEach(p -> p.setStatus(ProposalStatus.OPEN));
-        proposalRepository.saveAll(proposals);
+        return proposalRepository.saveAll(proposals);
     }
 
     /**

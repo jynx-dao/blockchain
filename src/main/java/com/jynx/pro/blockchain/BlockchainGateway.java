@@ -44,6 +44,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Autowired
     private EthereumService ethereumService;
     @Autowired
+    private ProposalService proposalService;
+    @Autowired
     private AppStateManager appStateManager;
     @Autowired
     private DatabaseTransactionManager databaseTransactionManager;
@@ -70,6 +72,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         deliverTransactions.put(TendermintTransaction.SUSPEND_ASSET, this::suspendAsset);
         deliverTransactions.put(TendermintTransaction.UNSUSPEND_ASSET, this::unsuspendAsset);
         deliverTransactions.put(TendermintTransaction.CONFIRM_ETHEREUM_EVENTS, this::confirmEthereumEvents);
+        deliverTransactions.put(TendermintTransaction.SYNC_PROPOSALS, this::syncProposals);
+        deliverTransactions.put(TendermintTransaction.SETTLE_MARKETS, this::settleMarkets);
         checkTransactions.put(TendermintTransaction.CREATE_ORDER, this::checkCreateOrder);
         checkTransactions.put(TendermintTransaction.CANCEL_ORDER, this::checkCancelOrder);
         checkTransactions.put(TendermintTransaction.AMEND_ORDER, this::checkAmendOrder);
@@ -83,6 +87,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         checkTransactions.put(TendermintTransaction.SUSPEND_ASSET, this::checkSuspendAsset);
         checkTransactions.put(TendermintTransaction.UNSUSPEND_ASSET, this::checkUnsuspendAsset);
         checkTransactions.put(TendermintTransaction.CONFIRM_ETHEREUM_EVENTS, this::checkConfirmEthereumEvents);
+        checkTransactions.put(TendermintTransaction.SYNC_PROPOSALS, this::checkSyncProposals);
+        checkTransactions.put(TendermintTransaction.SETTLE_MARKETS, this::checkSettleMarkets);
     }
 
     @Data
@@ -103,6 +109,18 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     }
 
     private void checkConfirmEthereumEvents(
+            final String txAsJson
+    ) {
+        // TODO
+    }
+
+    private void checkSyncProposals(
+            final String txAsJson
+    ) {
+        // TODO
+    }
+
+    private void checkSettleMarkets(
             final String txAsJson
     ) {
         // TODO
@@ -184,6 +202,18 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         return ethereumService.confirmEvents().hashCode();
+    }
+
+    private int syncProposals(
+            final String txAsJson
+    ) {
+        return proposalService.sync().hashCode();
+    }
+
+    private int settleMarkets(
+            final String txAsJson
+    ) {
+        return marketService.settleMarkets().hashCode();
     }
 
     private int createWithdrawal(
@@ -313,8 +343,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         String proposerAddress = req.getHeader().getProposerAddress().toStringUtf8();
         if(validatorAddress.equals(proposerAddress)) {
             tendermintClient.confirmEthereumEvents();
+            tendermintClient.settleMarkets();
+            tendermintClient.syncProposals();
             // TODO - risk management / liquidations?? [if we decide it's better to do it once per block...]
-            // TODO - update proposals via deliverTx [open, reject, approve, enact]
         }
         responseObserver.onNext(resp);
         responseObserver.onCompleted();

@@ -9,12 +9,12 @@ import com.jynx.pro.model.Kline;
 import com.jynx.pro.model.MarketStatistics;
 import com.jynx.pro.model.OrderBook;
 import com.jynx.pro.model.Quote;
+import com.jynx.pro.request.AddMarketRequest;
+import com.jynx.pro.request.AmendMarketRequest;
+import com.jynx.pro.request.SingleItemRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
@@ -67,5 +67,33 @@ public class MarketController extends AbstractController {
             @PathVariable("id") UUID id
     ) {
         return ResponseEntity.ok(readOnlyRepository.getStatisticsByMarketId(id));
+    }
+
+    @PostMapping
+    public ResponseEntity<Market> add(
+            @RequestBody AddMarketRequest request
+    ) {
+        return ResponseEntity.ok(tendermintClient.addMarket(request).getItem());
+    }
+
+    @PutMapping
+    public ResponseEntity<Market> amend(
+            @RequestBody AmendMarketRequest request
+    ) {
+        return ResponseEntity.ok(tendermintClient.amendMarket(request).getItem());
+    }
+
+    @PostMapping("/suspend")
+    public ResponseEntity<Market> suspend(
+            @RequestBody SingleItemRequest request
+    ) {
+        return ResponseEntity.ok(tendermintClient.suspendMarket(request).getItem());
+    }
+
+    @PostMapping("/unsuspend")
+    public ResponseEntity<Market> unsuspend(
+            @RequestBody SingleItemRequest request
+    ) {
+        return ResponseEntity.ok(tendermintClient.unsuspendMarket(request).getItem());
     }
 }

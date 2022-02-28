@@ -5,6 +5,8 @@ import com.jynx.pro.blockchain.request.TendermintRequest;
 import com.jynx.pro.blockchain.response.TendermintResponse;
 import com.jynx.pro.blockchain.response.TransactionResponse;
 import com.jynx.pro.constant.TendermintTransaction;
+import com.jynx.pro.entity.Asset;
+import com.jynx.pro.entity.Market;
 import com.jynx.pro.entity.Order;
 import com.jynx.pro.entity.Withdrawal;
 import com.jynx.pro.error.ErrorCode;
@@ -25,6 +27,7 @@ import java.util.Base64;
 public class TendermintClient {
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    private static final String GET_TX_BASE_URI = "http://localhost:26657/tx?hash=";
     private static final String TX_BASE_URI = "http://localhost:26657/broadcast_tx_sync?tx=";
     private static final String QUERY_BASE_URI = "http://localhost:26657/abci_query?data=";
 
@@ -34,6 +37,7 @@ public class TendermintClient {
             final TendermintTransaction tendermintTx
     ) {
         try {
+            if(request == null) return baseUri;
             String data = objectMapper.writeValueAsString(request);
             JSONObject jsonObject = new JSONObject(data);
             jsonObject.put("tendermintTx", tendermintTx.name());
@@ -72,6 +76,28 @@ public class TendermintClient {
         throw new JynxProException(errorCode);
     }
 
+    public void getTransaction(
+            final String txHash
+    ) {
+        try {
+            HttpResponse<JsonNode> response = Unirest.get(String.format("%s%s", GET_TX_BASE_URI, txHash)).asJson();
+            if(response.getStatus() == 200) {
+                log.info(response.getBody().toString());
+            } else {
+                log.info(response.getBody().toString());
+            }
+        } catch(Exception e) {
+            log.error(e.getMessage(), e);
+        }
+    }
+
+    private void processTransaction(
+            final TendermintTransaction tendermintTx,
+            final String errorCode
+    ) {
+        processTransaction(null, null, tendermintTx, errorCode);
+    }
+
     private <S extends TendermintRequest, T> TransactionResponse<T> processTransaction(
             final S request,
             final Class<T> responseType,
@@ -81,6 +107,7 @@ public class TendermintClient {
         try {
             HttpResponse<JsonNode> response = Unirest.get(buildUrl(TX_BASE_URI, request, tendermintTx)).asJson();
             if(response.getStatus() == 200) {
+                if(responseType == null) return null;
                 JSONObject jsonObject = new JSONObject(response.getBody().toString());
                 String hash = jsonObject
                         .getJSONObject("result")
@@ -101,10 +128,16 @@ public class TendermintClient {
         throw new JynxProException(errorCode);
     }
 
-    public TransactionResponse<Object> confirmEthereumEvents() {
-        // TODO - handle requests with no payload
-        return processTransaction(new SingleItemRequest(), Object.class,
-                TendermintTransaction.CONFIRM_ETHEREUM_EVENTS, ErrorCode.CONFIRM_ETHEREUM_EVENTS_FAILED);
+    public void confirmEthereumEvents() {
+        processTransaction(TendermintTransaction.CONFIRM_ETHEREUM_EVENTS, ErrorCode.CONFIRM_ETHEREUM_EVENTS_FAILED);
+    }
+
+    public void settleMarkets() {
+        processTransaction(TendermintTransaction.SETTLE_MARKETS, ErrorCode.SETTLE_MARKETS_FAILED);
+    }
+
+    public void syncProposals() {
+        processTransaction(TendermintTransaction.SYNC_PROPOSALS, ErrorCode.SYNC_PROPOSALS_FAILED);
     }
 
     public TransactionResponse<Withdrawal> createWithdrawal(
@@ -140,5 +173,54 @@ public class TendermintClient {
     ) {
         return processTransaction(request, Order.class,
                 TendermintTransaction.CANCEL_ORDER, ErrorCode.CANCEL_ORDER_FAILED);
+    }
+
+    public TransactionResponse<Market> addMarket(
+            final AddMarketRequest request
+    ) {
+        return processTransaction(request, Market.class,
+                TendermintTransaction.ADD_MARKET, ErrorCode.ADD_MARKET_FAILED);
+    }
+
+    public TransactionResponse<Market> amendMarket(
+            final AmendMarketRequest request
+    ) {
+        return processTransaction(request, Market.class,
+                TendermintTransaction.AMEND_MARKET, ErrorCode.AMEND_MARKET_FAILED);
+    }
+
+    public TransactionResponse<Market> suspendMarket(
+            final SingleItemRequest request
+    ) {
+        return processTransaction(request, Market.class,
+                TendermintTransaction.SUSPEND_MARKET, ErrorCode.SUSPEND_MARKET_FAILED);
+    }
+
+    public TransactionResponse<Market> unsuspendMarket(
+            final SingleItemRequest request
+    ) {
+        return processTransaction(request, Market.class,
+                TendermintTransaction.UNSUSPEND_MARKET, ErrorCode.UNSUSPEND_MARKET_FAILED);
+    }
+
+    public TransactionResponse<Asset> addAsset(
+            final AddAssetRequest request
+    ) {
+        return processTransaction(request, Asset.class,
+                TendermintTransaction.ADD_ASSET, ErrorCode.ADD_ASSET_FAILED);
+    }
+
+    public TransactionResponse<Asset> suspendAsset(
+            final SingleItemRequest request
+    ) {
+        return processTransaction(request, Asset.class,
+                TendermintTransaction.SUSPEND_ASSET, ErrorCode.SUSPEND_ASSET_FAILED);
+    }
+
+    public TransactionResponse<Asset> unsuspendAsset(
+            final SingleItemRequest request
+    ) {
+        return processTransaction(request, Asset.class,
+                TendermintTransaction.UNSUSPEND_ASSET, ErrorCode.UNSUSPEND_ASSET_FAILED);
     }
 }
