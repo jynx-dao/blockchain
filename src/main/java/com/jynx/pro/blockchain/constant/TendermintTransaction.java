@@ -1,4 +1,4 @@
-package com.jynx.pro.constant;
+package com.jynx.pro.blockchain.constant;
 
 public enum TendermintTransaction {
     CREATE_ORDER,
@@ -16,7 +16,7 @@ public enum TendermintTransaction {
     UNSUSPEND_ASSET,
     CREATE_WITHDRAWAL,
     CANCEL_WITHDRAWAL,
-    CAST_VOTE, // TODO
+    CAST_VOTE,
     UPDATE_DELEGATION, // TODO
     CONFIRM_ETHEREUM_EVENTS,
     SETTLE_MARKETS,

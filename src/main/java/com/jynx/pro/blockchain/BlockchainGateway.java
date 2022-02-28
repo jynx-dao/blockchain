@@ -1,7 +1,7 @@
 package com.jynx.pro.blockchain;
 
 import com.google.protobuf.ByteString;
-import com.jynx.pro.constant.TendermintTransaction;
+import com.jynx.pro.blockchain.constant.TendermintTransaction;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.manager.AppStateManager;
 import com.jynx.pro.manager.DatabaseTransactionManager;
@@ -57,23 +57,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private final Map<TendermintTransaction, Function<String, Integer>> deliverTransactions = new HashMap<>();
     private final Map<TendermintTransaction, Consumer<String>> checkTransactions = new HashMap<>();
 
-    @PostConstruct
-    private void setup() {
-        deliverTransactions.put(TendermintTransaction.CREATE_ORDER, this::createOrder);
-        deliverTransactions.put(TendermintTransaction.CANCEL_ORDER, this::cancelOrder);
-        deliverTransactions.put(TendermintTransaction.AMEND_ORDER, this::amendOrder);
-        deliverTransactions.put(TendermintTransaction.CREATE_WITHDRAWAL, this::createWithdrawal);
-        deliverTransactions.put(TendermintTransaction.CANCEL_WITHDRAWAL, this::cancelWithdrawal);
-        deliverTransactions.put(TendermintTransaction.ADD_MARKET, this::addMarket);
-        deliverTransactions.put(TendermintTransaction.AMEND_MARKET, this::amendMarket);
-        deliverTransactions.put(TendermintTransaction.SUSPEND_MARKET, this::suspendMarket);
-        deliverTransactions.put(TendermintTransaction.UNSUSPEND_MARKET, this::unsuspendMarket);
-        deliverTransactions.put(TendermintTransaction.ADD_ASSET, this::addAsset);
-        deliverTransactions.put(TendermintTransaction.SUSPEND_ASSET, this::suspendAsset);
-        deliverTransactions.put(TendermintTransaction.UNSUSPEND_ASSET, this::unsuspendAsset);
-        deliverTransactions.put(TendermintTransaction.CONFIRM_ETHEREUM_EVENTS, this::confirmEthereumEvents);
-        deliverTransactions.put(TendermintTransaction.SYNC_PROPOSALS, this::syncProposals);
-        deliverTransactions.put(TendermintTransaction.SETTLE_MARKETS, this::settleMarkets);
+    private void setupCheckTransactions() {
         checkTransactions.put(TendermintTransaction.CREATE_ORDER, this::checkCreateOrder);
         checkTransactions.put(TendermintTransaction.CANCEL_ORDER, this::checkCancelOrder);
         checkTransactions.put(TendermintTransaction.AMEND_ORDER, this::checkAmendOrder);
@@ -89,6 +73,32 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         checkTransactions.put(TendermintTransaction.CONFIRM_ETHEREUM_EVENTS, this::checkConfirmEthereumEvents);
         checkTransactions.put(TendermintTransaction.SYNC_PROPOSALS, this::checkSyncProposals);
         checkTransactions.put(TendermintTransaction.SETTLE_MARKETS, this::checkSettleMarkets);
+        checkTransactions.put(TendermintTransaction.CAST_VOTE, this::checkCastVote);
+    }
+
+    private void setupDeliverTransactions() {
+        deliverTransactions.put(TendermintTransaction.CREATE_ORDER, this::createOrder);
+        deliverTransactions.put(TendermintTransaction.CANCEL_ORDER, this::cancelOrder);
+        deliverTransactions.put(TendermintTransaction.AMEND_ORDER, this::amendOrder);
+        deliverTransactions.put(TendermintTransaction.CREATE_WITHDRAWAL, this::createWithdrawal);
+        deliverTransactions.put(TendermintTransaction.CANCEL_WITHDRAWAL, this::cancelWithdrawal);
+        deliverTransactions.put(TendermintTransaction.ADD_MARKET, this::addMarket);
+        deliverTransactions.put(TendermintTransaction.AMEND_MARKET, this::amendMarket);
+        deliverTransactions.put(TendermintTransaction.SUSPEND_MARKET, this::suspendMarket);
+        deliverTransactions.put(TendermintTransaction.UNSUSPEND_MARKET, this::unsuspendMarket);
+        deliverTransactions.put(TendermintTransaction.ADD_ASSET, this::addAsset);
+        deliverTransactions.put(TendermintTransaction.SUSPEND_ASSET, this::suspendAsset);
+        deliverTransactions.put(TendermintTransaction.UNSUSPEND_ASSET, this::unsuspendAsset);
+        deliverTransactions.put(TendermintTransaction.CONFIRM_ETHEREUM_EVENTS, this::confirmEthereumEvents);
+        deliverTransactions.put(TendermintTransaction.SYNC_PROPOSALS, this::syncProposals);
+        deliverTransactions.put(TendermintTransaction.SETTLE_MARKETS, this::settleMarkets);
+        deliverTransactions.put(TendermintTransaction.CAST_VOTE, this::castVote);
+    }
+
+    @PostConstruct
+    private void setup() {
+        setupDeliverTransactions();
+        setupCheckTransactions();
     }
 
     @Data
@@ -106,6 +116,12 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         } catch(Exception e) {
             return TendermintTransaction.UNKNOWN;
         }
+    }
+
+    private void checkCastVote(
+            final String txAsJson
+    ) {
+        // TODO
     }
 
     private void checkConfirmEthereumEvents(
@@ -196,6 +212,12 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         // TODO
+    }
+
+    private int castVote(
+            final String txAsJson
+    ) {
+        return proposalService.vote(jsonUtils.fromJson(txAsJson, CastVoteRequest.class)).hashCode();
     }
 
     private int confirmEthereumEvents(
@@ -345,6 +367,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             tendermintClient.confirmEthereumEvents();
             tendermintClient.settleMarkets();
             tendermintClient.syncProposals();
+            // TODO - propagate latest Ethereum events
             // TODO - risk management / liquidations?? [if we decide it's better to do it once per block...]
         }
         responseObserver.onNext(resp);

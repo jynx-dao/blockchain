@@ -4,11 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jynx.pro.blockchain.request.TendermintRequest;
 import com.jynx.pro.blockchain.response.TendermintResponse;
 import com.jynx.pro.blockchain.response.TransactionResponse;
-import com.jynx.pro.constant.TendermintTransaction;
-import com.jynx.pro.entity.Asset;
-import com.jynx.pro.entity.Market;
-import com.jynx.pro.entity.Order;
-import com.jynx.pro.entity.Withdrawal;
+import com.jynx.pro.blockchain.constant.TendermintTransaction;
+import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.*;
@@ -76,19 +73,22 @@ public class TendermintClient {
         throw new JynxProException(errorCode);
     }
 
-    public void getTransaction(
+    public Object getTransaction(
             final String txHash
     ) {
         try {
             HttpResponse<JsonNode> response = Unirest.get(String.format("%s%s", GET_TX_BASE_URI, txHash)).asJson();
             if(response.getStatus() == 200) {
                 log.info(response.getBody().toString());
+                return null;
             } else {
                 log.info(response.getBody().toString());
+                return null;
             }
         } catch(Exception e) {
             log.error(e.getMessage(), e);
         }
+        return null;
     }
 
     private void processTransaction(
@@ -117,6 +117,7 @@ public class TendermintClient {
                         .getString("log");
                 String jsonData = new String(Base64.getDecoder()
                         .decode(encodedMessage.getBytes(StandardCharsets.UTF_8)));
+                // TODO - query the result of the transaction here because log will be empty when using async methods
                 return new TransactionResponse<T>().setHash(hash)
                         .setItem(objectMapper.readValue(jsonData, responseType));
             } else {
@@ -222,5 +223,12 @@ public class TendermintClient {
     ) {
         return processTransaction(request, Asset.class,
                 TendermintTransaction.UNSUSPEND_ASSET, ErrorCode.UNSUSPEND_ASSET_FAILED);
+    }
+
+    public TransactionResponse<Vote> castVote(
+            final CastVoteRequest request
+    ) {
+        return processTransaction(request, Vote.class,
+                TendermintTransaction.CAST_VOTE, ErrorCode.CAST_VOTE_FAILED);
     }
 }

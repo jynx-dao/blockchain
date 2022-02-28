@@ -9,6 +9,7 @@ import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.ProposalRepository;
 import com.jynx.pro.repository.VoteRepository;
+import com.jynx.pro.request.CastVoteRequest;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -167,30 +168,29 @@ public class ProposalService {
     /**
      * Cast a {@link Vote} on a {@link Proposal}
      *
-     * @param inFavour for / against
-     * @param id the {@link  Proposal} ID
-     * @param user the authenticated {@link User}
+     * @param request {@link CastVoteRequest}
+     *
+     * @return {@link Vote}
      */
-    public void vote(
-            final boolean inFavour,
-            final UUID id,
-            final User user
+    public Vote vote(
+        final CastVoteRequest request
     ) {
-        Proposal proposal = proposalRepository.findById(id)
+        Proposal proposal = proposalRepository.findById(request.getId())
                 .orElseThrow(() -> new JynxProException(ErrorCode.PROPOSAL_NOT_FOUND));
-        List<Vote> votes = voteRepository.findByProposalAndUser(proposal, user);
+        List<Vote> votes = voteRepository.findByProposalAndUser(proposal, request.getUser());
         if(votes.size() > 0) {
             throw new JynxProException(ErrorCode.ALREADY_VOTED);
         }
-        if(!proposal.getStatus().equals(ProposalStatus.OPEN) && !proposal.getUser().getId().equals(user.getId())) {
+        if(!proposal.getStatus().equals(ProposalStatus.OPEN) &&
+                !proposal.getUser().getId().equals(request.getUser().getId())) {
             throw new JynxProException(ErrorCode.VOTING_DISABLED);
         }
         Vote vote = new Vote()
                 .setId(uuidUtils.next())
                 .setProposal(proposal)
-                .setUser(user)
-                .setInFavour(inFavour);
-        voteRepository.save(vote);
+                .setUser(request.getUser())
+                .setInFavour(request.getInFavour());
+        return voteRepository.save(vote);
     }
 
     /**
@@ -292,7 +292,11 @@ public class ProposalService {
                 .setType(type)
                 .setStatus(ProposalStatus.CREATED);
         proposal = proposalRepository.save(proposal);
-        vote(true, proposal.getId(), user);
+        CastVoteRequest castVoteRequest = new CastVoteRequest()
+                .setId(proposal.getId())
+                .setInFavour(true);
+        castVoteRequest.setUser(user);
+        vote(castVoteRequest);
         return proposal;
     }
 }

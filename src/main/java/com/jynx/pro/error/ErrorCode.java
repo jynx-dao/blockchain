@@ -77,4 +77,5 @@ public class ErrorCode {
     public static final String UNSUSPEND_ASSET_FAILED = "Failed to unsuspend asset.";
     public static final String SETTLE_MARKETS_FAILED = "Failed to settle markets.";
     public static final String SYNC_PROPOSALS_FAILED = "Failed to sync proposals.";
+    public static final String CAST_VOTE_FAILED = "Failed to cast vote.";
 }
