@@ -1,8 +1,6 @@
 package com.jynx.pro.blockchain;
 
-import com.fasterxml.jackson.core.JsonParseException;
 import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jynx.pro.constant.TendermintTransaction;
 import com.jynx.pro.entity.*;
@@ -11,6 +9,7 @@ import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.*;
 import com.jynx.pro.response.TendermintResponse;
 import com.jynx.pro.response.TransactionResponse;
+import com.jynx.pro.utils.SleepUtils;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.JsonNode;
 import com.mashape.unirest.http.Unirest;
@@ -18,6 +17,7 @@ import com.mashape.unirest.http.exceptions.UnirestException;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -35,6 +35,8 @@ public class TendermintClient {
     @Setter
     @Value("${tendermint.port}")
     private Integer port;
+    @Autowired
+    private SleepUtils sleepUtils;
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final String GET_TX_BASE_URI = "/tx?hash=";
@@ -139,15 +141,13 @@ public class TendermintClient {
                     throw new JynxProException(e.getMessage());
                 }
                 Optional<T> resultOptional = Optional.empty();
-                while (resultOptional.isEmpty()) {
-                    try {
-                        Thread.sleep(1000L);
-                    } catch (Exception e) {
-                        log.error(e.getMessage(), e);
-                    }
+                for(int i=0; i<10; i++) {
                     resultOptional = getTransaction(hash, responseType);
+                    if(resultOptional.isPresent()) break;
+                    sleepUtils.sleep(500L);
                 }
-                return new TransactionResponse<T>().setHash(hash).setItem(resultOptional.get());
+                return new TransactionResponse<T>().setHash(hash)
+                        .setItem(resultOptional.orElseThrow(() -> new JynxProException(errorCode)));
             } else {
                 log.error(response.getBody().toString());
                 throw new JynxProException(errorCode);

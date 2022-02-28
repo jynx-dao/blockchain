@@ -1,21 +1,25 @@
 package com.jynx.pro.controller;
 
 import com.jynx.pro.entity.Asset;
-import com.jynx.pro.entity.Market;
 import com.jynx.pro.request.AddAssetRequest;
-import com.jynx.pro.request.AddMarketRequest;
-import com.jynx.pro.request.AmendMarketRequest;
 import com.jynx.pro.request.SingleItemRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+
+import java.util.List;
 
 @Controller
 @RequestMapping("/asset")
 public class AssetController extends AbstractController {
+
+    @GetMapping("/all")
+    public ResponseEntity<List<Asset>> get() {
+        return ResponseEntity.ok(readOnlyRepository.getAssets());
+    }
 
     @PostMapping
     public ResponseEntity<Asset> add(

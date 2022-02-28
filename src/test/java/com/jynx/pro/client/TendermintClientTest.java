@@ -18,6 +18,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.web.server.LocalServerPort;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -33,6 +36,12 @@ public class TendermintClientTest extends IntegrationTest {
     private TendermintClient tendermintClient;
     @Autowired
     private AppStateManager appStateManager;
+
+    @LocalServerPort
+    private int port;
+
+    @Autowired
+    private TestRestTemplate restTemplate;
 
     public static GenericContainer tendermint;
 
@@ -74,6 +83,13 @@ public class TendermintClientTest extends IntegrationTest {
         request.setUser(makerUser);
         TransactionResponse<Asset> txResponse = tendermintClient.addAsset(request);
         Assertions.assertEquals(txResponse.getItem().getStatus(), AssetStatus.PENDING);
+        ResponseEntity<Asset[]> responseEntity = this.restTemplate.getForEntity(
+                String.format("http://localhost:%s/asset/all", port), Asset[].class);
+        Asset[] assetArray = responseEntity.getBody();
+        Assertions.assertNotNull(assetArray);
+        Assertions.assertEquals(assetArray.length, 1);
+        Assertions.assertEquals(assetArray[0].getStatus(), AssetStatus.PENDING);
+        Assertions.assertEquals(assetArray[0].getId(), txResponse.getItem().getId());
     }
 
     @Test
@@ -119,7 +135,7 @@ public class TendermintClientTest extends IntegrationTest {
     @SneakyThrows
     private void waitForBlockchain() {
         long blockHeight = appStateManager.getBlockHeight();
-        while(blockHeight < 5) {
+        while(blockHeight < 1) {
             blockHeight = appStateManager.getBlockHeight();
             log.info("Block height = {}", blockHeight);
             Thread.sleep(500L);

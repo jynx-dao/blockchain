@@ -368,7 +368,6 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         Types.ResponseBeginBlock resp = Types.ResponseBeginBlock.newBuilder().build();
         databaseTransactionManager.createTransaction();
         String proposerAddress = req.getHeader().getProposerAddress().toStringUtf8();
-        appStateManager.setBlockHeight(req.getHeader().getHeight());
         if(validatorAddress.equals(proposerAddress)) {
             tendermintClient.confirmEthereumEvents();
             tendermintClient.settleMarkets();
@@ -384,6 +383,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     public void endBlock(Types.RequestEndBlock req, StreamObserver<Types.ResponseEndBlock> responseObserver) {
         // TODO - update validators
         Types.ResponseEndBlock resp = Types.ResponseEndBlock.newBuilder().build();
+        appStateManager.setBlockHeight(req.getHeight());
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }

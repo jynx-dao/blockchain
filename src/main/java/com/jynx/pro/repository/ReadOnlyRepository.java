@@ -363,4 +363,17 @@ public class ReadOnlyRepository {
         query = query.select(rootType).where(cb.equal(user_id, userId));
         return getEntityManager().createQuery(query).getResultList();
     }
+
+    /**
+     * Get all {@link Asset}s
+     *
+     * @return {@link List<Asset>}
+     */
+    public List<Asset> getAssets() {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Asset> query = cb.createQuery(Asset.class);
+        Root<Asset> rootType = query.from(Asset.class);
+        query = query.select(rootType);
+        return getEntityManager().createQuery(query).getResultList();
+    }
 }
