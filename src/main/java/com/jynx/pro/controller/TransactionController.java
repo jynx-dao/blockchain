@@ -12,6 +12,6 @@ public class TransactionController extends AbstractController {
     public ResponseEntity<Object> get(
             @PathVariable("hash") String hash
     ) {
-        return ResponseEntity.ok(tendermintClient.getTransaction(hash));
+        return ResponseEntity.ok(tendermintClient.getTransaction(hash, Object.class));
     }
 }

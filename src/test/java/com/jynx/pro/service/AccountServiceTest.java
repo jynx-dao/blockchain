@@ -35,10 +35,12 @@ public class AccountServiceTest extends IntegrationTest {
     @BeforeEach
     public void setup() {
         initializeState();
+        databaseTransactionManager.createTransaction();
     }
 
     @AfterEach
     public void shutdown() {
+        databaseTransactionManager.commit();
         clearState();
     }
 

@@ -197,7 +197,6 @@ public abstract class IntegrationTest {
     }
 
     protected void clearState() {
-        databaseTransactionManager.commit();
         databaseTransactionManager.createTransaction();
         orderHistoryRepository.deleteAll();
         tradeRepository.deleteAll();
@@ -259,5 +258,6 @@ public abstract class IntegrationTest {
         degenUser = userRepository.save(degenUser);
         stakeRepository.save(new Stake().setId(uuidUtils.next()).setUser(makerUser).setAmount(BigDecimal.valueOf(500000000L)));
         stakeRepository.save(new Stake().setId(uuidUtils.next()).setUser(takerUser).setAmount(BigDecimal.valueOf(700000000L)));
+        databaseTransactionManager.commit();
     }
 }

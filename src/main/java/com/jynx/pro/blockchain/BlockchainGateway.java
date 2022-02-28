@@ -2,10 +2,10 @@ package com.jynx.pro.blockchain;
 
 import com.google.protobuf.ByteString;
 import com.jynx.pro.constant.TendermintTransaction;
-import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.manager.AppStateManager;
 import com.jynx.pro.manager.DatabaseTransactionManager;
 import com.jynx.pro.request.*;
+import com.jynx.pro.response.ErrorResponse;
 import com.jynx.pro.service.*;
 import com.jynx.pro.utils.JSONUtils;
 import io.grpc.stub.StreamObserver;
@@ -54,7 +54,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Value("${validator.address}")
     private String validatorAddress;
 
-    private final Map<TendermintTransaction, Function<String, Integer>> deliverTransactions = new HashMap<>();
+    private final Map<TendermintTransaction, Function<String, Object>> deliverTransactions = new HashMap<>();
     private final Map<TendermintTransaction, Consumer<String>> checkTransactions = new HashMap<>();
 
     private void setupCheckTransactions() {
@@ -214,112 +214,115 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         // TODO
     }
 
-    private int castVote(
+    private Object castVote(
             final String txAsJson
     ) {
-        return proposalService.vote(jsonUtils.fromJson(txAsJson, CastVoteRequest.class)).hashCode();
+        return proposalService.vote(jsonUtils.fromJson(txAsJson, CastVoteRequest.class));
     }
 
-    private int confirmEthereumEvents(
+    private Object confirmEthereumEvents(
             final String txAsJson
     ) {
-        return ethereumService.confirmEvents().hashCode();
+        return ethereumService.confirmEvents();
     }
 
-    private int syncProposals(
+    private Object syncProposals(
             final String txAsJson
     ) {
-        return proposalService.sync().hashCode();
+        return proposalService.sync();
     }
 
-    private int settleMarkets(
+    private Object settleMarkets(
             final String txAsJson
     ) {
-        return marketService.settleMarkets().hashCode();
+        return marketService.settleMarkets();
     }
 
-    private int createWithdrawal(
+    private Object createWithdrawal(
             final String txAsJson
     ) {
-        return accountService.createWithdrawal(jsonUtils.fromJson(txAsJson, CreateWithdrawalRequest.class)).hashCode();
+        return accountService.createWithdrawal(jsonUtils.fromJson(txAsJson, CreateWithdrawalRequest.class));
     }
 
-    private int cancelWithdrawal(
+    private Object cancelWithdrawal(
             final String txAsJson
     ) {
-        return accountService.cancelWithdrawal(jsonUtils.fromJson(txAsJson, SingleItemRequest.class)).hashCode();
+        return accountService.cancelWithdrawal(jsonUtils.fromJson(txAsJson, SingleItemRequest.class));
     }
 
-    private int addMarket(
+    private Object addMarket(
             final String txAsJson
     ) {
-        return marketService.proposeToAdd(jsonUtils.fromJson(txAsJson, AddMarketRequest.class)).hashCode();
+        return marketService.proposeToAdd(jsonUtils.fromJson(txAsJson, AddMarketRequest.class));
     }
 
-    private int amendMarket(
+    private Object amendMarket(
             final String txAsJson
     ) {
-        return marketService.proposeToAmend(jsonUtils.fromJson(txAsJson, AmendMarketRequest.class)).hashCode();
+        return marketService.proposeToAmend(jsonUtils.fromJson(txAsJson, AmendMarketRequest.class));
     }
 
-    private int suspendMarket(
+    private Object suspendMarket(
             final String txAsJson
     ) {
-        return marketService.proposeToSuspend(jsonUtils.fromJson(txAsJson, SingleItemRequest.class)).hashCode();
+        return marketService.proposeToSuspend(jsonUtils.fromJson(txAsJson, SingleItemRequest.class));
     }
 
-    private int unsuspendMarket(
+    private Object unsuspendMarket(
             final String txAsJson
     ) {
-        return marketService.proposeToUnsuspend(jsonUtils.fromJson(txAsJson, SingleItemRequest.class)).hashCode();
+        return marketService.proposeToUnsuspend(jsonUtils.fromJson(txAsJson, SingleItemRequest.class));
     }
 
-    private int addAsset(
+    private Object addAsset(
             final String txAsJson
     ) {
-        return assetService.proposeToAdd(jsonUtils.fromJson(txAsJson, AddAssetRequest.class)).hashCode();
+        return assetService.proposeToAdd(jsonUtils.fromJson(txAsJson, AddAssetRequest.class));
     }
 
-    private int suspendAsset(
+    private Object suspendAsset(
             final String txAsJson
     ) {
-        return assetService.proposeToSuspend(jsonUtils.fromJson(txAsJson, SingleItemRequest.class)).hashCode();
+        return assetService.proposeToSuspend(jsonUtils.fromJson(txAsJson, SingleItemRequest.class));
     }
 
-    private int unsuspendAsset(
+    private Object unsuspendAsset(
             final String txAsJson
     ) {
-        return assetService.proposeToUnsuspend(jsonUtils.fromJson(txAsJson, SingleItemRequest.class)).hashCode();
+        return assetService.proposeToUnsuspend(jsonUtils.fromJson(txAsJson, SingleItemRequest.class));
     }
 
-    private int createOrder(
+    private Object createOrder(
             final String txAsJson
     ) {
-        return orderService.create(jsonUtils.fromJson(txAsJson, CreateOrderRequest.class)).hashCode();
+        return orderService.create(jsonUtils.fromJson(txAsJson, CreateOrderRequest.class));
     }
 
-    private int cancelOrder(
+    private Object cancelOrder(
             final String txAsJson
     ) {
-        return orderService.cancel(jsonUtils.fromJson(txAsJson, CancelOrderRequest.class)).hashCode();
+        return orderService.cancel(jsonUtils.fromJson(txAsJson, CancelOrderRequest.class));
     }
 
-    private int amendOrder(
+    private Object amendOrder(
             final String txAsJson
     ) {
-        return orderService.amend(jsonUtils.fromJson(txAsJson, AmendOrderRequest.class)).hashCode();
+        return orderService.amend(jsonUtils.fromJson(txAsJson, AmendOrderRequest.class));
     }
 
-    private void deliverTransaction(
+    private Object deliverTransaction(
             final String tx,
             final TendermintTransaction tendermintTx
     ) {
         String txAsJson = new String(Base64.getDecoder().decode(tx.getBytes(StandardCharsets.UTF_8)));
         // TODO - extract signature / public key
         try {
-            appStateManager.update(deliverTransactions.get(tendermintTx).apply(txAsJson));
-        } catch(JynxProException e) {
-            appStateManager.update(e.hashCode());
+            Object result = deliverTransactions.get(tendermintTx).apply(txAsJson);
+            appStateManager.update(result.hashCode());
+            return result;
+        } catch(Exception e) {
+            appStateManager.update(e.getMessage().hashCode());
+            return new ErrorResponse().setError(e.getMessage());
         }
     }
 
@@ -332,7 +335,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         try {
             checkTransactions.get(tendermintTx).accept(txAsJson);
             return new CheckTxResult().setCode(0);
-        } catch(JynxProException e) {
+        } catch(Exception e) {
             return new CheckTxResult().setCode(1).setError(e.getMessage());
         }
     }
@@ -363,6 +366,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         Types.ResponseBeginBlock resp = Types.ResponseBeginBlock.newBuilder().build();
         databaseTransactionManager.createTransaction();
         String proposerAddress = req.getHeader().getProposerAddress().toStringUtf8();
+        appStateManager.setBlockHeight(req.getHeader().getHeight());
         if(validatorAddress.equals(proposerAddress)) {
             tendermintClient.confirmEthereumEvents();
             tendermintClient.settleMarkets();
@@ -388,7 +392,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         TendermintTransaction tendermintTx = getTendermintTx(tx);
         Types.ResponseDeliverTx.Builder builder = Types.ResponseDeliverTx.newBuilder();
         try {
-            deliverTransaction(tx, tendermintTx);
+            Object result = deliverTransaction(tx, tendermintTx);
+            builder.setCode(0);
+            builder.setLog(jsonUtils.toJson(result));
         } catch(Exception e) {
             builder.setCode(1);
             builder.setLog(e.getMessage());

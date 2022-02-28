@@ -1,6 +1,7 @@
 package com.jynx.pro.manager;
 
 import lombok.Getter;
+import lombok.Setter;
 import org.springframework.stereotype.Component;
 
 import java.math.BigInteger;
@@ -11,6 +12,9 @@ public class AppStateManager {
 
     @Getter
     private int appState;
+    @Setter
+    @Getter
+    private long blockHeight = 0L;
 
     /**
      * Update the app state hash code

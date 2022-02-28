@@ -1,32 +1,41 @@
 package com.jynx.pro.blockchain;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jynx.pro.request.TendermintRequest;
-import com.jynx.pro.response.TendermintResponse;
-import com.jynx.pro.response.TransactionResponse;
 import com.jynx.pro.constant.TendermintTransaction;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.*;
+import com.jynx.pro.response.TendermintResponse;
+import com.jynx.pro.response.TransactionResponse;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.JsonNode;
 import com.mashape.unirest.http.Unirest;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Optional;
 
 @Slf4j
 @Component
 public class TendermintClient {
 
+    @Setter
+    @Value("${tendermint.base.uri}")
+    private String baseUri;
+    @Setter
+    @Value("${tendermint.port}")
+    private Integer port;
+
     private static final ObjectMapper objectMapper = new ObjectMapper();
-    private static final String GET_TX_BASE_URI = "http://localhost:26657/tx?hash=";
-    private static final String TX_BASE_URI = "http://localhost:26657/broadcast_tx_sync?tx=";
-    private static final String QUERY_BASE_URI = "http://localhost:26657/abci_query?data=";
+    private static final String GET_TX_BASE_URI = "/tx?hash=";
+    private static final String TX_BASE_URI = "/broadcast_tx_sync?tx=";
+    private static final String QUERY_BASE_URI = "/abci_query?data=";
 
     private String buildUrl(
             final String baseUri,
@@ -54,7 +63,8 @@ public class TendermintClient {
             final String errorCode
     ) {
         try {
-            HttpResponse<JsonNode> response = Unirest.get(buildUrl(QUERY_BASE_URI, request, tendermintTx)).asJson();
+            HttpResponse<JsonNode> response = Unirest.get(buildUrl(
+                    String.format("%s:%s%s", baseUri, port, QUERY_BASE_URI), request, tendermintTx)).asJson();
             if(response.getStatus() == 200) {
                 JSONObject jsonObject = new JSONObject(response.getBody().toString());
                 String encodedData = jsonObject
@@ -73,22 +83,24 @@ public class TendermintClient {
         throw new JynxProException(errorCode);
     }
 
-    public Object getTransaction(
-            final String txHash
+    public <T> Optional<T> getTransaction(
+            final String txHash,
+            final Class<T> responseType
     ) {
         try {
-            HttpResponse<JsonNode> response = Unirest.get(String.format("%s%s", GET_TX_BASE_URI, txHash)).asJson();
-            if(response.getStatus() == 200) {
-                log.info(response.getBody().toString());
-                return null;
+            HttpResponse<JsonNode> response = Unirest.get(String.format("%s:%s%s%s",
+                    baseUri, port, GET_TX_BASE_URI, String.format("0x%s", txHash))).asJson();
+            String log = response.getBody().getObject().getJSONObject("result")
+                    .getJSONObject("tx_result").getString("log");
+            if(!log.contains("error")) {
+                return Optional.of(objectMapper.readValue(log, responseType));
             } else {
-                log.info(response.getBody().toString());
-                return null;
+                throw new JynxProException(log);
             }
         } catch(Exception e) {
-            log.error(e.getMessage(), e);
+            log.debug(e.getMessage(), e);
         }
-        return null;
+        return Optional.empty();
     }
 
     private void processTransaction(
@@ -105,21 +117,25 @@ public class TendermintClient {
             final String errorCode
     ) {
         try {
-            HttpResponse<JsonNode> response = Unirest.get(buildUrl(TX_BASE_URI, request, tendermintTx)).asJson();
+            HttpResponse<JsonNode> response = Unirest.get(buildUrl(
+                    String.format("%s:%s%s", baseUri, port, TX_BASE_URI), request, tendermintTx)).asJson();
             if(response.getStatus() == 200) {
                 if(responseType == null) return null;
                 JSONObject jsonObject = new JSONObject(response.getBody().toString());
                 String hash = jsonObject
                         .getJSONObject("result")
                         .getString("hash");
-                String encodedMessage = jsonObject
-                        .getJSONObject("result")
-                        .getString("log");
-                String jsonData = new String(Base64.getDecoder()
-                        .decode(encodedMessage.getBytes(StandardCharsets.UTF_8)));
-                // TODO - query the result of the transaction here because log will be empty when using async methods
-                return new TransactionResponse<T>().setHash(hash)
-                        .setItem(objectMapper.readValue(jsonData, responseType));
+                Optional<T> resultOptional = Optional.empty();
+                int total = 0;
+                while(resultOptional.isEmpty()) {
+                    resultOptional = getTransaction(hash, responseType);
+                    Thread.sleep(500L);
+                    total++;
+                    if(total >= 10) {
+                        throw new JynxProException(errorCode);
+                    }
+                }
+                return new TransactionResponse<T>().setHash(hash).setItem(resultOptional.get());
             } else {
                 log.error(response.getBody().toString());
             }
