@@ -2,6 +2,7 @@ package com.jynx.pro.blockchain;
 
 import com.google.protobuf.ByteString;
 import com.jynx.pro.constant.TendermintTransaction;
+import com.jynx.pro.entity.User;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.manager.AppStateManager;
@@ -46,6 +47,10 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private EthereumService ethereumService;
     @Autowired
     private ProposalService proposalService;
+    @Autowired
+    private ConfigService configService;
+    @Autowired
+    private UserService userService;
     @Autowired
     private AppStateManager appStateManager;
     @Autowired
@@ -218,97 +223,134 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private Object castVote(
             final String txAsJson
     ) {
+//        verifySignature(txAsJson, request); // TODO - verify validator
         return proposalService.vote(jsonUtils.fromJson(txAsJson, CastVoteRequest.class));
     }
 
     private Object confirmEthereumEvents(
             final String txAsJson
     ) {
+//        verifySignature(txAsJson, request); // TODO - verify validator
         return ethereumService.confirmEvents();
     }
 
     private Object syncProposals(
             final String txAsJson
     ) {
+//        verifySignature(txAsJson, request); // TODO - verify validator
         return proposalService.sync();
     }
 
     private Object settleMarkets(
             final String txAsJson
     ) {
+//        verifySignature(txAsJson, request); // TODO - verify validator
         return marketService.settleMarkets();
     }
 
     private Object createWithdrawal(
             final String txAsJson
     ) {
-        return accountService.createWithdrawal(jsonUtils.fromJson(txAsJson, CreateWithdrawalRequest.class));
+        CreateWithdrawalRequest request = jsonUtils.fromJson(txAsJson, CreateWithdrawalRequest.class);
+        verifySignature(txAsJson, request);
+        return accountService.createWithdrawal(request);
     }
 
     private Object cancelWithdrawal(
             final String txAsJson
     ) {
-        return accountService.cancelWithdrawal(jsonUtils.fromJson(txAsJson, SingleItemRequest.class));
+        SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
+        verifySignature(txAsJson, request);
+        return accountService.cancelWithdrawal(request);
     }
 
     private Object addMarket(
             final String txAsJson
     ) {
-        return marketService.proposeToAdd(jsonUtils.fromJson(txAsJson, AddMarketRequest.class));
+        AddMarketRequest request = jsonUtils.fromJson(txAsJson, AddMarketRequest.class);
+        verifySignature(txAsJson, request);
+        return marketService.proposeToAdd(request);
     }
 
     private Object amendMarket(
             final String txAsJson
     ) {
-        return marketService.proposeToAmend(jsonUtils.fromJson(txAsJson, AmendMarketRequest.class));
+        AmendMarketRequest request = jsonUtils.fromJson(txAsJson, AmendMarketRequest.class);
+        verifySignature(txAsJson, request);
+        return marketService.proposeToAmend(request);
     }
 
     private Object suspendMarket(
             final String txAsJson
     ) {
-        return marketService.proposeToSuspend(jsonUtils.fromJson(txAsJson, SingleItemRequest.class));
+        SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
+        verifySignature(txAsJson, request);
+        return marketService.proposeToSuspend(request);
     }
 
     private Object unsuspendMarket(
             final String txAsJson
     ) {
-        return marketService.proposeToUnsuspend(jsonUtils.fromJson(txAsJson, SingleItemRequest.class));
+        SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
+        verifySignature(txAsJson, request);
+        return marketService.proposeToUnsuspend(request);
     }
 
     private Object addAsset(
             final String txAsJson
     ) {
-        return assetService.proposeToAdd(jsonUtils.fromJson(txAsJson, AddAssetRequest.class));
+        AddAssetRequest request = jsonUtils.fromJson(txAsJson, AddAssetRequest.class);
+        verifySignature(txAsJson, request);
+        return assetService.proposeToAdd(request);
     }
 
     private Object suspendAsset(
             final String txAsJson
     ) {
-        return assetService.proposeToSuspend(jsonUtils.fromJson(txAsJson, SingleItemRequest.class));
+        SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
+        verifySignature(txAsJson, request);
+        return assetService.proposeToSuspend(request);
     }
 
     private Object unsuspendAsset(
             final String txAsJson
     ) {
-        return assetService.proposeToUnsuspend(jsonUtils.fromJson(txAsJson, SingleItemRequest.class));
+        SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
+        verifySignature(txAsJson, request);
+        return assetService.proposeToUnsuspend(request);
     }
 
     private Object createOrder(
             final String txAsJson
     ) {
-        return orderService.create(jsonUtils.fromJson(txAsJson, CreateOrderRequest.class));
+        CreateOrderRequest request = jsonUtils.fromJson(txAsJson, CreateOrderRequest.class);
+        verifySignature(txAsJson, request);
+        return orderService.create(request);
     }
 
     private Object cancelOrder(
             final String txAsJson
     ) {
-        return orderService.cancel(jsonUtils.fromJson(txAsJson, CancelOrderRequest.class));
+        CancelOrderRequest request = jsonUtils.fromJson(txAsJson, CancelOrderRequest.class);
+        verifySignature(txAsJson, request);
+        return orderService.cancel(request);
     }
 
     private Object amendOrder(
             final String txAsJson
     ) {
-        return orderService.amend(jsonUtils.fromJson(txAsJson, AmendOrderRequest.class));
+        AmendOrderRequest request = jsonUtils.fromJson(txAsJson, AmendOrderRequest.class);
+        verifySignature(txAsJson, request);
+        return orderService.amend(request);
+    }
+
+    private void verifySignature(
+            final String txAsJson,
+            final SignedRequest request
+    ) {
+        // TODO - verify the signature
+        User user = userService.getAndCreate(request.getPublicKey());
+        request.setUser(user);
     }
 
     private Object deliverTransaction(
@@ -346,7 +388,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     public void initChain(tendermint.abci.types.Types.RequestInitChain request,
                           io.grpc.stub.StreamObserver<tendermint.abci.types.Types.ResponseInitChain> responseObserver) {
         Types.ResponseInitChain resp = Types.ResponseInitChain.newBuilder().build();
-        // TODO - load config from genesis
+        request.getAppStateBytes(); // TODO - load config from genesis
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
@@ -367,6 +409,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     public void beginBlock(Types.RequestBeginBlock req, StreamObserver<Types.ResponseBeginBlock> responseObserver) {
         Types.ResponseBeginBlock resp = Types.ResponseBeginBlock.newBuilder().build();
         databaseTransactionManager.createTransaction();
+        configService.setTimestamp(((long) req.getHeader().getTime().getNanos()) / 1000000L);
         String proposerAddress = req.getHeader().getProposerAddress().toStringUtf8();
         if(validatorAddress.equals(proposerAddress)) {
             tendermintClient.confirmEthereumEvents();

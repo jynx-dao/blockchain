@@ -80,7 +80,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
-        request.setUser(makerUser);
+        request.setPublicKey("40404040404040404040404040404040");
         TransactionResponse<Asset> txResponse = tendermintClient.addAsset(request);
         Assertions.assertEquals(txResponse.getItem().getStatus(), AssetStatus.PENDING);
         ResponseEntity<Asset[]> responseEntity = this.restTemplate.getForEntity(
@@ -93,16 +93,17 @@ public class TendermintClientTest extends IntegrationTest {
     }
 
     @Test
-    public void testAddAssetFailsWithoutUser() {
+    public void testAddAssetFailsWithoutOpenTime() {
         AddAssetRequest request = new AddAssetRequest()
                 .setAddress("0x0")
                 .setName("Test asset")
                 .setDecimalPlaces(5)
                 .setType(AssetType.ERC20);
         long[] times = proposalTimes();
-        request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        request.setPublicKey("40404040404040404040404040404040");
+
         try {
             tendermintClient.addAsset(request);
             Assertions.fail();
@@ -123,7 +124,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
-        request.setUser(makerUser);
+        request.setPublicKey("40404040404040404040404040404040");
         try {
             tendermintClient.addAsset(request);
             Assertions.fail();
