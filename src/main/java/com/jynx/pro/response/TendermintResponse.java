@@ -1,4 +1,4 @@
-package com.jynx.pro.blockchain.response;
+package com.jynx.pro.response;
 
 public abstract class TendermintResponse {
 }

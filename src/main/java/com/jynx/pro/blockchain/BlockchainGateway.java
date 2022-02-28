@@ -1,7 +1,7 @@
 package com.jynx.pro.blockchain;
 
 import com.google.protobuf.ByteString;
-import com.jynx.pro.blockchain.constant.TendermintTransaction;
+import com.jynx.pro.constant.TendermintTransaction;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.manager.AppStateManager;
 import com.jynx.pro.manager.DatabaseTransactionManager;

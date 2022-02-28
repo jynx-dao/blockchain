@@ -1,6 +1,5 @@
 package com.jynx.pro.request;
 
-import com.jynx.pro.blockchain.request.TendermintRequest;
 import com.jynx.pro.entity.User;
 import lombok.Data;
 import lombok.EqualsAndHashCode;

@@ -1,4 +1,4 @@
-package com.jynx.pro.blockchain.constant;
+package com.jynx.pro.constant;
 
 public enum TendermintTransaction {
     CREATE_ORDER,

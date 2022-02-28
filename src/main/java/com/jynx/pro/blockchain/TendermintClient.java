@@ -1,10 +1,10 @@
 package com.jynx.pro.blockchain;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jynx.pro.blockchain.request.TendermintRequest;
-import com.jynx.pro.blockchain.response.TendermintResponse;
-import com.jynx.pro.blockchain.response.TransactionResponse;
-import com.jynx.pro.blockchain.constant.TendermintTransaction;
+import com.jynx.pro.request.TendermintRequest;
+import com.jynx.pro.response.TendermintResponse;
+import com.jynx.pro.response.TransactionResponse;
+import com.jynx.pro.constant.TendermintTransaction;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;

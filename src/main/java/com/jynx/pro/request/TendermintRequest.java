@@ -1,4 +1,4 @@
-package com.jynx.pro.blockchain.request;
+package com.jynx.pro.request;
 
 import java.util.UUID;
 

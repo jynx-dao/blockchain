@@ -1,4 +1,4 @@
-package com.jynx.pro.blockchain.response;
+package com.jynx.pro.response;
 
 import lombok.Data;
 import lombok.EqualsAndHashCode;
