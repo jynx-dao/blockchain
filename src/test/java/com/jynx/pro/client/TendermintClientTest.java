@@ -30,6 +30,6 @@ public class TendermintClientTest {
 
     @Test
     public void test() throws InterruptedException {
-        Thread.sleep(5000L);
+        Thread.sleep(20000L);
     }
 }
