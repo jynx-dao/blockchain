@@ -5,9 +5,9 @@ import com.jynx.pro.blockchain.TendermintClient;
 import com.jynx.pro.constant.AssetStatus;
 import com.jynx.pro.constant.AssetType;
 import com.jynx.pro.entity.Asset;
+import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.manager.AppStateManager;
 import com.jynx.pro.request.AddAssetRequest;
-import com.jynx.pro.request.SingleItemRequest;
 import com.jynx.pro.response.TransactionResponse;
 import com.jynx.pro.service.IntegrationTest;
 import lombok.SneakyThrows;
@@ -56,6 +56,7 @@ public class TendermintClientTest extends IntegrationTest {
     @AfterEach
     public void shutdown() {
         tendermint.stop();
+        appStateManager.setBlockHeight(0);
         clearState();
     }
 
@@ -75,11 +76,52 @@ public class TendermintClientTest extends IntegrationTest {
         Assertions.assertEquals(txResponse.getItem().getStatus(), AssetStatus.PENDING);
     }
 
+    @Test
+    public void testAddAssetFailsWithoutUser() {
+        AddAssetRequest request = new AddAssetRequest()
+                .setAddress("0x0")
+                .setName("Test asset")
+                .setDecimalPlaces(5)
+                .setType(AssetType.ERC20);
+        long[] times = proposalTimes();
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        try {
+            tendermintClient.addAsset(request);
+            Assertions.fail();
+        } catch(Exception e) {
+            String errorMessage = "An unknown error occurred.";
+            Assertions.assertEquals(e.getMessage(), errorMessage);
+        }
+    }
+
+    @Test
+    public void testAddAssetFailsWithTooManyDecimalPlaces() {
+        AddAssetRequest request = new AddAssetRequest()
+                .setAddress("0x0")
+                .setName("Test asset")
+                .setDecimalPlaces(10)
+                .setType(AssetType.ERC20);
+        long[] times = proposalTimes();
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setUser(makerUser);
+        try {
+            tendermintClient.addAsset(request);
+            Assertions.fail();
+        } catch(Exception e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.TOO_MANY_DECIMAL_PLACES);
+        }
+    }
+
     @SneakyThrows
     private void waitForBlockchain() {
         long blockHeight = appStateManager.getBlockHeight();
-        while(blockHeight < 1) {
+        while(blockHeight < 5) {
             blockHeight = appStateManager.getBlockHeight();
+            log.info("Block height = {}", blockHeight);
             Thread.sleep(500L);
         }
     }

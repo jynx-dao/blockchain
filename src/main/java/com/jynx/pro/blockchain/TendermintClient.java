@@ -1,5 +1,8 @@
 package com.jynx.pro.blockchain;
 
+import com.fasterxml.jackson.core.JsonParseException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jynx.pro.constant.TendermintTransaction;
 import com.jynx.pro.entity.*;
@@ -11,6 +14,7 @@ import com.jynx.pro.response.TransactionResponse;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.JsonNode;
 import com.mashape.unirest.http.Unirest;
+import com.mashape.unirest.http.exceptions.UnirestException;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
@@ -87,20 +91,23 @@ public class TendermintClient {
             final String txHash,
             final Class<T> responseType
     ) {
+        String logMessage;
         try {
             HttpResponse<JsonNode> response = Unirest.get(String.format("%s:%s%s%s",
                     baseUri, port, GET_TX_BASE_URI, String.format("0x%s", txHash))).asJson();
-            String log = response.getBody().getObject().getJSONObject("result")
+            log.info(response.getBody().toString());
+            if (!response.getBody().getObject().has("result")) return Optional.empty();
+            logMessage = response.getBody().getObject().getJSONObject("result")
                     .getJSONObject("tx_result").getString("log");
-            if(!log.contains("error")) {
-                return Optional.of(objectMapper.readValue(log, responseType));
-            } else {
-                throw new JynxProException(log);
-            }
         } catch(Exception e) {
-            log.debug(e.getMessage(), e);
+            log.info(e.getMessage(), e);
+            throw new JynxProException("Could not get transaction result.");
         }
-        return Optional.empty();
+        try {
+            return Optional.of(objectMapper.readValue(logMessage, responseType));
+        } catch(JsonProcessingException e) {
+            throw new JynxProException(logMessage);
+        }
     }
 
     private void processTransaction(
@@ -119,30 +126,36 @@ public class TendermintClient {
         try {
             HttpResponse<JsonNode> response = Unirest.get(buildUrl(
                     String.format("%s:%s%s", baseUri, port, TX_BASE_URI), request, tendermintTx)).asJson();
-            if(response.getStatus() == 200) {
-                if(responseType == null) return null;
-                JSONObject jsonObject = new JSONObject(response.getBody().toString());
-                String hash = jsonObject
-                        .getJSONObject("result")
-                        .getString("hash");
+            if (response.getStatus() == 200) {
+                if (responseType == null) return null;
+                JSONObject jsonObject;
+                String hash;
+                try {
+                    jsonObject = new JSONObject(response.getBody().toString());
+                    hash = jsonObject
+                            .getJSONObject("result")
+                            .getString("hash");
+                } catch (Exception e) {
+                    throw new JynxProException(e.getMessage());
+                }
                 Optional<T> resultOptional = Optional.empty();
-                int total = 0;
-                while(resultOptional.isEmpty()) {
-                    resultOptional = getTransaction(hash, responseType);
-                    Thread.sleep(500L);
-                    total++;
-                    if(total >= 10) {
-                        throw new JynxProException(errorCode);
+                while (resultOptional.isEmpty()) {
+                    try {
+                        Thread.sleep(1000L);
+                    } catch (Exception e) {
+                        log.error(e.getMessage(), e);
                     }
+                    resultOptional = getTransaction(hash, responseType);
                 }
                 return new TransactionResponse<T>().setHash(hash).setItem(resultOptional.get());
             } else {
                 log.error(response.getBody().toString());
+                throw new JynxProException(errorCode);
             }
-        } catch(Exception e) {
+        } catch(UnirestException e) {
             log.error(e.getMessage(), e);
+            throw new JynxProException(errorCode);
         }
-        throw new JynxProException(errorCode);
     }
 
     public void confirmEthereumEvents() {

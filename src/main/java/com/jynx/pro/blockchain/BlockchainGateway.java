@@ -2,10 +2,11 @@ package com.jynx.pro.blockchain;
 
 import com.google.protobuf.ByteString;
 import com.jynx.pro.constant.TendermintTransaction;
+import com.jynx.pro.error.ErrorCode;
+import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.manager.AppStateManager;
 import com.jynx.pro.manager.DatabaseTransactionManager;
 import com.jynx.pro.request.*;
-import com.jynx.pro.response.ErrorResponse;
 import com.jynx.pro.service.*;
 import com.jynx.pro.utils.JSONUtils;
 import io.grpc.stub.StreamObserver;
@@ -321,8 +322,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             appStateManager.update(result.hashCode());
             return result;
         } catch(Exception e) {
-            appStateManager.update(e.getMessage().hashCode());
-            return new ErrorResponse().setError(e.getMessage());
+            log.info(e.getMessage(), e);
+            appStateManager.update(e.getMessage() != null ? e.getMessage().hashCode() : 1);
+            throw new JynxProException(e.getMessage());
         }
     }
 
@@ -397,8 +399,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             builder.setLog(jsonUtils.toJson(result));
         } catch(Exception e) {
             builder.setCode(1);
-            builder.setLog(e.getMessage());
-            log.error(e.getMessage(), e);
+            builder.setLog(e.getMessage() != null ? e.getMessage() : ErrorCode.UNKNOWN_ERROR);
         }
         Types.ResponseDeliverTx resp = builder.setGasWanted(1).build();
         responseObserver.onNext(resp);
