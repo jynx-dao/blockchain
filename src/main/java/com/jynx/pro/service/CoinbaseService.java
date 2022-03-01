@@ -34,9 +34,9 @@ public class CoinbaseService implements ExchangeService {
             final String symbol,
             final Long time
     ) {
-        String fromStr = LocalDateTime.ofEpochSecond(time - 120, 0, ZoneOffset.UTC)
+        String fromStr = LocalDateTime.ofEpochSecond(time - 600, 0, ZoneOffset.UTC)
                 .format(DateTimeFormatter.ISO_DATE_TIME);
-        String toStr = LocalDateTime.ofEpochSecond(time + 120, 0, ZoneOffset.UTC)
+        String toStr = LocalDateTime.ofEpochSecond(time + 600, 0, ZoneOffset.UTC)
                 .format(DateTimeFormatter.ISO_DATE_TIME);
         String path = "products/%s/candles?start=%s&end=%s&granularity=60";
         String url = String.format(API_URL, String.format(path, symbol,

@@ -476,6 +476,7 @@ public class OrderService {
             final CreateOrderRequest request,
             final Market market
     ) {
+        // TODO - user cannot place a stop-loss that would be below their current liquidation price
         Order order = new Order()
                 .setUser(request.getUser())
                 .setId(uuidUtils.next())
@@ -639,6 +640,13 @@ public class OrderService {
         if(request.getReduceOnly() == null) {
             request.setReduceOnly(false);
         }
+        if(request.getReduceOnly()) {
+            Market market = marketService.get(request.getMarketId());
+            Position position = positionService.getAndCreate(request.getUser(), market);
+            if(request.getQuantity().doubleValue() > position.getQuantity().doubleValue()) {
+                request.setQuantity(position.getQuantity());
+            }
+        }
         if(OrderType.MARKET.equals(request.getType())) {
             request.setPrice(null);
         }
@@ -662,13 +670,6 @@ public class OrderService {
         }
         if(request.getPrice() != null && request.getPrice().doubleValue() <= 0) {
             throw new JynxProException(ErrorCode.NEGATIVE_PRICE);
-        }
-        if(request.getReduceOnly()) {
-            Market market = marketService.get(request.getMarketId());
-            Position position = positionService.getAndCreate(request.getUser(), market);
-            if(request.getQuantity().doubleValue() > position.getQuantity().doubleValue()) {
-                request.setQuantity(position.getQuantity());
-            }
         }
     }
 
