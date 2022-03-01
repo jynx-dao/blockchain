@@ -30,7 +30,7 @@ import org.testcontainers.utility.DockerImageName;
 @Slf4j
 @Testcontainers
 @ActiveProfiles("tendermint")
-@DisabledIfEnvironmentVariable(named = "TRAVIS_CI", matches = "*")
+@DisabledIfEnvironmentVariable(named = "TRAVIS_CI", matches = "true")
 @SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class TendermintClientTest extends IntegrationTest {
 
