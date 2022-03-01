@@ -7,12 +7,11 @@ import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.manager.AppStateManager;
 import com.jynx.pro.manager.DatabaseTransactionManager;
+import com.jynx.pro.model.CheckTxResult;
 import com.jynx.pro.request.*;
 import com.jynx.pro.service.*;
 import com.jynx.pro.utils.JSONUtils;
 import io.grpc.stub.StreamObserver;
-import lombok.Data;
-import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -107,14 +106,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         setupCheckTransactions();
     }
 
-    @Data
-    @Accessors(chain = true)
-    private static class CheckTxResult {
-        private int code;
-        private String error;
-    }
-
-    private TendermintTransaction getTendermintTx(String tx) {
+    private TendermintTransaction getTendermintTx(
+            final String tx
+    ) {
         try {
             String txAsJson = new String(Base64.getDecoder().decode(tx.getBytes(StandardCharsets.UTF_8)));
             JSONObject jsonObject = new JSONObject(txAsJson);

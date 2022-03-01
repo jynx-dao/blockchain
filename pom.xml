@@ -176,6 +176,7 @@
                         <exclude>**/*com/jynx/pro/ethereum/**</exclude>
                         <exclude>**/*com/jynx/pro/model/**</exclude>
                         <exclude>**/*com/jynx/pro/request/**</exclude>
+                        <exclude>**/*com/jynx/pro/response/**</exclude>
                         <exclude>**/*com/google/protobuf/**</exclude>
                         <exclude>**/*tendermint/abci/types/**</exclude>
                         <exclude>**/*tendermint/types/**</exclude>

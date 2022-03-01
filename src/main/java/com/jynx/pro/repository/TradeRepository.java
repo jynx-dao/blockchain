@@ -14,45 +14,6 @@ import java.util.UUID;
 public class TradeRepository extends EntityRepository<Trade> {
 
     /**
-     * Get {@link Trade}s by market ID
-     *
-     * @param marketId the market ID
-     *
-     * @return {@link List<Trade>}
-     */
-    public List<Trade> findByMarketId(
-            final UUID marketId
-    ) {
-        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
-        CriteriaQuery<Trade> query = cb.createQuery(getType());
-        Root<Trade> rootType = query.from(getType());
-        Path<UUID> market_id = rootType.join("market").get("id");
-        query = query.select(rootType).where(cb.equal(market_id, marketId));
-        return getEntityManager().createQuery(query).getResultList();
-    }
-
-    /**
-     * Get {@link Trade}s by market ID and user ID
-     *
-     * @param userId the user ID
-     * @param marketId the market ID
-     *
-     * @return {@link List<Trade>}
-     */
-    public List<Trade> findByTakerOrderUserIdAndMarketId(
-            final UUID userId,
-            final UUID marketId
-    ) {
-        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
-        CriteriaQuery<Trade> query = cb.createQuery(getType());
-        Root<Trade> rootType = query.from(getType());
-        Path<UUID> market_id = rootType.join("market").get("id");
-        Path<UUID> user_id = rootType.join("user").get("id");
-        query = query.select(rootType).where(cb.equal(market_id, marketId), cb.equal(user_id, userId));
-        return getEntityManager().createQuery(query).getResultList();
-    }
-
-    /**
      * Get {@link Trade}s by market ID and executed between 'to' and 'from' timestamps
      *
      * @param marketId the market ID
