@@ -1579,6 +1579,12 @@ public class OrderServiceTest extends IntegrationTest {
         }
         orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1.5),
                 side, OrderType.MARKET, degenUser));
+        orderService.create(getCreateOrderRequest(market.getId(), side.equals(MarketSide.BUY) ? BigDecimal.valueOf(1) :
+                        BigDecimal.valueOf(1000000), BigDecimal.valueOf(0.0001),
+                side.equals(MarketSide.BUY) ? MarketSide.SELL : MarketSide.BUY, OrderType.STOP_MARKET, degenUser));
+        orderService.create(getCreateOrderRequest(market.getId(), side.equals(MarketSide.SELL) ? BigDecimal.valueOf(1) :
+                        BigDecimal.valueOf(1000000), BigDecimal.valueOf(0.0001),
+                side.equals(MarketSide.BUY) ? MarketSide.SELL : MarketSide.BUY, OrderType.LIMIT, degenUser));
         Optional<Position> positionDegenOptional = positionRepository.findByUserAndMarket(degenUser, market);
         Assertions.assertTrue(positionDegenOptional.isPresent());
         Position positionDegen = positionDegenOptional.get();
@@ -1878,8 +1884,7 @@ public class OrderServiceTest extends IntegrationTest {
         );
     }
 
-    // TODO - test liquidation with open orders (orders should be canceled)
-    // TODO - test stop market order
+    // TODO - test stop market order (trigger with price move + force negative balance)
 
     @Test
     public void testLiquidationShortPositionWithInsuranceFund() throws InterruptedException {
