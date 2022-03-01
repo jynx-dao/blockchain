@@ -53,19 +53,6 @@ public class TradeService {
                 .setSide(side));
     }
 
-    public List<Trade> getByMarketId(
-            final UUID marketId
-    ) {
-        return tradeRepository.findByMarketId(marketId);
-    }
-
-    public List<Trade> getByUserIdAndMarketId(
-            final UUID userId,
-            final UUID marketId
-    ) {
-        return tradeRepository.findByTakerOrderUserIdAndMarketId(userId, marketId);
-    }
-
     public List<Kline> getKline(
             final UUID marketId,
             final Long from,

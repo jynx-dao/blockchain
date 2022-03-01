@@ -124,7 +124,7 @@ public class PositionService {
             position.setUnrealisedPnl(unrealisedProfitRatio.multiply(position.getUnrealisedPnl()));
             accountService.bookProfit(user, market, realisedProfit);
             BigDecimal margin = orderService.getMarginRequirement(market, user);
-            accountService.allocateMargin(margin, user, market.getSettlementAsset());
+            accountService.allocateMargin(user, market, margin);
             updateLiquidationPrice(position);
         } else {
             BigDecimal averageEntryPrice = getAverageEntryPrice(position.getAverageEntryPrice(), price,
@@ -244,7 +244,7 @@ public class PositionService {
         positions = positionRepository.saveAll(positions);
         for(Position position : positions) {
             BigDecimal margin = orderService.getMarginRequirement(market, position.getUser());
-            accountService.allocateMargin(margin, position.getUser(), market.getSettlementAsset());
+            accountService.allocateMargin(position.getUser(), market, margin);
             updateLiquidationPrice(position);
         }
         positionRepository.saveAll(positions);

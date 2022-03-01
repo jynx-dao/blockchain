@@ -804,16 +804,93 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    // TODO - implement properly
     public void testCreateStopOrder() throws InterruptedException {
-//        Market market = createOrderBook(1, 1);
-//        try {
-//            orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.ONE, BigDecimal.valueOf(1),
-//                    MarketSide.SELL, OrderType.STOP_MARKET, takerUser));
-//            Assertions.fail();
-//        } catch(JynxProException e) {
-//            Assertions.assertEquals(e.getMessage(), ErrorCode.STOP_ORDER_NOT_SUPPORTED);
-//        }
+        Market market = createOrderBook(1, 1);
+        orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(44000), BigDecimal.valueOf(1),
+                MarketSide.SELL, OrderType.STOP_MARKET, takerUser).setStopTrigger(StopTrigger.LAST_PRICE));
+        BigDecimal takerMargin = BigDecimal.valueOf(44000).multiply(market.getMarginRequirement());
+        BigDecimal makerMargin = BigDecimal.valueOf(45610).multiply(market.getMarginRequirement());
+        Trader taker = new Trader()
+                .setMargin(takerMargin)
+                .setBalance(BigDecimal.valueOf(INITIAL_BALANCE))
+                .setAverageEntryPrice(BigDecimal.ZERO)
+                .setUser(takerUser)
+                .setSide(null)
+                .setOpenVolume(BigDecimal.ZERO)
+                .setRealisedProfit(BigDecimal.ZERO)
+                .setTradeCount(0)
+                .setFee(BigDecimal.ZERO);
+        Trader maker = new Trader()
+                .setMargin(makerMargin)
+                .setBalance(BigDecimal.valueOf(INITIAL_BALANCE))
+                .setAverageEntryPrice(BigDecimal.ZERO)
+                .setUser(makerUser)
+                .setSide(null)
+                .setOpenVolume(BigDecimal.ZERO)
+                .setRealisedProfit(BigDecimal.ZERO)
+                .setTradeCount(0)
+                .setFee(BigDecimal.ZERO);
+        taker.setAvailableBalance(taker.getBalance().subtract(taker.getMargin()));
+        maker.setAvailableBalance(maker.getBalance().subtract(maker.getMargin()));
+        validateMarketState(
+                market.getId(),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.valueOf(45590),
+                BigDecimal.valueOf(45610),
+                BigDecimal.valueOf(1),
+                BigDecimal.valueOf(1),
+                1,
+                1,
+                BigDecimal.ZERO,
+                List.of(taker, maker)
+        );
+    }
+
+    @Test
+    public void testCreateStopOrderWithImmediateExecution() throws InterruptedException {
+        Market market = createOrderBook(2, 2);
+        orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(44000), BigDecimal.valueOf(1),
+                MarketSide.BUY, OrderType.STOP_MARKET, takerUser));
+        BigDecimal takerMargin = BigDecimal.valueOf(45610).multiply(market.getMarginRequirement());
+        BigDecimal makerMargin = BigDecimal.valueOf(45610).multiply(market.getMarginRequirement()).add(BigDecimal.valueOf(45611).multiply(market.getMarginRequirement()));
+        BigDecimal takerFee = BigDecimal.valueOf(45610).multiply(market.getTakerFee());
+        BigDecimal makerFee = BigDecimal.valueOf(45610).multiply(market.getMakerFee());
+        Trader taker = new Trader()
+                .setMargin(takerMargin)
+                .setBalance(BigDecimal.valueOf(INITIAL_BALANCE).subtract(takerFee))
+                .setAverageEntryPrice(BigDecimal.valueOf(45610))
+                .setUser(takerUser)
+                .setSide(MarketSide.BUY)
+                .setOpenVolume(BigDecimal.ONE)
+                .setRealisedProfit(takerFee.multiply(BigDecimal.valueOf(-1)))
+                .setTradeCount(1)
+                .setFee(takerFee.multiply(BigDecimal.valueOf(-1)));
+        Trader maker = new Trader()
+                .setMargin(makerMargin)
+                .setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(makerFee))
+                .setAverageEntryPrice(BigDecimal.valueOf(45610))
+                .setUser(makerUser)
+                .setSide(MarketSide.SELL)
+                .setOpenVolume(BigDecimal.ONE)
+                .setRealisedProfit(makerFee)
+                .setTradeCount(1)
+                .setFee(makerFee);
+        taker.setAvailableBalance(taker.getBalance().subtract(taker.getMargin()));
+        maker.setAvailableBalance(maker.getBalance().subtract(maker.getMargin()));
+        validateMarketState(
+                market.getId(),
+                BigDecimal.valueOf(1),
+                BigDecimal.valueOf(45610),
+                BigDecimal.valueOf(45590),
+                BigDecimal.valueOf(45611),
+                BigDecimal.valueOf(1),
+                BigDecimal.valueOf(1),
+                2,
+                1,
+                BigDecimal.ZERO,
+                List.of(maker, taker)
+        );
     }
 
     @Test

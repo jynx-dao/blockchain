@@ -56,6 +56,8 @@ public class AccountService {
     private EthereumService ethereumService;
     @Autowired
     private WithdrawalRepository withdrawalRepository;
+    @Autowired
+    private OrderService orderService;
 
     public Optional<Account> get(
             final User user,
@@ -80,15 +82,23 @@ public class AccountService {
     }
 
     public void allocateMargin(
-            final BigDecimal margin,
             final User user,
-            final Asset asset
+            final Market market,
+            final BigDecimal margin
     ) {
-        Account account = getAndCreate(user, asset);
+        Account account = getAndCreate(user, market.getSettlementAsset());
         account.setAvailableBalance(account.getAvailableBalance().add(account.getMarginBalance()));
         account.setMarginBalance(margin);
         account.setAvailableBalance(account.getAvailableBalance().subtract(margin));
         accountRepository.save(account);
+    }
+
+    public void allocateMargin(
+            final User user,
+            final Market market
+    ) {
+        BigDecimal margin = orderService.getMarginRequirement(market, user);
+        allocateMargin(user, market, margin);
     }
 
     /**

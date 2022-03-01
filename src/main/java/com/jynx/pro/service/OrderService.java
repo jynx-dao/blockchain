@@ -102,19 +102,6 @@ public class OrderService {
     }
 
     /**
-     * Gets the current {@link OrderBook} of given market ID
-     *
-     * @param marketId the market ID
-     *
-     * @return the {@link OrderBook}
-     */
-    public OrderBook getOrderBook(
-            final UUID marketId
-    ) {
-        return getOrderBook(marketService.get(marketId));
-    }
-
-    /**
      * Gets the current {@link OrderBook} of given {@link Market}
      *
      * @param market the {@link Market}
@@ -179,7 +166,7 @@ public class OrderService {
         order.setStatus(OrderStatus.CANCELED);
         order = orderRepository.save(order);
         BigDecimal margin = getMarginRequirement(order.getMarket(), order.getUser());
-        accountService.allocateMargin(margin, order.getUser(), order.getMarket().getSettlementAsset());
+        accountService.allocateMargin(request.getUser(), order.getMarket(), margin);
         OrderHistory orderHistory = new OrderHistory()
                 .setOrder(order)
                 .setId(uuidUtils.next())
@@ -232,10 +219,8 @@ public class OrderService {
                 .setStatus(OrderStatus.OPEN)
                 .setType(request.getType())
                 .setPriority(getLimitOrderPriority(market, request.getSide(), request.getPrice()));
-        BigDecimal margin = getMarginRequirementWithNewOrder(market, order.getSide(), request.getQuantity(),
-                request.getPrice(), request.getUser());
-        accountService.allocateMargin(margin, request.getUser(), market.getSettlementAsset());
         order = orderRepository.save(order);
+        accountService.allocateMargin(request.getUser(), market);
         handleMarkPriceChange(market, market.getLastPrice());
         return order;
     }
@@ -331,18 +316,19 @@ public class OrderService {
      * Check if a stop-loss order is triggered
      *
      * @param order stop-loss {@link Order}
-     * @param price the price used to trigger the stop execution
+     * @param triggerPrice the price used to trigger the stop execution
      *
      * @return true / false
      */
     private boolean isStopTriggered(
             final Order order,
-            final BigDecimal price
+            final BigDecimal triggerPrice
     ) {
+        if(triggerPrice.equals(BigDecimal.ZERO)) return false;
         return (order.getSide().equals(MarketSide.SELL) &&
-                order.getPrice().doubleValue() < price.doubleValue()) ||
+                order.getPrice().doubleValue() > triggerPrice.doubleValue()) ||
                 (order.getSide().equals(MarketSide.BUY) &&
-                    order.getPrice().doubleValue() > price.doubleValue());
+                    order.getPrice().doubleValue() < triggerPrice.doubleValue());
     }
 
     /**
@@ -417,7 +403,7 @@ public class OrderService {
         BigDecimal price = orderOverride != null ? orderOverride.getPrice() : request.getPrice();
         BigDecimal quantity = orderOverride != null ? orderOverride.getQuantity() : request.getQuantity();
         List<Order> passiveOrders = getSideOfBook(market, getOtherSide(side)).stream()
-                .filter(o -> !o.getUser().getId().equals(request.getUser().getId())).collect(Collectors.toList());
+                .filter(o -> !o.getUser().getId().equals(user.getId())).collect(Collectors.toList());
         double passiveVolume = passiveOrders.stream().mapToDouble(o -> o.getRemainingQuantity().doubleValue()).sum();
         Order order;
         if(orderOverride != null) {
@@ -444,7 +430,7 @@ public class OrderService {
         }
         order = orderRepository.save(order);
         BigDecimal margin = getMarginRequirementWithNewOrder(market, side, quantity, price, user);
-        accountService.allocateMargin(margin, user, market.getSettlementAsset());
+        accountService.allocateMargin(user, market, margin);
         return matchOrders(passiveOrders, order, market);
     }
 
@@ -504,6 +490,7 @@ public class OrderService {
                 .setTag(OrderTag.USER_GENERATED)
                 .setStopTrigger(request.getStopTrigger());
         order = orderRepository.save(order);
+        accountService.allocateMargin(request.getUser(), market);
         BigDecimal triggerPrice = request.getStopTrigger().equals(StopTrigger.LAST_PRICE) ?
                 market.getLastPrice() : market.getMarkPrice();
         if(isStopTriggered(order, triggerPrice)) {
@@ -547,9 +534,7 @@ public class OrderService {
                 .setPrice(request.getPrice())
                 .setPriority(getLimitOrderPriority(market, request.getSide(), request.getPrice()));
         order = orderRepository.save(order);
-        BigDecimal margin = getMarginRequirementWithNewOrder(market, order.getSide(), request.getQuantity(),
-                request.getPrice(), request.getUser());
-        accountService.allocateMargin(margin, request.getUser(), market.getSettlementAsset());
+        accountService.allocateMargin(request.getUser(), market);
         return matchOrders(passiveOrders, order, market);
     }
 
@@ -743,7 +728,7 @@ public class OrderService {
                 order.getRemainingQuantity(), order.getPrice(), request.getUser());
         BigDecimal newMargin = combinedMargin.subtract(originalMargin);
         order = orderRepository.save(order);
-        accountService.allocateMargin(newMargin, order.getUser(), order.getMarket().getSettlementAsset());
+        accountService.allocateMargin(request.getUser(), order.getMarket(), newMargin);
         OrderHistory orderHistory = new OrderHistory()
                 .setOrder(order)
                 .setId(uuidUtils.next())
