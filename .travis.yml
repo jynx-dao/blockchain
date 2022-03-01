@@ -1,5 +1,7 @@
 language: java
 install: echo "skip default install"
+env:
+  - TRAVIS_CI=true
 jdk:
   - openjdk11
 script:
