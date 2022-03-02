@@ -380,7 +380,6 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final TendermintTransaction tendermintTx
     ) {
         String txAsJson = new String(Base64.getDecoder().decode(tx.getBytes(StandardCharsets.UTF_8)));
-        // TODO - extract signature / public key
         try {
             checkTransactions.get(tendermintTx).accept(txAsJson);
             return new CheckTxResult().setCode(0);
