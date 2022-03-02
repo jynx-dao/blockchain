@@ -376,4 +376,26 @@ public class ReadOnlyRepository {
         query = query.select(rootType);
         return getEntityManager().createQuery(query).getResultList();
     }
+
+    /**
+     * Get {@link Asset} by ID
+     *
+     * @param id the asset ID
+     *
+     * @return {@link Optional<Asset>}
+     */
+    public Optional<Asset> getAssetById(
+            final UUID id
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Asset> query = cb.createQuery(Asset.class);
+        Root<Asset> rootType = query.from(Asset.class);
+        Path<UUID> assetId = rootType.get("id");
+        query = query.select(rootType).where(cb.equal(assetId, id));
+        try {
+            return Optional.of(getEntityManager().createQuery(query).getSingleResult());
+        } catch(Exception e) {
+            return Optional.empty();
+        }
+    }
 }

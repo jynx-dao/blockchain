@@ -53,7 +53,7 @@ public class TendermintClientTest extends IntegrationTest {
 
     @BeforeEach
     public void setup() {
-        initializeState();
+        initializeState(true);
         tendermint =
                 new GenericContainer(DockerImageName.parse("tendermint/tendermint:v0.33.8"))
                         .withExposedPorts(26657)
@@ -92,15 +92,41 @@ public class TendermintClientTest extends IntegrationTest {
                 String.format("http://localhost:%s/asset/all", port), Asset[].class);
         Asset[] assetArray = responseEntity.getBody();
         Assertions.assertNotNull(assetArray);
-        Assertions.assertEquals(assetArray.length, 1);
-        Assertions.assertEquals(assetArray[0].getStatus(), AssetStatus.PENDING);
-        Assertions.assertEquals(assetArray[0].getId(), txResponse.getItem().getId());
+        Assertions.assertEquals(assetArray.length, 2);
+        Assertions.assertEquals(assetArray[1].getStatus(), AssetStatus.PENDING);
+        Assertions.assertEquals(assetArray[1].getId(), txResponse.getItem().getId());
         return assetArray[0];
     }
 
     @Test
     public void testAddAsset() {
         addAsset();
+    }
+
+    @Test
+    public void testSuspendAndUnsuspendAsset() {
+        Asset asset = addAsset();
+        SingleItemRequest request = new SingleItemRequest()
+                .setId(asset.getId());
+        long[] times = proposalTimes();
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setPublicKey(takerUser.getPublicKey());
+        tendermintClient.suspendAsset(request);
+        syncProposals();
+        ResponseEntity<Asset> responseEntity = this.restTemplate.getForEntity(
+                String.format("http://localhost:%s/asset/%s", port, asset.getId().toString()), Asset.class);
+        asset = responseEntity.getBody();
+        Assertions.assertNotNull(asset);
+        Assertions.assertEquals(asset.getStatus(), AssetStatus.SUSPENDED);
+        tendermintClient.unsuspendAsset(request);
+        syncProposals();
+        responseEntity = this.restTemplate.getForEntity(
+                String.format("http://localhost:%s/asset/%s", port, asset.getId().toString()), Asset.class);
+        asset = responseEntity.getBody();
+        Assertions.assertNotNull(asset);
+        Assertions.assertEquals(asset.getStatus(), AssetStatus.ACTIVE);
     }
 
     @Test
@@ -204,6 +230,32 @@ public class TendermintClientTest extends IntegrationTest {
     }
 
     @Test
+    public void testSuspendAndUnsuspendMarket() {
+        Market market = addMarket();
+        SingleItemRequest request = new SingleItemRequest()
+                .setId(market.getId());
+        long[] times = proposalTimes();
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setPublicKey(takerUser.getPublicKey());
+        tendermintClient.suspendMarket(request);
+        syncProposals();
+        ResponseEntity<Market> responseEntity = this.restTemplate.getForEntity(
+                String.format("http://localhost:%s/market/%s", port, market.getId().toString()), Market.class);
+        market = responseEntity.getBody();
+        Assertions.assertNotNull(market);
+        Assertions.assertEquals(market.getStatus(), MarketStatus.SUSPENDED);
+        tendermintClient.unsuspendMarket(request);
+        syncProposals();
+        responseEntity = this.restTemplate.getForEntity(
+                String.format("http://localhost:%s/market/%s", port, market.getId().toString()), Market.class);
+        market = responseEntity.getBody();
+        Assertions.assertNotNull(market);
+        Assertions.assertEquals(market.getStatus(), MarketStatus.ACTIVE);
+    }
+
+    @Test
     public void testCreateOrder() {
         Market market = addMarket();
         CreateOrderRequest buyRequest = new CreateOrderRequest()
@@ -269,6 +321,42 @@ public class TendermintClientTest extends IntegrationTest {
         Assertions.assertNotNull(orderBook);
         Assertions.assertEquals(0, orderBook.getAsks().size());
         Assertions.assertEquals(0, orderBook.getBids().size());
+    }
+
+    @Test
+    public void testAmendOrder() {
+        Market market = addMarket();
+        CreateOrderRequest request = new CreateOrderRequest()
+                .setTag(OrderTag.USER_GENERATED)
+                .setType(OrderType.LIMIT)
+                .setPostOnly(true)
+                .setQuantity(BigDecimal.ONE)
+                .setPrice(BigDecimal.valueOf(1.1))
+                .setSide(MarketSide.SELL)
+                .setMarketId(market.getId());
+        request.setPublicKey(makerUser.getPublicKey());
+        TransactionResponse<Order> newOrder = tendermintClient.createOrder(request);
+        ResponseEntity<OrderBook> responseEntity = this.restTemplate.getForEntity(
+                String.format("http://localhost:%s/market/%s/order-book", port, market.getId().toString()), OrderBook.class);
+        OrderBook orderBook = responseEntity.getBody();
+        Assertions.assertNotNull(orderBook);
+        Assertions.assertTrue(orderBook.getAsks().size() > 0);
+        Assertions.assertEquals(0, orderBook.getBids().size());
+        Assertions.assertEquals(orderBook.getAsks().get(0).getPrice().doubleValue(),
+                BigDecimal.valueOf(1.1).doubleValue(), 0.0001d);
+        AmendOrderRequest amendOrderRequest = new AmendOrderRequest()
+                .setId(newOrder.getItem().getId())
+                .setPrice(BigDecimal.valueOf(1.2));
+        amendOrderRequest.setPublicKey(makerUser.getPublicKey());
+        tendermintClient.amendOrder(amendOrderRequest);
+        responseEntity = this.restTemplate.getForEntity(
+                String.format("http://localhost:%s/market/%s/order-book", port, market.getId().toString()), OrderBook.class);
+        orderBook = responseEntity.getBody();
+        Assertions.assertNotNull(orderBook);
+        Assertions.assertTrue(orderBook.getAsks().size() > 0);
+        Assertions.assertEquals(0, orderBook.getBids().size());
+        Assertions.assertEquals(orderBook.getAsks().get(0).getPrice().doubleValue(),
+                BigDecimal.valueOf(1.2).doubleValue(), 0.0001d);
     }
 
     private void waitForBlockchain() {

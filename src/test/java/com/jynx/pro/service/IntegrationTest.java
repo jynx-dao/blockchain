@@ -304,7 +304,9 @@ public abstract class IntegrationTest {
         databaseTransactionManager.commit();
     }
 
-    protected void initializeState() {
+    protected void initializeState(
+            final boolean createAsset
+    ) {
         databaseTransactionManager.createTransaction();
         if(!setupComplete) {
             ethereumHelper.deploy(ganache.getHost(), ganache.getFirstMappedPort(), PRIVATE_KEY);
@@ -344,7 +346,13 @@ public abstract class IntegrationTest {
         degenUser = userRepository.save(degenUser);
         stakeRepository.save(new Stake().setId(uuidUtils.next()).setUser(makerUser).setAmount(BigDecimal.valueOf(500000000L)));
         stakeRepository.save(new Stake().setId(uuidUtils.next()).setUser(takerUser).setAmount(BigDecimal.valueOf(700000000L)));
-        createAndEnactAsset(true);
+        if(createAsset) {
+            createAndEnactAsset(true);
+        }
         databaseTransactionManager.commit();
+    }
+
+    protected void initializeState() {
+        initializeState(false);
     }
 }

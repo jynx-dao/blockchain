@@ -108,6 +108,7 @@ public class TendermintClient {
         try {
             return Optional.of(objectMapper.readValue(logMessage, responseType));
         } catch(JsonProcessingException e) {
+            log.info(e.getMessage());
             throw new JynxProException(logMessage);
         }
     }
@@ -243,17 +244,17 @@ public class TendermintClient {
                 TendermintTransaction.ADD_ASSET, ErrorCode.ADD_ASSET_FAILED);
     }
 
-    public TransactionResponse<Asset> suspendAsset(
+    public TransactionResponse<Proposal> suspendAsset(
             final SingleItemRequest request
     ) {
-        return processTransaction(request, Asset.class,
+        return processTransaction(request, Proposal.class,
                 TendermintTransaction.SUSPEND_ASSET, ErrorCode.SUSPEND_ASSET_FAILED);
     }
 
-    public TransactionResponse<Asset> unsuspendAsset(
+    public TransactionResponse<Proposal> unsuspendAsset(
             final SingleItemRequest request
     ) {
-        return processTransaction(request, Asset.class,
+        return processTransaction(request, Proposal.class,
                 TendermintTransaction.UNSUSPEND_ASSET, ErrorCode.UNSUSPEND_ASSET_FAILED);
     }
 

@@ -1,16 +1,17 @@
 package com.jynx.pro.controller;
 
 import com.jynx.pro.entity.Asset;
+import com.jynx.pro.entity.Proposal;
+import com.jynx.pro.error.ErrorCode;
+import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.AddAssetRequest;
 import com.jynx.pro.request.SingleItemRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @Controller
 @RequestMapping("/asset")
@@ -21,6 +22,14 @@ public class AssetController extends AbstractController {
         return ResponseEntity.ok(readOnlyRepository.getAssets());
     }
 
+    @GetMapping("/{id}")
+    public ResponseEntity<Asset> getById(
+            @PathVariable("id") UUID id
+    ) {
+        return ResponseEntity.ok(readOnlyRepository.getAssetById(id)
+                .orElseThrow(() -> new JynxProException(ErrorCode.ASSET_NOT_FOUND)));
+    }
+
     @PostMapping
     public ResponseEntity<Asset> add(
             @RequestBody AddAssetRequest request
@@ -29,14 +38,14 @@ public class AssetController extends AbstractController {
     }
 
     @PostMapping("/suspend")
-    public ResponseEntity<Asset> suspend(
+    public ResponseEntity<Proposal> suspend(
             @RequestBody SingleItemRequest request
     ) {
         return ResponseEntity.ok(tendermintClient.suspendAsset(request).getItem());
     }
 
     @PostMapping("/unsuspend")
-    public ResponseEntity<Asset> unsuspend(
+    public ResponseEntity<Proposal> unsuspend(
             @RequestBody SingleItemRequest request
     ) {
         return ResponseEntity.ok(tendermintClient.unsuspendAsset(request).getItem());
