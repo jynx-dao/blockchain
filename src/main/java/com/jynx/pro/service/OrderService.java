@@ -362,33 +362,7 @@ public class OrderService {
             final Market market
     ) {
         Order marketOrder = createMarketOrder(market, order);
-        reconcileBalanceAfterStopOrder(marketOrder, market);
-    }
-
-    /**
-     * Reconcile the user balance after a stop-loss order executes
-     *
-     * @param order {@link Order}
-     * @param market {@link Market}
-     */
-    private void reconcileBalanceAfterStopOrder(
-            final Order order,
-            final Market market
-    ) {
-        Account account = accountService.getAndCreate(order.getUser(), market.getSettlementAsset());
-        Position position = positionService.getAndCreate(order.getUser(), market);
-        if(account.getBalance().doubleValue() < 0) {
-            if(market.getInsuranceFund().doubleValue() < account.getBalance().abs().doubleValue()) {
-                positionService.claimLossBySocialization(market, account);
-            } else {
-                positionService.claimLossFromInsuranceFund(market, account);
-            }
-            account.setBalance(BigDecimal.ZERO);
-            account.setAvailableBalance(BigDecimal.ZERO);
-            account.setMarginBalance(BigDecimal.ZERO);
-            accountRepository.save(account);
-            positionService.reconcileLiquidatedPosition(position);
-        }
+        accountService.reconcileNegativeBalance(marketOrder.getUser(), market);
     }
 
     /**

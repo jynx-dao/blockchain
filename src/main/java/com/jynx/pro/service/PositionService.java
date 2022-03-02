@@ -312,6 +312,7 @@ public class PositionService {
             final Position position
     ) {
         market.setInsuranceFund(market.getInsuranceFund().add(account.getBalance()));
+        // TODO - do we need a transaction for the insurance fund credit?
         Transaction transaction = new Transaction()
                 .setTimestamp(configService.getTimestamp())
                 .setAsset(position.getMarket().getSettlementAsset())
@@ -333,6 +334,7 @@ public class PositionService {
     ) {
         BigDecimal insuranceFund = market.getInsuranceFund();
         BigDecimal lossToSocialize = account.getBalance().abs().subtract(insuranceFund);
+        // TODO - do we need a transaction for the insurance fund debit?
         market.setInsuranceFund(BigDecimal.ZERO);
         socializeLosses(market, lossToSocialize);
         Transaction transaction = new Transaction()
@@ -355,6 +357,7 @@ public class PositionService {
             final Account account
     ) {
         market.setInsuranceFund(market.getInsuranceFund().subtract(account.getBalance().abs()));
+        // TODO - do we need a transaction for the insurance fund debit?
         Transaction transaction = new Transaction()
                 .setTimestamp(configService.getTimestamp())
                 .setAsset(market.getSettlementAsset())
@@ -396,13 +399,8 @@ public class PositionService {
                 liquidatedPositionIds.add(position.getId());
                 if(account.getBalance().doubleValue() > 0) {
                     liquidateWithExcessBalance(market, account, position);
-                } else if(account.getBalance().doubleValue() < 0) {
-                    if(market.getInsuranceFund().doubleValue() < account.getBalance().abs().doubleValue()) {
-                        claimLossBySocialization(market, account);
-                    } else {
-                        claimLossFromInsuranceFund(market, account);
-                    }
                 }
+                accountService.reconcileNegativeBalance(position.getUser(), market);
                 account.setBalance(BigDecimal.ZERO);
                 account.setAvailableBalance(BigDecimal.ZERO);
                 account.setMarginBalance(BigDecimal.ZERO);

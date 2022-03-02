@@ -461,10 +461,10 @@ public class MarketServiceTest extends IntegrationTest {
         market.setLastSettlement(LocalDateTime.now().toEpochSecond(ZoneOffset.UTC) - 86400);
         market = marketRepository.save(market);
         orderService.create(getCreateOrderRequest(market.getId(),
-                null, BigDecimal.ONE, MarketSide.BUY, OrderType.MARKET, takerUser));
+                null, BigDecimal.ONE, MarketSide.SELL, OrderType.MARKET, takerUser));
         marketService.settleMarkets();
         market = marketRepository.findById(market.getId()).orElse(new Market());
-        BigDecimal makerFee = BigDecimal.valueOf(45610).multiply(market.getMakerFee());
+        BigDecimal makerFee = BigDecimal.valueOf(45590).multiply(market.getMakerFee());
         List<Position> positions = positionRepository.findByMarket(market);
         List<Account> accounts = accountRepository.findByAsset(market.getSettlementAsset());
         List<Transaction> makerTxns = transactionRepository.findByUserAndAsset(makerUser, market.getSettlementAsset());

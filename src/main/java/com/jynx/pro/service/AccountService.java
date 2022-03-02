@@ -102,6 +102,32 @@ public class AccountService {
     }
 
     /**
+     * Reconcile the user balance if it's negative
+     *
+     * @param user {@link User}
+     * @param market {@link Market}
+     */
+    public void reconcileNegativeBalance(
+            final User user,
+            final Market market
+    ) {
+        Account account = getAndCreate(user, market.getSettlementAsset());
+        Position position = positionService.getAndCreate(user, market);
+        if(account.getBalance().doubleValue() < 0) {
+            if(market.getInsuranceFund().doubleValue() < account.getBalance().abs().doubleValue()) {
+                positionService.claimLossBySocialization(market, account);
+            } else {
+                positionService.claimLossFromInsuranceFund(market, account);
+            }
+            account.setBalance(BigDecimal.ZERO);
+            account.setAvailableBalance(BigDecimal.ZERO);
+            account.setMarginBalance(BigDecimal.ZERO);
+            accountRepository.save(account);
+            positionService.reconcileLiquidatedPosition(position);
+        }
+    }
+
+    /**
      * Request a new withdrawal
      *
      * @param request {@link CreateWithdrawalRequest}

@@ -40,11 +40,7 @@ public class MarketService {
     @Autowired
     private PositionRepository positionRepository;
     @Autowired
-    private OrderService orderService;
-    @Autowired
     private ConfigService configService;
-    @Autowired
-    private SettlementRepository settlementRepository;
     @Autowired
     private OracleRepository oracleRepository;
     @Autowired
@@ -82,6 +78,7 @@ public class MarketService {
                 .setTimestamp(configService.getTimestamp());
         transactionRepository.save(transaction);
         accountRepository.save(account);
+        accountService.reconcileNegativeBalance(account.getUser(), market);
     }
 
     public List<Market> settleMarkets() {
@@ -98,7 +95,6 @@ public class MarketService {
                 positions.forEach(position -> settlePosition(position, market, settlementDelta));
             }
         }
-        // TODO - what do we do with negative balances after settlement?
         return markets;
     }
 
@@ -309,6 +305,13 @@ public class MarketService {
         updateStatus(proposal, MarketStatus.ACTIVE);
     }
 
+    /**
+     * Updates the market with last traded price and latest mark price
+     *
+     * @param lastPrice the last traded price
+     * @param markPrice the latest mark price
+     * @param market {@link Market}
+     */
     public void updateLastPrice(
             final BigDecimal lastPrice,
             final BigDecimal markPrice,
