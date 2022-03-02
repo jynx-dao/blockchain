@@ -3,6 +3,8 @@ package com.jynx.pro.service;
 import com.jynx.pro.Application;
 import com.jynx.pro.constant.WithdrawalStatus;
 import com.jynx.pro.entity.*;
+import com.jynx.pro.error.ErrorCode;
+import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.CreateWithdrawalRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -47,6 +49,56 @@ public class EthereumServiceTest extends IntegrationTest {
         Assertions.assertEquals(Convert.toWei("1000000000", Convert.Unit.WEI)
                 .setScale(1, RoundingMode.HALF_UP), jynxTotalSupply
                 .setScale(1, RoundingMode.HALF_UP));
+    }
+
+    @Test
+    public void testGetTokenSupplyWithError() {
+        try {
+            ethereumService.totalSupply("12345");
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.CANNOT_GET_SUPPLY);
+        }
+    }
+
+    @Test
+    public void testDecimalPlacesWithError() {
+        try {
+            ethereumService.decimalPlaces("12345");
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.CANNOT_GET_DECIMAL_PLACES);
+        }
+    }
+
+    @Test
+    public void testWithdrawAssetsWithError() {
+        try {
+            ethereumService.withdrawAssets(List.of("12345"), List.of(BigInteger.ONE), List.of("12345"));
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.CANNOT_WITHDRAW_ASSETS);
+        }
+    }
+
+    @Test
+    public void testRemoveAssetWithError() {
+        try {
+            ethereumService.removeAsset(null);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.CANNOT_REMOVE_ASSET);
+        }
+    }
+
+    @Test
+    public void testAddAssetWithError() {
+        try {
+            ethereumService.addAsset(null);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.CANNOT_ADD_ASSET);
+        }
     }
 
     private void stakeTokens(double expectedStake, boolean unstake) throws InterruptedException {

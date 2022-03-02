@@ -181,15 +181,6 @@ public class ReadOnlyRepository {
         return getEntityManager().createQuery(query).getResultList();
     }
 
-    public List<Kline> getKline(
-            final UUID marketID,
-            final Long from,
-            final Long to,
-            final KlineInterval interval
-    ) {
-        return Collections.emptyList(); // TODO - generate aggregated price data
-    }
-
     /**
      * Get {@link Quote} by market ID
      *
@@ -397,5 +388,29 @@ public class ReadOnlyRepository {
         } catch(Exception e) {
             return Optional.empty();
         }
+    }
+
+    /**
+     * Get {@link Trade}s by market ID and executed between 'to' and 'from' timestamps
+     *
+     * @param marketId the market ID
+     * @param from the 'from' timestamp
+     * @param to the 'to' timestamp
+     *
+     * @return {@link List<Trade>}
+     */
+    public List<Trade> findByMarketIdAndExecutedGreaterThanAndExecutedLessThan(
+            final UUID marketId,
+            final Long from,
+            final Long to
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Trade> query = cb.createQuery(Trade.class);
+        Root<Trade> rootType = query.from(Trade.class);
+        Path<UUID> market_id = rootType.join("market").get("id");
+        Path<Long> tradeExecuted = rootType.get("executed");
+        query = query.select(rootType).where(cb.equal(market_id, marketId), cb.greaterThan(tradeExecuted, from),
+                cb.lessThan(tradeExecuted, to));
+        return getEntityManager().createQuery(query).getResultList();
     }
 }

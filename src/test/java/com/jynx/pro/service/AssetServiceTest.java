@@ -309,4 +309,14 @@ public class AssetServiceTest extends IntegrationTest {
             Assertions.assertEquals(e.getMessage(), ErrorCode.ASSET_NOT_SUSPENDED);
         }
     }
+
+    @Test
+    public void testGetByAddressFailsWhenMissing() {
+        try {
+            assetService.getByAddress("12345");
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.ASSET_NOT_FOUND);
+        }
+    }
 }

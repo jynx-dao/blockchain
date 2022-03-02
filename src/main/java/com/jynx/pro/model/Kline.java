@@ -1,6 +1,5 @@
 package com.jynx.pro.model;
 
-import com.jynx.pro.entity.Market;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
@@ -15,5 +14,4 @@ public class Kline {
     private BigDecimal close;
     private BigDecimal volume;
     private Long timestamp;
-    private Market market;
 }

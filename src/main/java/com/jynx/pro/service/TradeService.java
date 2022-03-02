@@ -18,7 +18,6 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -31,8 +30,6 @@ public class TradeService {
     private UUIDUtils uuidUtils;
     @Autowired
     private ConfigService configService;
-    @Autowired
-    private MarketService marketService;
 
     public Trade save(
             final Market market,
@@ -54,44 +51,18 @@ public class TradeService {
     }
 
     public List<Kline> getKline(
-            final UUID marketId,
-            final Long from,
-            final Long to,
-            final KlineInterval interval
+            final KlineInterval interval,
+            final List<Trade> trades
     ) {
-        if(from == null) {
-            throw new JynxProException(ErrorCode.FROM_MANDATORY);
-        }
-        if(to == null) {
-            throw new JynxProException(ErrorCode.TO_MANDATORY);
-        }
-        if(marketId == null) {
-            throw new JynxProException(ErrorCode.MARKET_ID_MANDATORY);
-        }
         if(interval == null) {
             throw new JynxProException(ErrorCode.INTERVAL_MANDATORY);
         }
-        if(from > to) {
-            throw new JynxProException(ErrorCode.FROM_AFTER_TO);
-        }
-        Market market = marketService.get(marketId);
         long intervalSeconds = getIntervalInSeconds(interval);
-        long duration = to - from;
-        long totalIntervals = duration / intervalSeconds;
-        long finalFrom = from;
-        if(totalIntervals > 100) {
-            finalFrom = to - (100 * intervalSeconds);
-        }
-        long intervalMinutes = intervalSeconds / 60;
-        finalFrom = ceilTimestamp(finalFrom, intervalMinutes);
-        long finalTo = floorTimestamp(to, intervalMinutes);
-        List<Trade> trades = tradeRepository.findByMarketIdAndExecutedGreaterThanAndExecutedLessThan(
-                marketId, finalFrom, finalTo).stream()
-                .sorted(Comparator.comparing(Trade::getExecuted))
-                .collect(Collectors.toList());
         List<Kline> kline = new ArrayList<>();
-        while(finalFrom < finalTo) {
-            final Long intervalFrom = finalFrom;
+        long from = trades.get(0).getExecuted();
+        long to = trades.get(trades.size()-1).getExecuted();
+        while(from < to) {
+            final Long intervalFrom = from;
             final Long intervalTo = intervalFrom + intervalSeconds;
             List<Trade> intervalTrades = trades.stream()
                     .filter(t -> t.getExecuted() >= intervalFrom && t.getExecuted() < intervalTo)
@@ -115,25 +86,10 @@ public class TradeService {
                     .setLow(low)
                     .setClose(close)
                     .setTimestamp(intervalFrom)
-                    .setMarket(market)
                     .setVolume(volume));
-            finalFrom += intervalSeconds;
+            from += intervalSeconds;
         }
         return kline;
-    }
-
-    private long ceilTimestamp(
-            long ts,
-            long interval
-    ) {
-        return (long) (Math.ceil((double) ts / (interval * 60)) * (interval * 60));
-    }
-
-    private long floorTimestamp(
-            long ts,
-            long interval
-    ) {
-        return (long) (Math.floor((double) ts / (interval * 60)) * (interval * 60));
     }
 
     private long getIntervalInSeconds(

@@ -12,16 +12,23 @@ import com.jynx.pro.model.Quote;
 import com.jynx.pro.request.AddMarketRequest;
 import com.jynx.pro.request.AmendMarketRequest;
 import com.jynx.pro.request.SingleItemRequest;
+import com.jynx.pro.service.TradeService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Controller
 @RequestMapping("/market")
 public class MarketController extends AbstractController {
+
+    @Autowired
+    private TradeService tradeService;
 
     @GetMapping("/{id}/order-book")
     public ResponseEntity<OrderBook> getOrderBook(
@@ -52,7 +59,11 @@ public class MarketController extends AbstractController {
             @RequestParam("to") Long to,
             @RequestParam("interval") KlineInterval interval
     ) {
-        return ResponseEntity.ok(readOnlyRepository.getKline(id, from, to, interval));
+        List<Trade> trades = readOnlyRepository.findByMarketIdAndExecutedGreaterThanAndExecutedLessThan(
+                        id, from, to).stream()
+                .sorted(Comparator.comparing(Trade::getExecuted))
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(tradeService.getKline(interval, trades));
     }
 
     @GetMapping("/{id}/quote")

@@ -147,11 +147,7 @@ public class EthereumService {
                 if(transactionOptional.isPresent() && confirmations >= configService.get().getEthConfirmations()) {
                     if(matchEvent(transactionOptional.get().getLogs(), event)) {
                         confirmedEvents.add(eventService.confirm(event));
-                    } else {
-                        log.warn("Cannot reconcile the event !!");
                     }
-                } else if(transactionOptional.isEmpty() && confirmations >= configService.get().getEthConfirmations()) {
-                    log.warn("This event cannot be processed: {}", event);
                 }
             }
         } catch(Exception e) {

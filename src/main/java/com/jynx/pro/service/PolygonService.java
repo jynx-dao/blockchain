@@ -45,7 +45,7 @@ public class PolygonService implements ExchangeService {
         HttpResponse<JsonNode> response = null;
         try {
             response = Unirest.get(url).asJson();
-            int size = response.getBody().getObject().getJSONArray("results").length();
+            int size = response.getBody().getObject().getInt("resultsCount");
             if(size == 0) {
                 throw new JynxProException(ErrorCode.CANNOT_GET_POLYGON_PRICE);
             }

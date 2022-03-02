@@ -51,8 +51,7 @@ public class AssetService {
             final Proposal proposal,
             final AssetStatus status
     ) {
-        Asset asset = assetRepository.findById(proposal.getLinkedId())
-                .orElseThrow(() -> new JynxProException(ErrorCode.ASSET_NOT_FOUND));
+        Asset asset = get(proposal.getLinkedId());
         asset.setStatus(status);
         assetRepository.save(asset);
     }

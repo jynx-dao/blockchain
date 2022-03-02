@@ -949,8 +949,6 @@ public class OrderServiceTest extends IntegrationTest {
     @Test
     public void testTriggerStopLoss() throws InterruptedException {
         Market market = createOrderBook(5, 5, 100);
-//        orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45550), BigDecimal.valueOf(1),
-//                MarketSide.SELL, OrderType.STOP_MARKET, degenUser));
         orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45550), BigDecimal.valueOf(1),
                 MarketSide.SELL, OrderType.STOP_MARKET, degenUser));
         orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45490), BigDecimal.valueOf(10),

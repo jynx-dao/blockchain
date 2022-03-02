@@ -288,7 +288,7 @@ public class PositionService {
      *
      * @return true / false
      */
-    private boolean isDistressed(
+    public boolean isDistressed(
             final Position position,
             final BigDecimal markPrice
     ) {

@@ -77,7 +77,6 @@ public class EventService {
             final Event event
     ) {
         List<EventType> stakeEvents = List.of(EventType.ADD_STAKE, EventType.REMOVE_STAKE);
-        List<EventType> assetEvents = List.of(EventType.DEPOSIT_ASSET);
         if(stakeEvents.contains(event.getType())) {
             Stake stake = stakeService.getAndCreate(event.getUser());
             if(event.getType().equals(EventType.ADD_STAKE)) {
@@ -86,16 +85,13 @@ public class EventService {
                 stake.setAmount(stake.getAmount().subtract(event.getAmount()));
             }
             stakeRepository.save(stake);
-            event.setConfirmed(true);
-            return eventRepository.save(event);
-        } else if(assetEvents.contains(event.getType())) {
+        } else {
             Deposit deposit = depositRepository.findByEventId(event.getId())
                     .orElseThrow(() -> new JynxProException(ErrorCode.DEPOSIT_NOT_FOUND));
             accountService.credit(deposit);
-            event.setConfirmed(true);
-            return eventRepository.save(event);
         }
-        return event;
+        event.setConfirmed(true);
+        return eventRepository.save(event);
     }
 
     public List<Event> getUnconfirmed() {
