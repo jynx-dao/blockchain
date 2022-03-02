@@ -28,8 +28,6 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
-import static io.grpc.stub.ClientCalls.asyncUnaryCall;
-
 @Slf4j
 @Component
 public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBase {
@@ -410,9 +408,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         configService.setTimestamp(millis);
         String proposerAddress = req.getHeader().getProposerAddress().toStringUtf8();
         if(validatorAddress.equals(proposerAddress)) {
-            tendermintClient.confirmEthereumEvents();
-            tendermintClient.settleMarkets();
-            tendermintClient.syncProposals(new SyncProposalsRequest()); // TODO - add public key and signature
+            tendermintClient.confirmEthereumEvents(new EmptyRequest()); // TODO - add public key and signature
+            tendermintClient.settleMarkets(new EmptyRequest()); // TODO - add public key and signature
+            tendermintClient.syncProposals(new EmptyRequest()); // TODO - add public key and signature
             // TODO - propagate latest Ethereum events
             // TODO - risk management / liquidations?? [if we decide it's better to do it once per block...]
         }

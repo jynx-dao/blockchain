@@ -11,6 +11,7 @@ import com.jynx.pro.request.AddAssetRequest;
 import com.jynx.pro.request.AddMarketRequest;
 import com.jynx.pro.request.CreateOrderRequest;
 import com.jynx.pro.utils.PriceUtils;
+import com.jynx.pro.utils.SleepUtils;
 import com.jynx.pro.utils.UUIDUtils;
 import org.junit.jupiter.api.Assertions;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -66,6 +67,8 @@ public abstract class IntegrationTest {
     @Autowired
     protected PriceUtils priceUtils;
     @Autowired
+    protected SleepUtils sleepUtils;
+    @Autowired
     protected DepositRepository depositRepository;
     @Autowired
     protected TransactionRepository transactionRepository;
@@ -103,10 +106,10 @@ public abstract class IntegrationTest {
 
     protected Asset createAndEnactAsset(
             final boolean activate
-    ) throws InterruptedException {
+    ) {
         Asset asset = assetService.proposeToAdd(getAddAssetRequest(takerUser));
         Assertions.assertEquals(asset.getStatus(), AssetStatus.PENDING);
-        Thread.sleep(100L);
+        sleepUtils.sleep(100L);
         if(activate) {
             configService.setTimestamp(nowAsMillis());
         }
@@ -133,11 +136,11 @@ public abstract class IntegrationTest {
 
     protected Market createAndEnactMarket(
             final boolean activate
-    ) throws InterruptedException {
+    ) {
         Asset asset = createAndEnactAsset(true);
         Market market = marketService.proposeToAdd(getAddMarketRequest(asset));
         Assertions.assertEquals(market.getStatus(), MarketStatus.PENDING);
-        Thread.sleep(100L);
+        sleepUtils.sleep(100L);
         if(activate) {
             configService.setTimestamp(nowAsMillis());
         }
@@ -341,6 +344,7 @@ public abstract class IntegrationTest {
         degenUser = userRepository.save(degenUser);
         stakeRepository.save(new Stake().setId(uuidUtils.next()).setUser(makerUser).setAmount(BigDecimal.valueOf(500000000L)));
         stakeRepository.save(new Stake().setId(uuidUtils.next()).setUser(takerUser).setAmount(BigDecimal.valueOf(700000000L)));
+        createAndEnactAsset(true);
         databaseTransactionManager.commit();
     }
 }

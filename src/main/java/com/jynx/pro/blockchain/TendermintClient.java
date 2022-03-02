@@ -152,18 +152,24 @@ public class TendermintClient {
         }
     }
 
-    public void confirmEthereumEvents() {
-//        processTransaction(TendermintTransaction.CONFIRM_ETHEREUM_EVENTS, ErrorCode.CONFIRM_ETHEREUM_EVENTS_FAILED);
-    }
-
-    public void settleMarkets() {
-//        processTransaction(TendermintTransaction.SETTLE_MARKETS, ErrorCode.SETTLE_MARKETS_FAILED);
-    }
-
-    public Object syncProposals(
-            final SyncProposalsRequest request
+    public void confirmEthereumEvents(
+            final EmptyRequest request
     ) {
-        return processTransaction(request, Object.class,
+        processTransaction(request, Object.class,
+                TendermintTransaction.CONFIRM_ETHEREUM_EVENTS, ErrorCode.CONFIRM_ETHEREUM_EVENTS_FAILED);
+    }
+
+    public void settleMarkets(
+            final EmptyRequest request
+    ) {
+        processTransaction(request, Object.class,
+                TendermintTransaction.SETTLE_MARKETS, ErrorCode.SETTLE_MARKETS_FAILED);
+    }
+
+    public void syncProposals(
+            final EmptyRequest request
+    ) {
+        processTransaction(request, Object.class,
                 TendermintTransaction.SYNC_PROPOSALS, ErrorCode.SYNC_PROPOSALS_FAILED);
     }
 

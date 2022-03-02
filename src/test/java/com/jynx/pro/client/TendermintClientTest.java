@@ -2,19 +2,16 @@ package com.jynx.pro.client;
 
 import com.jynx.pro.Application;
 import com.jynx.pro.blockchain.TendermintClient;
-import com.jynx.pro.constant.AssetStatus;
-import com.jynx.pro.constant.AssetType;
-import com.jynx.pro.constant.MarketStatus;
-import com.jynx.pro.constant.OracleType;
+import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.Asset;
 import com.jynx.pro.entity.Market;
-import com.jynx.pro.entity.Stake;
-import com.jynx.pro.entity.User;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.manager.AppStateManager;
+import com.jynx.pro.model.OrderBook;
 import com.jynx.pro.request.AddAssetRequest;
 import com.jynx.pro.request.AddMarketRequest;
-import com.jynx.pro.request.SyncProposalsRequest;
+import com.jynx.pro.request.CreateOrderRequest;
+import com.jynx.pro.request.EmptyRequest;
 import com.jynx.pro.response.TransactionResponse;
 import com.jynx.pro.service.IntegrationTest;
 import com.jynx.pro.utils.SleepUtils;
@@ -35,7 +32,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.math.BigDecimal;
-import java.util.Optional;
 
 @Slf4j
 @Testcontainers
@@ -84,7 +80,7 @@ public class TendermintClientTest extends IntegrationTest {
     private Asset addAsset() {
         AddAssetRequest request = new AddAssetRequest()
                 .setAddress("0x0")
-                .setName("Test asset")
+                .setName("USDC")
                 .setDecimalPlaces(5)
                 .setType(AssetType.ERC20);
         long[] times = proposalTimes();
@@ -150,15 +146,29 @@ public class TendermintClientTest extends IntegrationTest {
 
     private void syncProposals() {
         sleepUtils.sleep(100L);
-        SyncProposalsRequest syncProposalsRequest = new SyncProposalsRequest();
-        syncProposalsRequest.setPublicKey("50505050505050505050505050505050");
-        tendermintClient.syncProposals(syncProposalsRequest);
+        EmptyRequest emptyRequest = new EmptyRequest();
+        emptyRequest.setPublicKey("50505050505050505050505050505050");
+        tendermintClient.syncProposals(emptyRequest);
         sleepUtils.sleep(100L);
     }
 
-    @Test
-    public void testAddMarket() {
-        Asset asset = addAsset();
+    private Asset getDai() {
+        ResponseEntity<Asset[]> responseEntity = this.restTemplate.getForEntity(
+                String.format("http://localhost:%s/asset/all", port), Asset[].class);
+        Asset[] assetArray = responseEntity.getBody();
+        Assertions.assertNotNull(assetArray);
+        Asset asset = null;
+        for (Asset value : assetArray) {
+            if (value.getName().equals("DAI")) {
+                asset = value;
+            }
+        }
+        return asset;
+    }
+
+    private Market addMarket() {
+        Asset asset = getDai();
+        Assertions.assertNotNull(asset);
         syncProposals();
         AddMarketRequest request = new AddMarketRequest()
                 .setName("Tesla Motors")
@@ -187,6 +197,47 @@ public class TendermintClientTest extends IntegrationTest {
         Assertions.assertNotNull(market);
         Assertions.assertEquals(market.getStatus(), MarketStatus.ACTIVE);
         Assertions.assertEquals(market.getId(), txResponse.getItem().getId());
+        return market;
+    }
+
+    @Test
+    public void testAddMarket() {
+        addMarket();
+    }
+
+    @Test
+    public void testCreateOrder() {
+        Market market = addMarket();
+        CreateOrderRequest buyRequest = new CreateOrderRequest()
+                .setTag(OrderTag.USER_GENERATED)
+                .setType(OrderType.LIMIT)
+                .setPostOnly(true)
+                .setQuantity(BigDecimal.ONE)
+                .setPrice(BigDecimal.ONE)
+                .setSide(MarketSide.BUY)
+                .setMarketId(market.getId());
+        CreateOrderRequest sellRequest = new CreateOrderRequest()
+                .setTag(OrderTag.USER_GENERATED)
+                .setType(OrderType.LIMIT)
+                .setPostOnly(true)
+                .setQuantity(BigDecimal.ONE)
+                .setPrice(BigDecimal.valueOf(1.1))
+                .setSide(MarketSide.SELL)
+                .setMarketId(market.getId());
+        buyRequest.setPublicKey(makerUser.getPublicKey());
+        sellRequest.setPublicKey(makerUser.getPublicKey());
+        tendermintClient.createOrder(buyRequest);
+        tendermintClient.createOrder(sellRequest);
+        ResponseEntity<OrderBook> responseEntity = this.restTemplate.getForEntity(
+                String.format("http://localhost:%s/market/%s/order-book", port, market.getId().toString()), OrderBook.class);
+        OrderBook orderBook = responseEntity.getBody();
+        Assertions.assertNotNull(orderBook);
+        Assertions.assertTrue(orderBook.getAsks().size() > 0);
+        Assertions.assertTrue(orderBook.getBids().size() > 0);
+        Assertions.assertEquals(orderBook.getAsks().get(0).getPrice().doubleValue(),
+                BigDecimal.valueOf(1.1).doubleValue(), 0.0001d);
+        Assertions.assertEquals(orderBook.getBids().get(0).getPrice().doubleValue(),
+                BigDecimal.valueOf(1).doubleValue(), 0.0001d);
     }
 
     private void waitForBlockchain() {

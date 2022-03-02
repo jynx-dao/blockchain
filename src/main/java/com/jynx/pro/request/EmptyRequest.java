@@ -7,5 +7,5 @@ import lombok.experimental.Accessors;
 @EqualsAndHashCode(callSuper = true)
 @Data
 @Accessors(chain = true)
-public class SyncProposalsRequest extends SignedRequest {
+public class EmptyRequest extends SignedRequest {
 }
