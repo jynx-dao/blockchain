@@ -12,6 +12,8 @@ import com.jynx.pro.model.OrderBook;
 import com.jynx.pro.request.*;
 import com.jynx.pro.response.TransactionResponse;
 import com.jynx.pro.service.IntegrationTest;
+import com.jynx.pro.utils.CryptoUtils;
+import com.jynx.pro.utils.JSONUtils;
 import com.jynx.pro.utils.SleepUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -46,6 +48,10 @@ public class TendermintClientTest extends IntegrationTest {
     private TestRestTemplate restTemplate;
     @Autowired
     private SleepUtils sleepUtils;
+    @Autowired
+    private CryptoUtils cryptoUtils;
+    @Autowired
+    private JSONUtils jsonUtils;
     @LocalServerPort
     private int port;
 
@@ -85,7 +91,10 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        String message = jsonUtils.toJson(request);
+        String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
+        request.setSignature(sig);
         TransactionResponse<Asset> txResponse = tendermintClient.addAsset(request);
         Assertions.assertEquals(txResponse.getItem().getStatus(), AssetStatus.PENDING);
         ResponseEntity<Asset[]> responseEntity = this.restTemplate.getForEntity(
@@ -112,7 +121,10 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        String message = jsonUtils.toJson(request);
+        String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
+        request.setSignature(sig);
         tendermintClient.suspendAsset(request);
         syncProposals();
         ResponseEntity<Asset> responseEntity = this.restTemplate.getForEntity(
@@ -139,7 +151,10 @@ public class TendermintClientTest extends IntegrationTest {
         long[] times = proposalTimes();
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        String message = jsonUtils.toJson(request);
+        String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
+        request.setSignature(sig);
         try {
             tendermintClient.addAsset(request);
             Assertions.fail();
@@ -159,7 +174,10 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        String message = jsonUtils.toJson(request);
+        String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
+        request.setSignature(sig);
         try {
             tendermintClient.addAsset(request);
             Assertions.fail();
@@ -210,7 +228,10 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        String message = jsonUtils.toJson(request);
+        String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
+        request.setSignature(sig);
         TransactionResponse<Market> txResponse = tendermintClient.addMarket(request);
         syncProposals();
         Assertions.assertEquals(txResponse.getItem().getStatus(), MarketStatus.PENDING);
@@ -238,7 +259,10 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        String message = jsonUtils.toJson(request);
+        String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
+        request.setSignature(sig);
         tendermintClient.suspendMarket(request);
         syncProposals();
         ResponseEntity<Market> responseEntity = this.restTemplate.getForEntity(
@@ -274,8 +298,14 @@ public class TendermintClientTest extends IntegrationTest {
                 .setPrice(BigDecimal.valueOf(1.1))
                 .setSide(MarketSide.SELL)
                 .setMarketId(market.getId());
-        buyRequest.setPublicKey(makerUser.getPublicKey());
-        sellRequest.setPublicKey(makerUser.getPublicKey());
+        String message = jsonUtils.toJson(buyRequest);
+        String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
+        buyRequest.setPublicKey(takerUser.getPublicKey());
+        buyRequest.setSignature(sig);
+        message = jsonUtils.toJson(sellRequest);
+        sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
+        sellRequest.setPublicKey(takerUser.getPublicKey());
+        sellRequest.setSignature(sig);
         tendermintClient.createOrder(buyRequest);
         tendermintClient.createOrder(sellRequest);
         ResponseEntity<OrderBook> responseEntity = this.restTemplate.getForEntity(
@@ -301,7 +331,10 @@ public class TendermintClientTest extends IntegrationTest {
                 .setPrice(BigDecimal.valueOf(1.1))
                 .setSide(MarketSide.SELL)
                 .setMarketId(market.getId());
-        request.setPublicKey(makerUser.getPublicKey());
+        String message = jsonUtils.toJson(request);
+        String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
+        request.setPublicKey(takerUser.getPublicKey());
+        request.setSignature(sig);
         TransactionResponse<Order> newOrder = tendermintClient.createOrder(request);
         ResponseEntity<OrderBook> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/market/%s/order-book", port, market.getId().toString()), OrderBook.class);
@@ -313,7 +346,10 @@ public class TendermintClientTest extends IntegrationTest {
                 BigDecimal.valueOf(1.1).doubleValue(), 0.0001d);
         CancelOrderRequest cancelOrderRequest = new CancelOrderRequest()
                 .setId(newOrder.getItem().getId());
-        cancelOrderRequest.setPublicKey(makerUser.getPublicKey());
+        message = jsonUtils.toJson(cancelOrderRequest);
+        sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
+        cancelOrderRequest.setPublicKey(takerUser.getPublicKey());
+        cancelOrderRequest.setSignature(sig);
         tendermintClient.cancelOrder(cancelOrderRequest);
         responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/market/%s/order-book", port, market.getId().toString()), OrderBook.class);
@@ -334,7 +370,10 @@ public class TendermintClientTest extends IntegrationTest {
                 .setPrice(BigDecimal.valueOf(1.1))
                 .setSide(MarketSide.SELL)
                 .setMarketId(market.getId());
-        request.setPublicKey(makerUser.getPublicKey());
+        String message = jsonUtils.toJson(request);
+        String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
+        request.setPublicKey(takerUser.getPublicKey());
+        request.setSignature(sig);
         TransactionResponse<Order> newOrder = tendermintClient.createOrder(request);
         ResponseEntity<OrderBook> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/market/%s/order-book", port, market.getId().toString()), OrderBook.class);
@@ -347,7 +386,10 @@ public class TendermintClientTest extends IntegrationTest {
         AmendOrderRequest amendOrderRequest = new AmendOrderRequest()
                 .setId(newOrder.getItem().getId())
                 .setPrice(BigDecimal.valueOf(1.2));
-        amendOrderRequest.setPublicKey(makerUser.getPublicKey());
+        message = jsonUtils.toJson(amendOrderRequest);
+        sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
+        amendOrderRequest.setPublicKey(takerUser.getPublicKey());
+        amendOrderRequest.setSignature(sig);
         tendermintClient.amendOrder(amendOrderRequest);
         responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/market/%s/order-book", port, market.getId().toString()), OrderBook.class);

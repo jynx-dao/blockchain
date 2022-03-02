@@ -28,6 +28,9 @@ import java.util.UUID;
 
 public abstract class IntegrationTest {
 
+    protected static final String PRIVATE_KEY = "1498b5467a63dffa2dc9d9e069caf075d16fc33fdd4c3b01bfadae6433767d93";
+    protected static final String PUBLIC_KEY = "b7a3c12dc0c8c748ab07525b701122b88bd78f600c76342d27f25e5f92444cde";
+
     @Autowired
     protected UUIDUtils uuidUtils;
     @Autowired
@@ -88,9 +91,9 @@ public abstract class IntegrationTest {
     protected OrderService orderService;
 
     protected static final String ETH_ADDRESS = "0xd7E1236C08731C3632519DCd1A581bFe6876a3B2";
-    protected static final String PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
+    protected static final String ETH_PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
     private static final String GANACHE_CMD = String
-            .format("ganache-cli --gasLimit 100000000 --account=\"%s,1000000000000000000000\"", PRIVATE_KEY);
+            .format("ganache-cli --gasLimit 100000000 --account=\"%s,1000000000000000000000\"", ETH_PRIVATE_KEY);
     @Container
     public static GenericContainer ganache = new GenericContainer(DockerImageName.parse("trufflesuite/ganache-cli:latest"))
             .withExposedPorts(8545)
@@ -309,7 +312,7 @@ public abstract class IntegrationTest {
     ) {
         databaseTransactionManager.createTransaction();
         if(!setupComplete) {
-            ethereumHelper.deploy(ganache.getHost(), ganache.getFirstMappedPort(), PRIVATE_KEY);
+            ethereumHelper.deploy(ganache.getHost(), ganache.getFirstMappedPort(), ETH_PRIVATE_KEY);
             ethereumService.setRpcHost(ganache.getHost());
             ethereumService.setRpcPort(ganache.getFirstMappedPort());
             Config config = new Config()
@@ -331,7 +334,7 @@ public abstract class IntegrationTest {
         }
         takerUser = new User()
                 .setId(uuidUtils.next())
-                .setPublicKey("11111111111111111111111111111111")
+                .setPublicKey(PUBLIC_KEY)
                 .setUsername("test-user1");
         takerUser = userRepository.save(takerUser);
         makerUser = new User()

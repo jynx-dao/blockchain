@@ -10,6 +10,7 @@ import com.jynx.pro.manager.DatabaseTransactionManager;
 import com.jynx.pro.model.CheckTxResult;
 import com.jynx.pro.request.*;
 import com.jynx.pro.service.*;
+import com.jynx.pro.utils.CryptoUtils;
 import com.jynx.pro.utils.JSONUtils;
 import io.grpc.stub.StreamObserver;
 import lombok.extern.slf4j.Slf4j;
@@ -56,6 +57,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private DatabaseTransactionManager databaseTransactionManager;
     @Autowired
     private JSONUtils jsonUtils;
+    @Autowired
+    private CryptoUtils cryptoUtils;
     @Value("${validator.address}")
     private String validatorAddress;
 
@@ -217,28 +220,28 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private Object castVote(
             final String txAsJson
     ) {
-//        verifySignature(txAsJson, request); // TODO - verify validator
+//        verifySignature(request); // TODO - verify validator
         return proposalService.vote(jsonUtils.fromJson(txAsJson, CastVoteRequest.class));
     }
 
     private Object confirmEthereumEvents(
             final String txAsJson
     ) {
-//        verifySignature(txAsJson, request); // TODO - verify validator
+//        verifySignature(request); // TODO - verify validator
         return ethereumService.confirmEvents();
     }
 
     private Object syncProposals(
             final String txAsJson
     ) {
-//        verifySignature(txAsJson, request); // TODO - verify validator
+//        verifySignature(request); // TODO - verify validator
         return proposalService.sync();
     }
 
     private Object settleMarkets(
             final String txAsJson
     ) {
-//        verifySignature(txAsJson, request); // TODO - verify validator
+//        verifySignature(request); // TODO - verify validator
         return marketService.settleMarkets();
     }
 
@@ -246,7 +249,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         CreateWithdrawalRequest request = jsonUtils.fromJson(txAsJson, CreateWithdrawalRequest.class);
-        verifySignature(txAsJson, request);
+        verifySignature(request);
         return accountService.createWithdrawal(request);
     }
 
@@ -254,7 +257,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
-        verifySignature(txAsJson, request);
+        verifySignature(request);
         return accountService.cancelWithdrawal(request);
     }
 
@@ -262,7 +265,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         AddMarketRequest request = jsonUtils.fromJson(txAsJson, AddMarketRequest.class);
-        verifySignature(txAsJson, request);
+        verifySignature(request);
         return marketService.proposeToAdd(request);
     }
 
@@ -270,7 +273,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         AmendMarketRequest request = jsonUtils.fromJson(txAsJson, AmendMarketRequest.class);
-        verifySignature(txAsJson, request);
+        verifySignature(request);
         return marketService.proposeToAmend(request);
     }
 
@@ -278,7 +281,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
-        verifySignature(txAsJson, request);
+        verifySignature(request);
         return marketService.proposeToSuspend(request);
     }
 
@@ -286,7 +289,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
-        verifySignature(txAsJson, request);
+        verifySignature(request);
         return marketService.proposeToUnsuspend(request);
     }
 
@@ -294,7 +297,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         AddAssetRequest request = jsonUtils.fromJson(txAsJson, AddAssetRequest.class);
-        verifySignature(txAsJson, request);
+        verifySignature(request);
         return assetService.proposeToAdd(request);
     }
 
@@ -302,7 +305,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
-        verifySignature(txAsJson, request);
+        verifySignature(request);
         return assetService.proposeToSuspend(request);
     }
 
@@ -310,7 +313,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
-        verifySignature(txAsJson, request);
+        verifySignature(request);
         return assetService.proposeToUnsuspend(request);
     }
 
@@ -318,7 +321,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         CreateOrderRequest request = jsonUtils.fromJson(txAsJson, CreateOrderRequest.class);
-        verifySignature(txAsJson, request);
+        verifySignature(request);
         return orderService.create(request);
     }
 
@@ -326,7 +329,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         CancelOrderRequest request = jsonUtils.fromJson(txAsJson, CancelOrderRequest.class);
-        verifySignature(txAsJson, request);
+        verifySignature(request);
         return orderService.cancel(request);
     }
 
@@ -334,17 +337,26 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         AmendOrderRequest request = jsonUtils.fromJson(txAsJson, AmendOrderRequest.class);
-        verifySignature(txAsJson, request);
+        verifySignature(request);
         return orderService.amend(request);
     }
 
     private void verifySignature(
-            final String txAsJson,
             final SignedRequest request
     ) {
-        // TODO - verify the signature
-        User user = userService.getAndCreate(request.getPublicKey());
+        String signature = request.getSignature();
+        String publicKey = request.getPublicKey();
+        request.setSignature(null);
+        request.setPublicKey(null);
+        String message = jsonUtils.toJson(request);
+        boolean result = cryptoUtils.verify(signature, message, publicKey);
+        if(!result) {
+            throw new JynxProException(ErrorCode.SIGNATURE_INVALID);
+        }
+        User user = userService.getAndCreate(publicKey);
         request.setUser(user);
+        request.setSignature(signature);
+        request.setPublicKey(publicKey);
     }
 
     private Object deliverTransaction(
@@ -352,7 +364,6 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final TendermintTransaction tendermintTx
     ) {
         String txAsJson = new String(Base64.getDecoder().decode(tx.getBytes(StandardCharsets.UTF_8)));
-        // TODO - extract signature / public key
         try {
             Object result = deliverTransactions.get(tendermintTx).apply(txAsJson);
             appStateManager.update(result.hashCode());

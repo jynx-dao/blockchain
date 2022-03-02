@@ -79,4 +79,5 @@ public class ErrorCode {
     public static final String SYNC_PROPOSALS_FAILED = "Failed to sync proposals.";
     public static final String CAST_VOTE_FAILED = "Failed to cast vote.";
     public static final String UNKNOWN_ERROR = "An unknown error occurred.";
+    public static final String SIGNATURE_INVALID = "The signature is invalid.";
 }
