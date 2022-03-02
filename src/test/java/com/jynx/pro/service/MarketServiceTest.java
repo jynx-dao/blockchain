@@ -463,8 +463,8 @@ public class MarketServiceTest extends IntegrationTest {
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.ONE, MarketSide.BUY, OrderType.MARKET, takerUser));
         marketService.settleMarkets();
+        market = marketRepository.findById(market.getId()).orElse(new Market());
         BigDecimal makerFee = BigDecimal.valueOf(45610).multiply(market.getMakerFee());
-        BigDecimal takerFee = BigDecimal.valueOf(45610).multiply(market.getTakerFee());
         List<Position> positions = positionRepository.findByMarket(market);
         List<Account> accounts = accountRepository.findByAsset(market.getSettlementAsset());
         List<Transaction> makerTxns = transactionRepository.findByUserAndAsset(makerUser, market.getSettlementAsset());
@@ -488,8 +488,7 @@ public class MarketServiceTest extends IntegrationTest {
         Assertions.assertTrue(makerSettlement.isPresent());
         Assertions.assertTrue(takerSettlement.isPresent());
         BigDecimal makerRealisedProfit = makerFee.add(makerSettlement.get().getAmount());
-        BigDecimal takerRealisedProfit = (takerFee.add(takerSettlement.get().getAmount().abs()))
-                .multiply(BigDecimal.valueOf(-1));
+        BigDecimal takerRealisedProfit = makerRealisedProfit.multiply(BigDecimal.valueOf(-1));
         Assertions.assertEquals(makerPosition.get().getRealisedPnl(), makerRealisedProfit);
         Assertions.assertEquals(takerPosition.get().getRealisedPnl(), takerRealisedProfit);
         Assertions.assertEquals(makerAccount.get().getBalance(), BigDecimal.valueOf(INITIAL_BALANCE).add(makerRealisedProfit));
