@@ -5,13 +5,11 @@ import com.jynx.pro.blockchain.TendermintClient;
 import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.Asset;
 import com.jynx.pro.entity.Market;
+import com.jynx.pro.entity.Order;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.manager.AppStateManager;
 import com.jynx.pro.model.OrderBook;
-import com.jynx.pro.request.AddAssetRequest;
-import com.jynx.pro.request.AddMarketRequest;
-import com.jynx.pro.request.CreateOrderRequest;
-import com.jynx.pro.request.EmptyRequest;
+import com.jynx.pro.request.*;
 import com.jynx.pro.response.TransactionResponse;
 import com.jynx.pro.service.IntegrationTest;
 import com.jynx.pro.utils.SleepUtils;
@@ -238,6 +236,39 @@ public class TendermintClientTest extends IntegrationTest {
                 BigDecimal.valueOf(1.1).doubleValue(), 0.0001d);
         Assertions.assertEquals(orderBook.getBids().get(0).getPrice().doubleValue(),
                 BigDecimal.valueOf(1).doubleValue(), 0.0001d);
+    }
+
+    @Test
+    public void testCancelOrder() {
+        Market market = addMarket();
+        CreateOrderRequest request = new CreateOrderRequest()
+                .setTag(OrderTag.USER_GENERATED)
+                .setType(OrderType.LIMIT)
+                .setPostOnly(true)
+                .setQuantity(BigDecimal.ONE)
+                .setPrice(BigDecimal.valueOf(1.1))
+                .setSide(MarketSide.SELL)
+                .setMarketId(market.getId());
+        request.setPublicKey(makerUser.getPublicKey());
+        TransactionResponse<Order> newOrder = tendermintClient.createOrder(request);
+        ResponseEntity<OrderBook> responseEntity = this.restTemplate.getForEntity(
+                String.format("http://localhost:%s/market/%s/order-book", port, market.getId().toString()), OrderBook.class);
+        OrderBook orderBook = responseEntity.getBody();
+        Assertions.assertNotNull(orderBook);
+        Assertions.assertTrue(orderBook.getAsks().size() > 0);
+        Assertions.assertEquals(0, orderBook.getBids().size());
+        Assertions.assertEquals(orderBook.getAsks().get(0).getPrice().doubleValue(),
+                BigDecimal.valueOf(1.1).doubleValue(), 0.0001d);
+        CancelOrderRequest cancelOrderRequest = new CancelOrderRequest()
+                .setId(newOrder.getItem().getId());
+        cancelOrderRequest.setPublicKey(makerUser.getPublicKey());
+        tendermintClient.cancelOrder(cancelOrderRequest);
+        responseEntity = this.restTemplate.getForEntity(
+                String.format("http://localhost:%s/market/%s/order-book", port, market.getId().toString()), OrderBook.class);
+        orderBook = responseEntity.getBody();
+        Assertions.assertNotNull(orderBook);
+        Assertions.assertEquals(0, orderBook.getAsks().size());
+        Assertions.assertEquals(0, orderBook.getBids().size());
     }
 
     private void waitForBlockchain() {
