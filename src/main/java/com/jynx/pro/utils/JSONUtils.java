@@ -13,6 +13,7 @@ public class JSONUtils {
 
     public JSONUtils(ObjectMapper objectMapper) {
         objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
+        objectMapper.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
         this.objectMapper = objectMapper;
     }
 
