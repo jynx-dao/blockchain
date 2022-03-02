@@ -65,6 +65,24 @@ public class AccountRepository extends EntityRepository<Account> {
     }
 
     /**
+     * Find {@link Account}s by {@link Asset}
+     *
+     * @param asset {@link Asset}
+     *
+     * @return {@link List<Account>}
+     */
+    public List<Account> findByAsset(
+            final Asset asset
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Account> query = cb.createQuery(getType());
+        Root<Account> rootType = query.from(getType());
+        Path<UUID> assetId = rootType.join("asset").get("id");
+        query = query.select(rootType).where(cb.equal(assetId, asset.getId()));
+        return getEntityManager().createQuery(query).getResultList();
+    }
+
+    /**
      * Returns the entity type
      *
      * @return {@link Class<Account>}

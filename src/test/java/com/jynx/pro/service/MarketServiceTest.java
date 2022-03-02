@@ -1,12 +1,8 @@
 package com.jynx.pro.service;
 
 import com.jynx.pro.Application;
-import com.jynx.pro.constant.AssetStatus;
-import com.jynx.pro.constant.MarketStatus;
-import com.jynx.pro.constant.OracleType;
-import com.jynx.pro.entity.Asset;
-import com.jynx.pro.entity.Market;
-import com.jynx.pro.entity.Oracle;
+import com.jynx.pro.constant.*;
+import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.AddMarketRequest;
@@ -24,7 +20,10 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -457,7 +456,79 @@ public class MarketServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testMarketSettlement() {
-        // TODO - test settling of a market
+    public void testMarketSettlement() throws InterruptedException {
+        Market market = createOrderBook(10, 10, 1);
+        market.setLastSettlement(LocalDateTime.now().toEpochSecond(ZoneOffset.UTC) - 86400);
+        market = marketRepository.save(market);
+        orderService.create(getCreateOrderRequest(market.getId(),
+                null, BigDecimal.ONE, MarketSide.BUY, OrderType.MARKET, takerUser));
+        marketService.settleMarkets();
+        BigDecimal makerFee = BigDecimal.valueOf(45610).multiply(market.getMakerFee());
+        BigDecimal takerFee = BigDecimal.valueOf(45610).multiply(market.getTakerFee());
+        List<Position> positions = positionRepository.findByMarket(market);
+        List<Account> accounts = accountRepository.findByAsset(market.getSettlementAsset());
+        List<Transaction> makerTxns = transactionRepository.findByUserAndAsset(makerUser, market.getSettlementAsset());
+        List<Transaction> takerTxns = transactionRepository.findByUserAndAsset(makerUser, market.getSettlementAsset());
+        Optional<Transaction> makerSettlement = makerTxns.stream()
+                .filter(t -> t.getType().equals(TransactionType.SETTLEMENT)).findFirst();
+        Optional<Transaction> takerSettlement = takerTxns.stream()
+                .filter(t -> t.getType().equals(TransactionType.SETTLEMENT)).findFirst();
+        Optional<Position> makerPosition = positions.stream()
+                .filter(p -> p.getUser().getId().equals(makerUser.getId())).findFirst();
+        Optional<Position> takerPosition = positions.stream()
+                .filter(p -> p.getUser().getId().equals(takerUser.getId())).findFirst();
+        Optional<Account> makerAccount = accounts.stream()
+                .filter(a -> a.getUser().getId().equals(makerUser.getId())).findFirst();
+        Optional<Account> takerAccount = accounts.stream()
+                .filter(a -> a.getUser().getId().equals(takerUser.getId())).findFirst();
+        Assertions.assertTrue(makerPosition.isPresent());
+        Assertions.assertTrue(takerPosition.isPresent());
+        Assertions.assertTrue(makerAccount.isPresent());
+        Assertions.assertTrue(takerAccount.isPresent());
+        Assertions.assertTrue(makerSettlement.isPresent());
+        Assertions.assertTrue(takerSettlement.isPresent());
+        BigDecimal makerRealisedProfit = makerFee.add(makerSettlement.get().getAmount());
+        BigDecimal takerRealisedProfit = (takerFee.add(takerSettlement.get().getAmount().abs()))
+                .multiply(BigDecimal.valueOf(-1));
+        Assertions.assertEquals(makerPosition.get().getRealisedPnl(), makerRealisedProfit);
+        Assertions.assertEquals(takerPosition.get().getRealisedPnl(), takerRealisedProfit);
+        Assertions.assertEquals(makerAccount.get().getBalance(), BigDecimal.valueOf(INITIAL_BALANCE).add(makerRealisedProfit));
+        Assertions.assertEquals(takerAccount.get().getBalance(), BigDecimal.valueOf(INITIAL_BALANCE).add(takerRealisedProfit));
+    }
+
+    @Test
+    public void testMarketSettlementSkip() throws InterruptedException {
+        Market market = createOrderBook(10, 10, 1);
+        orderService.create(getCreateOrderRequest(market.getId(),
+                null, BigDecimal.ONE, MarketSide.BUY, OrderType.MARKET, takerUser));
+        marketService.settleMarkets();
+        BigDecimal makerFee = BigDecimal.valueOf(45610).multiply(market.getMakerFee());
+        BigDecimal takerFee = BigDecimal.valueOf(45610).multiply(market.getTakerFee());
+        List<Position> positions = positionRepository.findByMarket(market);
+        List<Account> accounts = accountRepository.findByAsset(market.getSettlementAsset());
+        List<Transaction> makerTxns = transactionRepository.findByUserAndAsset(makerUser, market.getSettlementAsset());
+        List<Transaction> takerTxns = transactionRepository.findByUserAndAsset(makerUser, market.getSettlementAsset());
+        Optional<Transaction> makerSettlement = makerTxns.stream()
+                .filter(t -> t.getType().equals(TransactionType.SETTLEMENT)).findFirst();
+        Optional<Transaction> takerSettlement = takerTxns.stream()
+                .filter(t -> t.getType().equals(TransactionType.SETTLEMENT)).findFirst();
+        Optional<Position> makerPosition = positions.stream()
+                .filter(p -> p.getUser().getId().equals(makerUser.getId())).findFirst();
+        Optional<Position> takerPosition = positions.stream()
+                .filter(p -> p.getUser().getId().equals(takerUser.getId())).findFirst();
+        Optional<Account> makerAccount = accounts.stream()
+                .filter(a -> a.getUser().getId().equals(makerUser.getId())).findFirst();
+        Optional<Account> takerAccount = accounts.stream()
+                .filter(a -> a.getUser().getId().equals(takerUser.getId())).findFirst();
+        Assertions.assertTrue(makerPosition.isPresent());
+        Assertions.assertTrue(takerPosition.isPresent());
+        Assertions.assertTrue(makerAccount.isPresent());
+        Assertions.assertTrue(takerAccount.isPresent());
+        Assertions.assertFalse(makerSettlement.isPresent());
+        Assertions.assertFalse(takerSettlement.isPresent());
+        Assertions.assertEquals(makerPosition.get().getRealisedPnl(), makerFee);
+        Assertions.assertEquals(takerPosition.get().getRealisedPnl(), takerFee.multiply(BigDecimal.valueOf(-1)));
+        Assertions.assertEquals(makerAccount.get().getBalance(), BigDecimal.valueOf(INITIAL_BALANCE).add(makerFee));
+        Assertions.assertEquals(takerAccount.get().getBalance(), BigDecimal.valueOf(INITIAL_BALANCE).subtract(takerFee));
     }
 }

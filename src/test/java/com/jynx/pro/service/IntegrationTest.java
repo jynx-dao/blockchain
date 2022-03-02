@@ -1,15 +1,15 @@
 package com.jynx.pro.service;
 
-import com.jynx.pro.constant.AssetStatus;
-import com.jynx.pro.constant.AssetType;
-import com.jynx.pro.constant.MarketStatus;
-import com.jynx.pro.constant.OracleType;
+import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.helper.EthereumHelper;
 import com.jynx.pro.manager.DatabaseTransactionManager;
+import com.jynx.pro.model.OrderBook;
+import com.jynx.pro.model.OrderBookItem;
 import com.jynx.pro.repository.*;
 import com.jynx.pro.request.AddAssetRequest;
 import com.jynx.pro.request.AddMarketRequest;
+import com.jynx.pro.request.CreateOrderRequest;
 import com.jynx.pro.utils.PriceUtils;
 import com.jynx.pro.utils.UUIDUtils;
 import org.junit.jupiter.api.Assertions;
@@ -19,8 +19,11 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.Optional;
+import java.util.UUID;
 
 public abstract class IntegrationTest {
 
@@ -78,6 +81,8 @@ public abstract class IntegrationTest {
     protected AccountService accountService;
     @Autowired
     protected DatabaseTransactionManager databaseTransactionManager;
+    @Autowired
+    protected OrderService orderService;
 
     protected static final String ETH_ADDRESS = "0xd7E1236C08731C3632519DCd1A581bFe6876a3B2";
     protected static final String PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
@@ -145,6 +150,25 @@ public abstract class IntegrationTest {
         return market;
     }
 
+    protected CreateOrderRequest getCreateOrderRequest(
+            final UUID marketId,
+            final BigDecimal price,
+            final BigDecimal quantity,
+            final MarketSide side,
+            final OrderType type,
+            final User user
+    ) {
+        CreateOrderRequest request = new CreateOrderRequest();
+        request.setPrice(price);
+        request.setSide(side);
+        request.setQuantity(quantity);
+        request.setUser(user);
+        request.setMarketId(marketId);
+        request.setType(type);
+        request.setTag(OrderTag.USER_GENERATED);
+        return request;
+    }
+
     protected AddAssetRequest getAddAssetRequest(
             final User user
     ) {
@@ -159,6 +183,65 @@ public abstract class IntegrationTest {
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
         return request;
+    }
+
+    protected Market createOrderBook(
+            final int bids,
+            final int asks
+    ) throws InterruptedException {
+        return createOrderBook(bids, asks, 1);
+    }
+
+    protected Market createOrderBook(
+            final int bids,
+            final int asks,
+            final int stepSize
+    ) throws InterruptedException {
+        Market market = createAndEnactMarket(true);
+        int dps = market.getSettlementAsset().getDecimalPlaces();
+        for(int i=0; i<bids; i++) {
+            Order buyOrder = orderService.create(getCreateOrderRequest(market.getId(),
+                    BigDecimal.valueOf(45590-((long) i * stepSize)), BigDecimal.ONE, MarketSide.BUY, OrderType.LIMIT, makerUser));
+            Assertions.assertEquals(buyOrder.getStatus(), OrderStatus.OPEN);
+        }
+        for(int i=0; i<asks; i++) {
+            Order sellOrder = orderService.create(getCreateOrderRequest(market.getId(),
+                    BigDecimal.valueOf(45610+((long) i * stepSize)), BigDecimal.ONE, MarketSide.SELL, OrderType.LIMIT, makerUser));
+            Assertions.assertEquals(sellOrder.getStatus(), OrderStatus.OPEN);
+        }
+        OrderBook orderBook = orderService.getOrderBook(market);
+        Assertions.assertEquals(orderBook.getAsks().size(), asks);
+        Assertions.assertEquals(orderBook.getBids().size(), bids);
+        BigDecimal marginBalance = BigDecimal.ZERO;
+        for(int i=0; i<bids; i++) {
+            OrderBookItem item = orderBook.getBids().get(i);
+            Assertions.assertEquals(item.getPrice().setScale(dps, RoundingMode.HALF_UP),
+                    BigDecimal.valueOf(45590-((long) i * stepSize)).setScale(dps, RoundingMode.HALF_UP));
+            marginBalance = marginBalance.add(item.getPrice().multiply(item.getQuantity())
+                    .multiply(market.getMarginRequirement()));
+        }
+        for(int i=0; i<asks; i++) {
+            if(i == 0) {
+                marginBalance = BigDecimal.ZERO;
+            }
+            OrderBookItem item = orderBook.getAsks().get(i);
+            Assertions.assertEquals(item.getPrice().setScale(dps, RoundingMode.HALF_UP),
+                    BigDecimal.valueOf(45610+((long) i * stepSize)).setScale(dps, RoundingMode.HALF_UP));
+            marginBalance = marginBalance.add(item.getPrice().multiply(item.getQuantity())
+                    .multiply(market.getMarginRequirement()));
+        }
+        BigDecimal startingBalance = BigDecimal.valueOf(INITIAL_BALANCE);
+        BigDecimal availableBalance = startingBalance.subtract(marginBalance);
+        Optional<Account> accountOptional = accountRepository
+                .findByUserAndAsset(makerUser, market.getSettlementAsset());
+        Assertions.assertTrue(accountOptional.isPresent());
+        Assertions.assertEquals(accountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
+                marginBalance.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(accountOptional.get().getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
+                availableBalance.setScale(dps, RoundingMode.HALF_UP));
+        Assertions.assertEquals(accountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
+                startingBalance.setScale(dps, RoundingMode.HALF_UP));
+        return market;
     }
 
     protected AddMarketRequest getAddMarketRequest(
@@ -179,7 +262,7 @@ public abstract class IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
-        request.setOracleKey("BTC-USDT");
+        request.setOracleKey("BTCUSDT");
         request.setOracleType(OracleType.BINANCE);
         return request;
     }

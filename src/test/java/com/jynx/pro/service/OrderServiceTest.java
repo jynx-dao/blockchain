@@ -31,9 +31,6 @@ import java.util.stream.Collectors;
 @SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
 public class OrderServiceTest extends IntegrationTest {
 
-    @Autowired
-    private OrderService orderService;
-
     @BeforeEach
     public void setup() {
         initializeState();
@@ -54,84 +51,6 @@ public class OrderServiceTest extends IntegrationTest {
     @AfterAll
     public static void shutdownAll() {
         ganache.stop();
-    }
-
-    private CreateOrderRequest getCreateOrderRequest(
-            final UUID marketId,
-            final BigDecimal price,
-            final BigDecimal quantity,
-            final MarketSide side,
-            final OrderType type,
-            final User user
-    ) {
-        CreateOrderRequest request = new CreateOrderRequest();
-        request.setPrice(price);
-        request.setSide(side);
-        request.setQuantity(quantity);
-        request.setUser(user);
-        request.setMarketId(marketId);
-        request.setType(type);
-        request.setTag(OrderTag.USER_GENERATED);
-        return request;
-    }
-
-    private Market createOrderBook(
-            final int bids,
-            final int asks,
-            final int stepSize
-    ) throws InterruptedException {
-        Market market = createAndEnactMarket(true);
-        int dps = market.getSettlementAsset().getDecimalPlaces();
-        for(int i=0; i<bids; i++) {
-            Order buyOrder = orderService.create(getCreateOrderRequest(market.getId(),
-                    BigDecimal.valueOf(45590-((long) i * stepSize)), BigDecimal.ONE, MarketSide.BUY, OrderType.LIMIT, makerUser));
-            Assertions.assertEquals(buyOrder.getStatus(), OrderStatus.OPEN);
-        }
-        for(int i=0; i<asks; i++) {
-            Order sellOrder = orderService.create(getCreateOrderRequest(market.getId(),
-                    BigDecimal.valueOf(45610+((long) i * stepSize)), BigDecimal.ONE, MarketSide.SELL, OrderType.LIMIT, makerUser));
-            Assertions.assertEquals(sellOrder.getStatus(), OrderStatus.OPEN);
-        }
-        OrderBook orderBook = orderService.getOrderBook(market);
-        Assertions.assertEquals(orderBook.getAsks().size(), asks);
-        Assertions.assertEquals(orderBook.getBids().size(), bids);
-        BigDecimal marginBalance = BigDecimal.ZERO;
-        for(int i=0; i<bids; i++) {
-            OrderBookItem item = orderBook.getBids().get(i);
-            Assertions.assertEquals(item.getPrice().setScale(dps, RoundingMode.HALF_UP),
-                    BigDecimal.valueOf(45590-((long) i * stepSize)).setScale(dps, RoundingMode.HALF_UP));
-            marginBalance = marginBalance.add(item.getPrice().multiply(item.getQuantity())
-                    .multiply(market.getMarginRequirement()));
-        }
-        for(int i=0; i<asks; i++) {
-            if(i == 0) {
-                marginBalance = BigDecimal.ZERO;
-            }
-            OrderBookItem item = orderBook.getAsks().get(i);
-            Assertions.assertEquals(item.getPrice().setScale(dps, RoundingMode.HALF_UP),
-                    BigDecimal.valueOf(45610+((long) i * stepSize)).setScale(dps, RoundingMode.HALF_UP));
-            marginBalance = marginBalance.add(item.getPrice().multiply(item.getQuantity())
-                    .multiply(market.getMarginRequirement()));
-        }
-        BigDecimal startingBalance = BigDecimal.valueOf(INITIAL_BALANCE);
-        BigDecimal availableBalance = startingBalance.subtract(marginBalance);
-        Optional<Account> accountOptional = accountRepository
-                .findByUserAndAsset(makerUser, market.getSettlementAsset());
-        Assertions.assertTrue(accountOptional.isPresent());
-        Assertions.assertEquals(accountOptional.get().getMarginBalance().setScale(dps, RoundingMode.HALF_UP),
-                marginBalance.setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(accountOptional.get().getAvailableBalance().setScale(dps, RoundingMode.HALF_UP),
-                availableBalance.setScale(dps, RoundingMode.HALF_UP));
-        Assertions.assertEquals(accountOptional.get().getBalance().setScale(dps, RoundingMode.HALF_UP),
-                startingBalance.setScale(dps, RoundingMode.HALF_UP));
-        return market;
-    }
-
-    private Market createOrderBook(
-            final int bids,
-            final int asks
-    ) throws InterruptedException {
-        return createOrderBook(bids, asks, 1);
     }
 
     @Test

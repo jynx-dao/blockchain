@@ -65,7 +65,10 @@ public class MarketService {
             final Market market,
             final BigDecimal value
     ) {
-        BigDecimal settlementAmount = position.getQuantity().multiply(value);
+        BigDecimal settlementAmount = position.getQuantity().multiply(position.getAverageEntryPrice()).multiply(value);
+        if(position.getSide().equals(MarketSide.SELL)) {
+            settlementAmount = settlementAmount.multiply(BigDecimal.valueOf(-1));
+        }
         position.setRealisedPnl(position.getRealisedPnl().add(settlementAmount));
         Account account = accountService.getAndCreate(
                 position.getUser(), market.getSettlementAsset());
@@ -95,6 +98,7 @@ public class MarketService {
                 positions.forEach(position -> settlePosition(position, market, settlementDelta));
             }
         }
+        // TODO - what do we do with negative balances after settlement?
         return markets;
     }
 
