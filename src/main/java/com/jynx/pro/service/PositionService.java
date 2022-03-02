@@ -276,7 +276,7 @@ public class PositionService {
                     (BigDecimal.ONE.add(effectiveMargin)).multiply(position.getAverageEntryPrice());
         }
         position.setLeverage(leverage);
-        position.setLiquidationPrice(liquidationPrice);
+        position.setLiquidationPrice(liquidationPrice.doubleValue() < 0 ? BigDecimal.ZERO : liquidationPrice);
         position.setLatestMarkPrice(market.getMarkPrice());
     }
 
@@ -292,6 +292,7 @@ public class PositionService {
             final Position position,
             final BigDecimal markPrice
     ) {
+        if(position.getLiquidationPrice().equals(BigDecimal.ZERO)) return false;
         return (position.getSide().equals(MarketSide.BUY) &&
                 markPrice.doubleValue() <= position.getLiquidationPrice().doubleValue()) ||
                 (position.getSide().equals(MarketSide.SELL) &&
@@ -409,20 +410,24 @@ public class PositionService {
             }
         }
         List<Position> liquidatedPositions = positionRepository.findByIdIn(liquidatedPositionIds);
-        for(Position position : liquidatedPositions) {
-            List<Transaction> transactions = transactionRepository.findByUserAndAsset(
-                    position.getUser(), market.getSettlementAsset());
-            BigDecimal txSum = BigDecimal.valueOf(transactions.stream()
-                    .mapToDouble(t -> t.getAmount().doubleValue()).sum());
-            position.setRealisedPnl(txSum);
-            position.setUnrealisedPnl(BigDecimal.ZERO);
-            position.setSide(null);
-            position.setAverageEntryPrice(BigDecimal.ZERO);
-            position.setLeverage(BigDecimal.ZERO);
-            position.setLiquidationPrice(BigDecimal.ZERO);
-            position.setLatestMarkPrice(BigDecimal.ZERO);
-        }
-        positionRepository.saveAll(liquidatedPositions);
+        liquidatedPositions.forEach(this::reconcileLiquidatedPosition);
+    }
+
+    public void reconcileLiquidatedPosition(
+            final Position position
+    ) {
+        List<Transaction> transactions = transactionRepository.findByUserAndAsset(
+                position.getUser(), position.getMarket().getSettlementAsset());
+        BigDecimal txSum = BigDecimal.valueOf(transactions.stream()
+                .mapToDouble(t -> t.getAmount().doubleValue()).sum());
+        position.setRealisedPnl(txSum);
+        position.setUnrealisedPnl(BigDecimal.ZERO);
+        position.setSide(null);
+        position.setAverageEntryPrice(BigDecimal.ZERO);
+        position.setLeverage(BigDecimal.ZERO);
+        position.setLiquidationPrice(BigDecimal.ZERO);
+        position.setLatestMarkPrice(BigDecimal.ZERO);
+        positionRepository.save(position);
     }
 
     /**

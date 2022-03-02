@@ -6,6 +6,7 @@ import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.model.OrderBook;
 import com.jynx.pro.model.OrderBookItem;
+import com.jynx.pro.repository.AccountRepository;
 import com.jynx.pro.repository.OrderHistoryRepository;
 import com.jynx.pro.repository.OrderRepository;
 import com.jynx.pro.request.AmendOrderRequest;
@@ -44,7 +45,7 @@ public class OrderService {
     @Autowired
     private AuctionService auctionService;
     @Autowired
-    private UserService userService;
+    private AccountRepository accountRepository;
 
     private static final int MAX_BULK = 25;
 
@@ -375,12 +376,18 @@ public class OrderService {
             final Market market
     ) {
         Account account = accountService.getAndCreate(order.getUser(), market.getSettlementAsset());
+        Position position = positionService.getAndCreate(order.getUser(), market);
         if(account.getBalance().doubleValue() < 0) {
             if(market.getInsuranceFund().doubleValue() < account.getBalance().abs().doubleValue()) {
                 positionService.claimLossBySocialization(market, account);
             } else {
                 positionService.claimLossFromInsuranceFund(market, account);
             }
+            account.setBalance(BigDecimal.ZERO);
+            account.setAvailableBalance(BigDecimal.ZERO);
+            account.setMarginBalance(BigDecimal.ZERO);
+            accountRepository.save(account);
+            positionService.reconcileLiquidatedPosition(position);
         }
     }
 
