@@ -1,5 +1,6 @@
 package com.jynx.pro.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.jynx.pro.constant.WithdrawalStatus;
 import lombok.Data;
 import lombok.experimental.Accessors;
@@ -12,6 +13,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "jynx_withdrawal")
 @Accessors(chain = true)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Withdrawal {
     @Id
     private UUID id;

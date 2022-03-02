@@ -28,6 +28,8 @@ import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
+import static io.grpc.stub.ClientCalls.asyncUnaryCall;
+
 @Slf4j
 @Component
 public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBase {
@@ -403,12 +405,14 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     public void beginBlock(Types.RequestBeginBlock req, StreamObserver<Types.ResponseBeginBlock> responseObserver) {
         Types.ResponseBeginBlock resp = Types.ResponseBeginBlock.newBuilder().build();
         databaseTransactionManager.createTransaction();
-        configService.setTimestamp(((long) req.getHeader().getTime().getNanos()) / 1000000L);
+        long millis = (req.getHeader().getTime().getSeconds() * 1000) +
+                Math.round(req.getHeader().getTime().getNanos() / 1000000d);
+        configService.setTimestamp(millis);
         String proposerAddress = req.getHeader().getProposerAddress().toStringUtf8();
         if(validatorAddress.equals(proposerAddress)) {
             tendermintClient.confirmEthereumEvents();
             tendermintClient.settleMarkets();
-            tendermintClient.syncProposals();
+            tendermintClient.syncProposals(new SyncProposalsRequest()); // TODO - add public key and signature
             // TODO - propagate latest Ethereum events
             // TODO - risk management / liquidations?? [if we decide it's better to do it once per block...]
         }
@@ -463,6 +467,13 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Override
     public void info(Types.RequestInfo request, StreamObserver<Types.ResponseInfo> responseObserver) {
         Types.ResponseInfo response = Types.ResponseInfo.newBuilder().build();
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    @Override
+    public void flush(Types.RequestFlush request, StreamObserver<Types.ResponseFlush> responseObserver) {
+        Types.ResponseFlush response = Types.ResponseFlush.newBuilder().build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }

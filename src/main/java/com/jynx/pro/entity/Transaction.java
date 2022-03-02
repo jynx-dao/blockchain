@@ -1,5 +1,6 @@
 package com.jynx.pro.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.jynx.pro.constant.TransactionType;
 import lombok.Data;
 import lombok.experimental.Accessors;
@@ -11,6 +12,7 @@ import java.math.BigDecimal;
 @Entity
 @Table(name = "jynx_transaction")
 @Accessors(chain = true)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Transaction {
     @Id
     @GeneratedValue(strategy = GenerationType.SEQUENCE)

@@ -1,5 +1,6 @@
 package com.jynx.pro.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.jynx.pro.constant.OrderAction;
 import lombok.Data;
 import lombok.experimental.Accessors;
@@ -12,6 +13,7 @@ import java.util.UUID;
 @Table
 @Entity(name = "jynx_order_history")
 @Accessors(chain = true)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class OrderHistory {
     @Id
     private UUID id;

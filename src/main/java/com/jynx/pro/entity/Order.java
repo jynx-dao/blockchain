@@ -1,5 +1,6 @@
 package com.jynx.pro.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.jynx.pro.constant.*;
 import lombok.Data;
 import lombok.experimental.Accessors;
@@ -14,6 +15,7 @@ import java.util.UUID;
         @Index(name = "idx_market_id_status", columnList = "market_id,status")
 })
 @Accessors(chain = true)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Order {
     @Id
     private UUID id;

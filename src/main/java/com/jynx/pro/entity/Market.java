@@ -1,5 +1,6 @@
 package com.jynx.pro.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.jynx.pro.constant.MarketStatus;
 import lombok.Data;
 import lombok.experimental.Accessors;
@@ -12,6 +13,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "jynx_market")
 @Accessors(chain = true)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Market {
     @Id
     private UUID id;
@@ -23,11 +25,11 @@ public class Market {
     @Column(name = "margin_requirement", nullable = false)
     private BigDecimal marginRequirement;
     @Column(name = "tick_size", nullable = false)
-    private Integer tickSize;
+    private Integer tickSize; // TODO - we don't use this yet
     @Column(name = "step_size", nullable = false)
-    private Integer stepSize;
+    private Integer stepSize; // TODO - we don't use this yet
     @Column(name = "settlement_frequency", nullable = false)
-    private Integer settlementFrequency;
+    private Integer settlementFrequency; // TODO - we don't use this yet
     @Column(name = "maker_fee", nullable = false, scale = 8, precision = 18)
     private BigDecimal makerFee;
     @Column(name = "taker_fee", nullable = false, scale = 8, precision = 18)

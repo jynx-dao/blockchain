@@ -1,5 +1,6 @@
 package com.jynx.pro.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.jynx.pro.constant.OracleStatus;
 import com.jynx.pro.constant.OracleType;
 import lombok.Data;
@@ -12,6 +13,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "jynx_oracle")
 @Accessors(chain = true)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Oracle {
     @Id
     private UUID id;

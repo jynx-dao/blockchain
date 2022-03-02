@@ -1,5 +1,6 @@
 package com.jynx.pro.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.jynx.pro.constant.Blockchain;
 import com.jynx.pro.constant.EventType;
 import lombok.Data;
@@ -13,6 +14,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "jynx_event")
 @Accessors(chain = true)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Event {
     @Id
     private UUID id;

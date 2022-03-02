@@ -1,5 +1,6 @@
 package com.jynx.pro.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.jynx.pro.constant.AssetStatus;
 import com.jynx.pro.constant.AssetType;
 import lombok.Data;
@@ -13,6 +14,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "jynx_asset")
 @Accessors(chain = true)
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Asset {
     @Id
     private UUID id;

@@ -4,10 +4,17 @@ import com.jynx.pro.Application;
 import com.jynx.pro.blockchain.TendermintClient;
 import com.jynx.pro.constant.AssetStatus;
 import com.jynx.pro.constant.AssetType;
+import com.jynx.pro.constant.MarketStatus;
+import com.jynx.pro.constant.OracleType;
 import com.jynx.pro.entity.Asset;
+import com.jynx.pro.entity.Market;
+import com.jynx.pro.entity.Stake;
+import com.jynx.pro.entity.User;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.manager.AppStateManager;
 import com.jynx.pro.request.AddAssetRequest;
+import com.jynx.pro.request.AddMarketRequest;
+import com.jynx.pro.request.SyncProposalsRequest;
 import com.jynx.pro.response.TransactionResponse;
 import com.jynx.pro.service.IntegrationTest;
 import com.jynx.pro.utils.SleepUtils;
@@ -26,6 +33,9 @@ import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
+
+import java.math.BigDecimal;
+import java.util.Optional;
 
 @Slf4j
 @Testcontainers
@@ -71,8 +81,7 @@ public class TendermintClientTest extends IntegrationTest {
         clearState();
     }
 
-    @Test
-    public void testAddAsset() {
+    private Asset addAsset() {
         AddAssetRequest request = new AddAssetRequest()
                 .setAddress("0x0")
                 .setName("Test asset")
@@ -82,7 +91,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
-        request.setPublicKey("40404040404040404040404040404040");
+        request.setPublicKey(takerUser.getPublicKey());
         TransactionResponse<Asset> txResponse = tendermintClient.addAsset(request);
         Assertions.assertEquals(txResponse.getItem().getStatus(), AssetStatus.PENDING);
         ResponseEntity<Asset[]> responseEntity = this.restTemplate.getForEntity(
@@ -92,6 +101,12 @@ public class TendermintClientTest extends IntegrationTest {
         Assertions.assertEquals(assetArray.length, 1);
         Assertions.assertEquals(assetArray[0].getStatus(), AssetStatus.PENDING);
         Assertions.assertEquals(assetArray[0].getId(), txResponse.getItem().getId());
+        return assetArray[0];
+    }
+
+    @Test
+    public void testAddAsset() {
+        addAsset();
     }
 
     @Test
@@ -104,8 +119,7 @@ public class TendermintClientTest extends IntegrationTest {
         long[] times = proposalTimes();
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
-        request.setPublicKey("40404040404040404040404040404040");
-
+        request.setPublicKey(takerUser.getPublicKey());
         try {
             tendermintClient.addAsset(request);
             Assertions.fail();
@@ -125,13 +139,54 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
-        request.setPublicKey("40404040404040404040404040404040");
+        request.setPublicKey(takerUser.getPublicKey());
         try {
             tendermintClient.addAsset(request);
             Assertions.fail();
         } catch(Exception e) {
             Assertions.assertEquals(e.getMessage(), ErrorCode.TOO_MANY_DECIMAL_PLACES);
         }
+    }
+
+    private void syncProposals() {
+        sleepUtils.sleep(100L);
+        SyncProposalsRequest syncProposalsRequest = new SyncProposalsRequest();
+        syncProposalsRequest.setPublicKey("50505050505050505050505050505050");
+        tendermintClient.syncProposals(syncProposalsRequest);
+        sleepUtils.sleep(100L);
+    }
+
+    @Test
+    public void testAddMarket() {
+        Asset asset = addAsset();
+        syncProposals();
+        AddMarketRequest request = new AddMarketRequest()
+                .setName("Tesla Motors")
+                .setSettlementAssetId(asset.getId())
+                .setMarginRequirement(BigDecimal.valueOf(0.01))
+                .setTickSize(1)
+                .setStepSize(1)
+                .setSettlementFrequency(8)
+                .setMakerFee(BigDecimal.valueOf(0.001))
+                .setTakerFee(BigDecimal.valueOf(0.001))
+                .setLiquidationFee(BigDecimal.valueOf(0.001))
+                .setOracleKey("TSLA")
+                .setOracleType(OracleType.POLYGON);
+        long[] times = proposalTimes();
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setPublicKey(takerUser.getPublicKey());
+        TransactionResponse<Market> txResponse = tendermintClient.addMarket(request);
+        syncProposals();
+        Assertions.assertEquals(txResponse.getItem().getStatus(), MarketStatus.PENDING);
+        ResponseEntity<Market> responseEntity = this.restTemplate.getForEntity(
+                String.format("http://localhost:%s/market/%s", port,
+                        txResponse.getItem().getId().toString()), Market.class);
+        Market market = responseEntity.getBody();
+        Assertions.assertNotNull(market);
+        Assertions.assertEquals(market.getStatus(), MarketStatus.ACTIVE);
+        Assertions.assertEquals(market.getId(), txResponse.getItem().getId());
     }
 
     private void waitForBlockchain() {

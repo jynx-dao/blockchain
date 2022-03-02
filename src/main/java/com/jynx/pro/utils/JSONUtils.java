@@ -2,6 +2,7 @@ package com.jynx.pro.utils;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.jynx.pro.exception.JynxProException;
 import org.springframework.stereotype.Component;
 
@@ -11,6 +12,7 @@ public class JSONUtils {
     private final ObjectMapper objectMapper;
 
     public JSONUtils(ObjectMapper objectMapper) {
+        objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
         this.objectMapper = objectMapper;
     }
 

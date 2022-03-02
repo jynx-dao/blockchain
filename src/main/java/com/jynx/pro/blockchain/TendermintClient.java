@@ -112,13 +112,6 @@ public class TendermintClient {
         }
     }
 
-    private void processTransaction(
-            final TendermintTransaction tendermintTx,
-            final String errorCode
-    ) {
-        processTransaction(null, null, tendermintTx, errorCode);
-    }
-
     private <S extends TendermintRequest, T> TransactionResponse<T> processTransaction(
             final S request,
             final Class<T> responseType,
@@ -138,6 +131,7 @@ public class TendermintClient {
                             .getJSONObject("result")
                             .getString("hash");
                 } catch (Exception e) {
+                    log.info(response.getBody().toString());
                     throw new JynxProException(e.getMessage());
                 }
                 Optional<T> resultOptional = Optional.empty();
@@ -159,15 +153,18 @@ public class TendermintClient {
     }
 
     public void confirmEthereumEvents() {
-        processTransaction(TendermintTransaction.CONFIRM_ETHEREUM_EVENTS, ErrorCode.CONFIRM_ETHEREUM_EVENTS_FAILED);
+//        processTransaction(TendermintTransaction.CONFIRM_ETHEREUM_EVENTS, ErrorCode.CONFIRM_ETHEREUM_EVENTS_FAILED);
     }
 
     public void settleMarkets() {
-        processTransaction(TendermintTransaction.SETTLE_MARKETS, ErrorCode.SETTLE_MARKETS_FAILED);
+//        processTransaction(TendermintTransaction.SETTLE_MARKETS, ErrorCode.SETTLE_MARKETS_FAILED);
     }
 
-    public void syncProposals() {
-        processTransaction(TendermintTransaction.SYNC_PROPOSALS, ErrorCode.SYNC_PROPOSALS_FAILED);
+    public Object syncProposals(
+            final SyncProposalsRequest request
+    ) {
+        return processTransaction(request, Object.class,
+                TendermintTransaction.SYNC_PROPOSALS, ErrorCode.SYNC_PROPOSALS_FAILED);
     }
 
     public TransactionResponse<Withdrawal> createWithdrawal(
