@@ -7,7 +7,6 @@ import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.*;
-import com.jynx.pro.response.TendermintResponse;
 import com.jynx.pro.response.TransactionResponse;
 import com.jynx.pro.utils.SleepUtils;
 import com.mashape.unirest.http.HttpResponse;
@@ -41,7 +40,6 @@ public class TendermintClient {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final String GET_TX_BASE_URI = "/tx?hash=";
     private static final String TX_BASE_URI = "/broadcast_tx_sync?tx=";
-    private static final String QUERY_BASE_URI = "/abci_query?data=";
 
     private String buildUrl(
             final String baseUri,
@@ -60,33 +58,6 @@ public class TendermintClient {
             log.error(ErrorCode.FAILED_TO_BUILD_URL, e);
             throw new JynxProException(ErrorCode.FAILED_TO_BUILD_URL);
         }
-    }
-
-    private <T extends TendermintResponse, S extends TendermintRequest> T processQuery(
-            final S request,
-            final TendermintTransaction tendermintTx,
-            final Class<T> responseType,
-            final String errorCode
-    ) {
-        try {
-            HttpResponse<JsonNode> response = Unirest.get(buildUrl(
-                    String.format("%s:%s%s", baseUri, port, QUERY_BASE_URI), request, tendermintTx)).asJson();
-            if(response.getStatus() == 200) {
-                JSONObject jsonObject = new JSONObject(response.getBody().toString());
-                String encodedData = jsonObject
-                        .getJSONObject("result")
-                        .getJSONObject("response")
-                        .getString("value");
-                String jsonData = new String(Base64.getDecoder()
-                        .decode(encodedData.getBytes(StandardCharsets.UTF_8)));
-                return objectMapper.readValue(jsonData, responseType);
-            } else {
-                log.error(response.getBody().toString());
-            }
-        } catch(Exception e) {
-            log.error(e.getMessage(), e);
-        }
-        throw new JynxProException(errorCode);
     }
 
     public <T> Optional<T> getTransaction(
