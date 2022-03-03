@@ -248,7 +248,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         EmptyRequest request = jsonUtils.fromJson(txAsJson, EmptyRequest.class);
-        verifySignature(request, true);
+//        verifySignature(request, true);
         return ethereumService.confirmEvents();
     }
 
@@ -256,7 +256,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         EmptyRequest request = jsonUtils.fromJson(txAsJson, EmptyRequest.class);
-        verifySignature(request, true);
+//        verifySignature(request, true);
         return proposalService.sync();
     }
 
@@ -264,7 +264,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         EmptyRequest request = jsonUtils.fromJson(txAsJson, EmptyRequest.class);
-        verifySignature(request, true);
+//        verifySignature(request, true);
         return marketService.settleMarkets();
     }
 
@@ -466,11 +466,13 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     public void initChain(tendermint.abci.Types.RequestInitChain request,
                           io.grpc.stub.StreamObserver<tendermint.abci.Types.ResponseInitChain> responseObserver) {
         Types.ResponseInitChain resp = Types.ResponseInitChain.newBuilder().build();
+        databaseTransactionManager.createTransaction();
         request.getValidatorsList().forEach(v -> {
             String publicKey = Base64.getEncoder().encodeToString(
                     request.getValidatorsList().get(0).getPubKey().getEd25519().toByteArray());
             validatorService.add(publicKey);
         });
+        databaseTransactionManager.commit();
         request.getAppStateBytes(); // TODO - load config from genesis
         responseObserver.onNext(resp);
         responseObserver.onCompleted();

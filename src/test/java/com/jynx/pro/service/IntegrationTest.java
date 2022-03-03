@@ -87,6 +87,8 @@ public abstract class IntegrationTest {
     @Autowired
     protected WithdrawalRepository withdrawalRepository;
     @Autowired
+    protected ValidatorRepository validatorRepository;
+    @Autowired
     protected AccountService accountService;
     @Autowired
     protected DatabaseTransactionManager databaseTransactionManager;
@@ -298,6 +300,7 @@ public abstract class IntegrationTest {
 
     protected void clearState() {
         databaseTransactionManager.createTransaction();
+        validatorRepository.deleteAll();
         orderHistoryRepository.deleteAll();
         tradeRepository.deleteAll();
         orderRepository.deleteAll();
