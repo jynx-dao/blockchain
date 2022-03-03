@@ -104,6 +104,7 @@ public class PositionService {
         BigDecimal originalPositionQuantity = position.getQuantity();
         int dps = market.getSettlementAsset().getDecimalPlaces();
         BigDecimal quantityDelta = side.equals(position.getSide()) ? quantity : quantity.multiply(BigDecimal.valueOf(-1));
+        // TODO - when exposure changes it can affect reduce only orders (i.e. they might become too large)
         if(quantityDelta.doubleValue() < 0) {
             BigDecimal closingQuantity = quantityDelta.abs().doubleValue() < position.getQuantity().doubleValue() ?
                     quantityDelta.abs() : position.getQuantity();

@@ -50,8 +50,8 @@ public class MarketServiceTest extends IntegrationTest {
     @Test
     public void testAddMarket() throws InterruptedException {
         Asset asset = createAndEnactAsset(true);
-        Market market = marketService.proposeToAdd(getAddMarketRequest(asset));
-        Assertions.assertEquals(market.getStatus(), MarketStatus.PENDING);
+        Proposal proposal = marketService.proposeToAdd(getAddMarketRequest(asset));
+        Assertions.assertEquals(proposal.getStatus(), ProposalStatus.CREATED);
     }
 
     @Test

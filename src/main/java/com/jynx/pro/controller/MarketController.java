@@ -2,6 +2,7 @@ package com.jynx.pro.controller;
 
 import com.jynx.pro.constant.KlineInterval;
 import com.jynx.pro.entity.Market;
+import com.jynx.pro.entity.Proposal;
 import com.jynx.pro.entity.Trade;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
@@ -81,28 +82,28 @@ public class MarketController extends AbstractController {
     }
 
     @PostMapping
-    public ResponseEntity<Market> add(
+    public ResponseEntity<Proposal> add(
             @RequestBody AddMarketRequest request
     ) {
         return ResponseEntity.ok(tendermintClient.addMarket(request).getItem());
     }
 
     @PutMapping
-    public ResponseEntity<Market> amend(
+    public ResponseEntity<Proposal> amend(
             @RequestBody AmendMarketRequest request
     ) {
         return ResponseEntity.ok(tendermintClient.amendMarket(request).getItem());
     }
 
     @PostMapping("/suspend")
-    public ResponseEntity<Market> suspend(
+    public ResponseEntity<Proposal> suspend(
             @RequestBody SingleItemRequest request
     ) {
         return ResponseEntity.ok(tendermintClient.suspendMarket(request).getItem());
     }
 
     @PostMapping("/unsuspend")
-    public ResponseEntity<Market> unsuspend(
+    public ResponseEntity<Proposal> unsuspend(
             @RequestBody SingleItemRequest request
     ) {
         return ResponseEntity.ok(tendermintClient.unsuspendMarket(request).getItem());

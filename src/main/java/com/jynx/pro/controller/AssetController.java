@@ -31,7 +31,7 @@ public class AssetController extends AbstractController {
     }
 
     @PostMapping
-    public ResponseEntity<Asset> add(
+    public ResponseEntity<Proposal> add(
             @RequestBody AddAssetRequest request
     ) {
         return ResponseEntity.ok(tendermintClient.addAsset(request).getItem());

@@ -50,8 +50,8 @@ public class ProposalService {
     public List<Proposal> sync() {
         List<Proposal> proposals = new ArrayList<>();
         proposals.addAll(open());
-        proposals.addAll(approve());
         proposals.addAll(reject());
+        proposals.addAll(approve());
         proposals.addAll(enact());
         return proposals;
     }
@@ -138,8 +138,6 @@ public class ProposalService {
     public List<Proposal> reject() {
         List<Proposal> proposals = proposalRepository.findByStatus(ProposalStatus.OPEN)
                 .stream().filter(p -> p.getClosingTime() < configService.getTimestamp()).collect(Collectors.toList());
-        List<ProposalType> marketProposalTypes = List.of(ProposalType.ADD_MARKET, ProposalType.AMEND_MARKET,
-                ProposalType.SUSPEND_MARKET, ProposalType.UNSUSPEND_MARKET);
         List<ProposalType> assetProposalTypes = List.of(ProposalType.ADD_ASSET, ProposalType.SUSPEND_ASSET,
                 ProposalType.UNSUSPEND_ASSET);
         for(Proposal proposal : proposals) {
@@ -147,7 +145,7 @@ public class ProposalService {
                 proposal.setStatus(ProposalStatus.REJECTED);
                 if(assetProposalTypes.contains(proposal.getType())) {
                     assetService.reject(proposal);
-                } else if(marketProposalTypes.contains(proposal.getType())) {
+                } else {
                     marketService.reject(proposal);
                 }
             }

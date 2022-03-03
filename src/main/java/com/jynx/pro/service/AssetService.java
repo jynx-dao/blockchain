@@ -91,7 +91,7 @@ public class AssetService {
         updateStatus(proposal, AssetStatus.ACTIVE);
     }
 
-    public Asset proposeToAdd(
+    public Proposal proposeToAdd(
             final AddAssetRequest request
     ) {
         stakeService.checkProposerStake(request.getUser());
@@ -111,9 +111,8 @@ public class AssetService {
                 .setDecimalPlaces(request.getDecimalPlaces())
                 .setId(uuidUtils.next());
         asset = assetRepository.save(asset);
-        proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
+        return proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
                 request.getEnactmentTime(), asset.getId(), ProposalType.ADD_ASSET);
-        return asset;
     }
 
     public Proposal proposeToSuspend(

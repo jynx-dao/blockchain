@@ -98,7 +98,7 @@ public class MarketService {
         return markets;
     }
 
-    public Market proposeToAdd(
+    public Proposal proposeToAdd(
             final AddMarketRequest request
     ) {
         stakeService.checkProposerStake(request.getUser());
@@ -137,12 +137,11 @@ public class MarketService {
                 .setId(uuidUtils.next())
                 .setLastSettlement(0L);
         market = marketRepository.save(market);
-        proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
+        return proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
                 request.getEnactmentTime(), market.getId(), ProposalType.ADD_MARKET);
-        return market;
     }
 
-    public Market proposeToAmend(
+    public Proposal proposeToAmend(
             final AmendMarketRequest request
     ) {
         stakeService.checkProposerStake(request.getUser());
@@ -185,12 +184,11 @@ public class MarketService {
             market.setPendingSettlementFrequency(request.getSettlementFrequency());
         }
         market = marketRepository.save(market);
-        proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
+        return proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
                 request.getEnactmentTime(), market.getId(), ProposalType.AMEND_MARKET);
-        return market;
     }
 
-    public Market proposeToSuspend(
+    public Proposal proposeToSuspend(
             final SingleItemRequest request
     ) {
         stakeService.checkProposerStake(request.getUser());
@@ -199,12 +197,11 @@ public class MarketService {
         if(!market.getStatus().equals(MarketStatus.ACTIVE)) {
             throw new JynxProException(ErrorCode.MARKET_NOT_ACTIVE);
         }
-        proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
+        return proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
                 request.getEnactmentTime(), market.getId(), ProposalType.SUSPEND_MARKET);
-        return market;
     }
 
-    public Market proposeToUnsuspend(
+    public Proposal proposeToUnsuspend(
             final SingleItemRequest request
     ) {
         stakeService.checkProposerStake(request.getUser());
@@ -213,9 +210,8 @@ public class MarketService {
         if(!market.getStatus().equals(MarketStatus.SUSPENDED)) {
             throw new JynxProException(ErrorCode.MARKET_NOT_SUSPENDED);
         }
-        proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
+        return proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
                 request.getEnactmentTime(), market.getId(), ProposalType.UNSUSPEND_MARKET);
-        return market;
     }
 
     /**

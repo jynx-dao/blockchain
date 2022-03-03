@@ -6,6 +6,7 @@ import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.Asset;
 import com.jynx.pro.entity.Market;
 import com.jynx.pro.entity.Order;
+import com.jynx.pro.entity.Proposal;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.manager.AppStateManager;
 import com.jynx.pro.model.OrderBook;
@@ -95,15 +96,15 @@ public class TendermintClientTest extends IntegrationTest {
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
-        TransactionResponse<Asset> txResponse = tendermintClient.addAsset(request);
-        Assertions.assertEquals(txResponse.getItem().getStatus(), AssetStatus.PENDING);
+        TransactionResponse<Proposal> txResponse = tendermintClient.addAsset(request);
+        Assertions.assertEquals(txResponse.getItem().getStatus(), ProposalStatus.CREATED);
         ResponseEntity<Asset[]> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/asset/all", port), Asset[].class);
         Asset[] assetArray = responseEntity.getBody();
         Assertions.assertNotNull(assetArray);
         Assertions.assertEquals(assetArray.length, 2);
         Assertions.assertEquals(assetArray[1].getStatus(), AssetStatus.PENDING);
-        Assertions.assertEquals(assetArray[1].getId(), txResponse.getItem().getId());
+        Assertions.assertEquals(assetArray[1].getId(), txResponse.getItem().getLinkedId());
         return assetArray[0];
     }
 
@@ -232,16 +233,16 @@ public class TendermintClientTest extends IntegrationTest {
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
-        TransactionResponse<Market> txResponse = tendermintClient.addMarket(request);
+        TransactionResponse<Proposal> txResponse = tendermintClient.addMarket(request);
         syncProposals();
-        Assertions.assertEquals(txResponse.getItem().getStatus(), MarketStatus.PENDING);
+        Assertions.assertEquals(txResponse.getItem().getStatus(), ProposalStatus.CREATED);
         ResponseEntity<Market> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/market/%s", port,
-                        txResponse.getItem().getId().toString()), Market.class);
+                        txResponse.getItem().getLinkedId().toString()), Market.class);
         Market market = responseEntity.getBody();
         Assertions.assertNotNull(market);
         Assertions.assertEquals(market.getStatus(), MarketStatus.ACTIVE);
-        Assertions.assertEquals(market.getId(), txResponse.getItem().getId());
+        Assertions.assertEquals(market.getId(), txResponse.getItem().getLinkedId());
         return market;
     }
 

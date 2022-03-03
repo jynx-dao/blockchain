@@ -180,38 +180,38 @@ public class TendermintClient {
                 TendermintTransaction.CANCEL_ORDER, ErrorCode.CANCEL_ORDER_FAILED);
     }
 
-    public TransactionResponse<Market> addMarket(
+    public TransactionResponse<Proposal> addMarket(
             final AddMarketRequest request
     ) {
-        return processTransaction(request, Market.class,
+        return processTransaction(request, Proposal.class,
                 TendermintTransaction.ADD_MARKET, ErrorCode.ADD_MARKET_FAILED);
     }
 
-    public TransactionResponse<Market> amendMarket(
+    public TransactionResponse<Proposal> amendMarket(
             final AmendMarketRequest request
     ) {
-        return processTransaction(request, Market.class,
+        return processTransaction(request, Proposal.class,
                 TendermintTransaction.AMEND_MARKET, ErrorCode.AMEND_MARKET_FAILED);
     }
 
-    public TransactionResponse<Market> suspendMarket(
+    public TransactionResponse<Proposal> suspendMarket(
             final SingleItemRequest request
     ) {
-        return processTransaction(request, Market.class,
+        return processTransaction(request, Proposal.class,
                 TendermintTransaction.SUSPEND_MARKET, ErrorCode.SUSPEND_MARKET_FAILED);
     }
 
-    public TransactionResponse<Market> unsuspendMarket(
+    public TransactionResponse<Proposal> unsuspendMarket(
             final SingleItemRequest request
     ) {
-        return processTransaction(request, Market.class,
+        return processTransaction(request, Proposal.class,
                 TendermintTransaction.UNSUSPEND_MARKET, ErrorCode.UNSUSPEND_MARKET_FAILED);
     }
 
-    public TransactionResponse<Asset> addAsset(
+    public TransactionResponse<Proposal> addAsset(
             final AddAssetRequest request
     ) {
-        return processTransaction(request, Asset.class,
+        return processTransaction(request, Proposal.class,
                 TendermintTransaction.ADD_ASSET, ErrorCode.ADD_ASSET_FAILED);
     }
 

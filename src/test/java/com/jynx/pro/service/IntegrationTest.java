@@ -110,8 +110,8 @@ public abstract class IntegrationTest {
     protected Asset createAndEnactAsset(
             final boolean activate
     ) {
-        Asset asset = assetService.proposeToAdd(getAddAssetRequest(takerUser));
-        Assertions.assertEquals(asset.getStatus(), AssetStatus.PENDING);
+        Proposal proposal = assetService.proposeToAdd(getAddAssetRequest(takerUser));
+        Assertions.assertEquals(proposal.getStatus(), ProposalStatus.CREATED);
         sleepUtils.sleep(100L);
         if(activate) {
             configService.setTimestamp(nowAsMillis());
@@ -120,7 +120,7 @@ public abstract class IntegrationTest {
         proposalService.approve();
         proposalService.enact();
         proposalService.reject();
-        asset = assetRepository.findById(asset.getId()).orElse(new Asset());
+        Asset asset = assetRepository.findById(proposal.getLinkedId()).orElse(new Asset());
         Assertions.assertEquals(asset.getStatus(), activate ? AssetStatus.ACTIVE : AssetStatus.PENDING);
         accountRepository.save(new Account().setAsset(asset).setUser(takerUser).setId(uuidUtils.next())
                 .setBalance(BigDecimal.valueOf(INITIAL_BALANCE))
@@ -141,8 +141,8 @@ public abstract class IntegrationTest {
             final boolean activate
     ) {
         Asset asset = createAndEnactAsset(true);
-        Market market = marketService.proposeToAdd(getAddMarketRequest(asset));
-        Assertions.assertEquals(market.getStatus(), MarketStatus.PENDING);
+        Proposal proposal = marketService.proposeToAdd(getAddMarketRequest(asset));
+        Assertions.assertEquals(proposal.getStatus(), ProposalStatus.CREATED);
         sleepUtils.sleep(100L);
         if(activate) {
             configService.setTimestamp(nowAsMillis());
@@ -151,7 +151,7 @@ public abstract class IntegrationTest {
         proposalService.approve();
         proposalService.enact();
         proposalService.reject();
-        market = marketRepository.findById(market.getId()).orElse(new Market());
+        Market market = marketRepository.findById(proposal.getLinkedId()).orElse(new Market());
         Assertions.assertEquals(market.getStatus(), activate ? MarketStatus.ACTIVE : MarketStatus.PENDING);
         return market;
     }
