@@ -220,8 +220,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private Object castVote(
             final String txAsJson
     ) {
-//        verifySignature(request); // TODO - verify validator
-        return proposalService.vote(jsonUtils.fromJson(txAsJson, CastVoteRequest.class));
+        CastVoteRequest request = jsonUtils.fromJson(txAsJson, CastVoteRequest.class);
+        verifySignature(request);
+        return proposalService.vote(request);
     }
 
     private Object confirmEthereumEvents(

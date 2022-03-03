@@ -8,6 +8,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.Arrays;
+import java.util.List;
+
 @Controller
 @RequestMapping("/order")
 public class OrderController extends AbstractController {
@@ -33,24 +36,24 @@ public class OrderController extends AbstractController {
         return ResponseEntity.ok(tendermintClient.amendOrder(request).getItem());
     }
 
-//    @PostMapping("/batch")
-//    public ResponseEntity<List<Order>> createMany(
-//            @RequestBody CreateManyOrdersRequest request
-//    ) {
-//        return ResponseEntity.ok(tendermintClient.createManyOrders(request));
-//    }
-//
-//    @DeleteMapping("/batch")
-//    public ResponseEntity<List<Order>> cancelMany(
-//            @RequestBody CancelManyOrdersRequest request
-//    ) {
-//        return ResponseEntity.ok(orderService.cancelMany(request));
-//    }
-//
-//    @PutMapping("/batch")
-//    public ResponseEntity<List<Order>> amendMany(
-//            @RequestBody AmendManyOrdersRequest request
-//    ) {
-//        return ResponseEntity.ok(orderService.amendMany(request));
-//    }
+    @PostMapping("/batch")
+    public ResponseEntity<List<Order>> createMany(
+            @RequestBody List<CreateOrderRequest> request
+    ) {
+        return ResponseEntity.ok(Arrays.asList(tendermintClient.createOrderMany(request).getItem()));
+    }
+
+    @PutMapping("/batch")
+    public ResponseEntity<List<Order>> amendMany(
+            @RequestBody List<AmendOrderRequest> request
+    ) {
+        return ResponseEntity.ok(Arrays.asList(tendermintClient.amendOrderMany(request).getItem()));
+    }
+
+    @DeleteMapping("/batch")
+    public ResponseEntity<List<Order>> cancelMany(
+            @RequestBody List<CancelOrderRequest> request
+    ) {
+        return ResponseEntity.ok(Arrays.asList(tendermintClient.cancelOrderMany(request).getItem()));
+    }
 }

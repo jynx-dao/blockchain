@@ -3,10 +3,7 @@ package com.jynx.pro.client;
 import com.jynx.pro.Application;
 import com.jynx.pro.blockchain.TendermintClient;
 import com.jynx.pro.constant.*;
-import com.jynx.pro.entity.Asset;
-import com.jynx.pro.entity.Market;
-import com.jynx.pro.entity.Order;
-import com.jynx.pro.entity.Proposal;
+import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.manager.AppStateManager;
 import com.jynx.pro.model.OrderBook;
@@ -82,13 +79,17 @@ public class TendermintClientTest extends IntegrationTest {
         clearState();
     }
 
-    private Asset addAsset() {
+    private Proposal getAssetProposal(
+            final long openOffset,
+            final long closeOffset,
+            final long enactOffset
+    ) {
         AddAssetRequest request = new AddAssetRequest()
                 .setAddress("0x0")
                 .setName("USDC")
                 .setDecimalPlaces(5)
                 .setType(AssetType.ERC20);
-        long[] times = proposalTimes();
+        long[] times = proposalTimes(openOffset, closeOffset, enactOffset);
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
@@ -97,14 +98,19 @@ public class TendermintClientTest extends IntegrationTest {
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         TransactionResponse<Proposal> txResponse = tendermintClient.addAsset(request);
-        Assertions.assertEquals(txResponse.getItem().getStatus(), ProposalStatus.CREATED);
+        return txResponse.getItem();
+    }
+
+    private Asset addAsset() {
+        Proposal proposal = getAssetProposal(1, 2, 3);
+        Assertions.assertEquals(proposal.getStatus(), ProposalStatus.CREATED);
         ResponseEntity<Asset[]> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/asset/all", port), Asset[].class);
         Asset[] assetArray = responseEntity.getBody();
         Assertions.assertNotNull(assetArray);
         Assertions.assertEquals(assetArray.length, 2);
         Assertions.assertEquals(assetArray[1].getStatus(), AssetStatus.PENDING);
-        Assertions.assertEquals(assetArray[1].getId(), txResponse.getItem().getLinkedId());
+        Assertions.assertEquals(assetArray[1].getId(), proposal.getLinkedId());
         return assetArray[0];
     }
 
@@ -400,6 +406,20 @@ public class TendermintClientTest extends IntegrationTest {
         Assertions.assertEquals(0, orderBook.getBids().size());
         Assertions.assertEquals(orderBook.getAsks().get(0).getPrice().doubleValue(),
                 BigDecimal.valueOf(1.2).doubleValue(), 0.0001d);
+    }
+
+    @Test
+    public void testVote() {
+        Proposal proposal = getAssetProposal(-1, 10, 20);
+        CastVoteRequest castVoteRequest = new CastVoteRequest()
+                .setId(proposal.getId())
+                .setInFavour(true);
+        String message = jsonUtils.toJson(castVoteRequest);
+        String sig = cryptoUtils.sign(message, PRIVATE_KEY2).orElse("");
+        castVoteRequest.setSignature(sig);
+        castVoteRequest.setPublicKey(PUBLIC_KEY2);
+        TransactionResponse<Vote> txResponse = tendermintClient.castVote(castVoteRequest);
+        log.info(txResponse.getItem().toString());
     }
 
     private void waitForBlockchain() {

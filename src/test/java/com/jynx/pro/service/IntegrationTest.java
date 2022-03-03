@@ -31,6 +31,9 @@ public abstract class IntegrationTest {
     protected static final String PRIVATE_KEY = "1498b5467a63dffa2dc9d9e069caf075d16fc33fdd4c3b01bfadae6433767d93";
     protected static final String PUBLIC_KEY = "b7a3c12dc0c8c748ab07525b701122b88bd78f600c76342d27f25e5f92444cde";
 
+    protected static final String PRIVATE_KEY2 = "17f914594153922eb49c240bda6e7272e6d1e68e3fe0340482fc40dcb2f93581";
+    protected static final String PUBLIC_KEY2 = "e123a8e4ea5394f84261f3b33b99cf98fc72f00a2c5a5a536ae79131f6f0f451";
+
     @Autowired
     protected UUIDUtils uuidUtils;
     @Autowired
@@ -277,12 +280,20 @@ public abstract class IntegrationTest {
         return LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
     }
 
-    protected long[] proposalTimes() {
+    protected long[] proposalTimes(
+            final long openOffset,
+            final long closeOffset,
+            final long enactOffset
+    ) {
         long ts = nowAsMillis();
-        long open = ts + 1;
-        long close = ts + 2;
-        long enactment = ts + 3;
+        long open = ts + openOffset;
+        long close = ts + closeOffset;
+        long enactment = ts + enactOffset;
         return new long[]{ open, close, enactment };
+    }
+
+    protected long[] proposalTimes() {
+        return proposalTimes(1, 2, 3);
     }
 
     protected void clearState() {
@@ -342,7 +353,7 @@ public abstract class IntegrationTest {
         takerUser = userRepository.save(takerUser);
         makerUser = new User()
                 .setId(uuidUtils.next())
-                .setPublicKey("22222222222222222222222222222222")
+                .setPublicKey(PUBLIC_KEY2)
                 .setUsername("test-user2");
         makerUser = userRepository.save(makerUser);
         degenUser = new User()

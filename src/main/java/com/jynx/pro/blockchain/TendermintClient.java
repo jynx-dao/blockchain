@@ -3,7 +3,10 @@ package com.jynx.pro.blockchain;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jynx.pro.constant.TendermintTransaction;
-import com.jynx.pro.entity.*;
+import com.jynx.pro.entity.Order;
+import com.jynx.pro.entity.Proposal;
+import com.jynx.pro.entity.Vote;
+import com.jynx.pro.entity.Withdrawal;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.*;
@@ -22,6 +25,7 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -41,13 +45,12 @@ public class TendermintClient {
     private static final String GET_TX_BASE_URI = "/tx?hash=";
     private static final String TX_BASE_URI = "/broadcast_tx_sync?tx=";
 
-    private String buildUrl(
+    private <S> String buildUrl(
             final String baseUri,
-            final TendermintRequest request,
+            final S request,
             final TendermintTransaction tendermintTx
     ) {
         try {
-            if(request == null) return baseUri;
             String data = objectMapper.writeValueAsString(request);
             JSONObject jsonObject = new JSONObject(data);
             jsonObject.put("tendermintTx", tendermintTx.name());
@@ -68,23 +71,23 @@ public class TendermintClient {
         try {
             HttpResponse<JsonNode> response = Unirest.get(String.format("%s:%s%s%s",
                     baseUri, port, GET_TX_BASE_URI, String.format("0x%s", txHash))).asJson();
-            log.info(response.getBody().toString());
             if (!response.getBody().getObject().has("result")) return Optional.empty();
             logMessage = response.getBody().getObject().getJSONObject("result")
                     .getJSONObject("tx_result").getString("log");
+            log.debug(logMessage);
         } catch(Exception e) {
-            log.info(e.getMessage(), e);
+            log.debug(e.getMessage(), e);
             throw new JynxProException("Could not get transaction result.");
         }
         try {
             return Optional.of(objectMapper.readValue(logMessage, responseType));
         } catch(JsonProcessingException e) {
-            log.info(e.getMessage());
+            log.debug(e.getMessage());
             throw new JynxProException(logMessage);
         }
     }
 
-    private <S extends TendermintRequest, T> TransactionResponse<T> processTransaction(
+    private <S, T> TransactionResponse<T> processTransaction(
             final S request,
             final Class<T> responseType,
             final TendermintTransaction tendermintTx,
@@ -94,7 +97,6 @@ public class TendermintClient {
             HttpResponse<JsonNode> response = Unirest.get(buildUrl(
                     String.format("%s:%s%s", baseUri, port, TX_BASE_URI), request, tendermintTx)).asJson();
             if (response.getStatus() == 200) {
-                if (responseType == null) return null;
                 JSONObject jsonObject;
                 String hash;
                 try {
@@ -103,23 +105,23 @@ public class TendermintClient {
                             .getJSONObject("result")
                             .getString("hash");
                 } catch (Exception e) {
-                    log.info(response.getBody().toString());
+                    log.debug(response.getBody().toString());
                     throw new JynxProException(e.getMessage());
                 }
                 Optional<T> resultOptional = Optional.empty();
                 for(int i=0; i<10; i++) {
                     resultOptional = getTransaction(hash, responseType);
                     if(resultOptional.isPresent()) break;
-                    sleepUtils.sleep(500L);
+                    sleepUtils.sleep(200L);
                 }
                 return new TransactionResponse<T>().setHash(hash)
                         .setItem(resultOptional.orElseThrow(() -> new JynxProException(errorCode)));
             } else {
-                log.error(response.getBody().toString());
+                log.debug(response.getBody().toString());
                 throw new JynxProException(errorCode);
             }
         } catch(UnirestException e) {
-            log.error(e.getMessage(), e);
+            log.debug(e.getMessage(), e);
             throw new JynxProException(errorCode);
         }
     }
@@ -178,6 +180,27 @@ public class TendermintClient {
     ) {
         return processTransaction(request, Order.class,
                 TendermintTransaction.CANCEL_ORDER, ErrorCode.CANCEL_ORDER_FAILED);
+    }
+
+    public TransactionResponse<Order[]> createOrderMany(
+            final List<CreateOrderRequest> request
+    ) {
+        return processTransaction(request, Order[].class,
+                TendermintTransaction.CREATE_ORDER_MANY, ErrorCode.CREATE_ORDER_FAILED);
+    }
+
+    public TransactionResponse<Order[]> amendOrderMany(
+            final List<AmendOrderRequest> request
+    ) {
+        return processTransaction(request, Order[].class,
+                TendermintTransaction.AMEND_ORDER_MANY, ErrorCode.AMEND_ORDER_FAILED);
+    }
+
+    public TransactionResponse<Order[]> cancelOrderMany(
+            final List<CancelOrderRequest> request
+    ) {
+        return processTransaction(request, Order[].class,
+                TendermintTransaction.CANCEL_ORDER_MANY, ErrorCode.CANCEL_ORDER_FAILED);
     }
 
     public TransactionResponse<Proposal> addMarket(

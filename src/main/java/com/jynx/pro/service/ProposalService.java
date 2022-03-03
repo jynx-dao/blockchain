@@ -179,7 +179,7 @@ public class ProposalService {
         if(votes.size() > 0) {
             throw new JynxProException(ErrorCode.ALREADY_VOTED);
         }
-        if(!proposal.getStatus().equals(ProposalStatus.OPEN) &&
+        if(!List.of(ProposalStatus.OPEN, ProposalStatus.APPROVED).contains(proposal.getStatus()) &&
                 !proposal.getUser().getId().equals(request.getUser().getId())) {
             throw new JynxProException(ErrorCode.VOTING_DISABLED);
         }
