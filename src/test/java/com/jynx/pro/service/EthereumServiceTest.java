@@ -182,4 +182,12 @@ public class EthereumServiceTest extends IntegrationTest {
         Asset asset = depositAsset();
         withdrawAsset(asset);
     }
+
+    @Test
+    public void testConfirmEventsFailed() {
+        ganache.stop();
+        setupComplete = false;
+        List<Event> events = ethereumService.confirmEvents();
+        Assertions.assertEquals(events.size(), 0);
+    }
 }

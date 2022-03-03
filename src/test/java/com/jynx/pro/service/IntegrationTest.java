@@ -312,6 +312,9 @@ public abstract class IntegrationTest {
     ) {
         databaseTransactionManager.createTransaction();
         if(!setupComplete) {
+            if(!ganache.isRunning()) {
+                ganache.start();
+            }
             ethereumHelper.deploy(ganache.getHost(), ganache.getFirstMappedPort(), ETH_PRIVATE_KEY);
             ethereumService.setRpcHost(ganache.getHost());
             ethereumService.setRpcPort(ganache.getFirstMappedPort());

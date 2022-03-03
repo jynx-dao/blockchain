@@ -168,6 +168,7 @@ public class EthereumService {
             final List<Log> logs,
             final com.jynx.pro.entity.Event event
     ) {
+        boolean result = false;
         for(Log ethLog : logs) {
             String eventHash = ethLog.getTopics().get(0);
             if (eventHash.equals(ADD_STAKE_HASH)) {
@@ -176,7 +177,7 @@ public class EthereumService {
                 if(event.getAmount().setScale(10, RoundingMode.HALF_UP)
                         .equals(priceUtils.fromBigInteger(amount).setScale(10, RoundingMode.HALF_UP)) &&
                         event.getUser().getPublicKey().equals(jynxKey)) {
-                    return true;
+                    result = true;
                 }
             } else if (eventHash.equals(REMOVE_STAKE_HASH)) {
                 BigInteger amount = decodeUint256(ethLog, 1);
@@ -184,7 +185,7 @@ public class EthereumService {
                 if(event.getAmount().setScale(10, RoundingMode.HALF_UP)
                         .equals(priceUtils.fromBigInteger(amount).setScale(10, RoundingMode.HALF_UP)) &&
                         event.getUser().getPublicKey().equals(jynxKey)) {
-                    return true;
+                    result = true;
                 }
             } else if (eventHash.equals(DEPOSIT_ASSET_HASH)) {
                 String asset = decodeAddress(ethLog, 1);
@@ -194,11 +195,11 @@ public class EthereumService {
                         .equals(priceUtils.fromBigInteger(amount).setScale(10, RoundingMode.HALF_UP)) &&
                         event.getUser().getPublicKey().equals(jynxKey) &&
                         event.getAsset().equals(asset)) {
-                    return true;
+                    result = true;
                 }
             }
         }
-        return false;
+        return result;
     }
 
     /**
@@ -244,14 +245,14 @@ public class EthereumService {
     /**
      * Gets an instance of the deployed {@link ERC20Detailed} contract
      *
-     * @param erc20contractAddress contract address
+     * @param contractAddress contract address
      *
      * @return {@link ERC20Detailed} contract
      */
     private ERC20Detailed getERC20Contract(
-            final String erc20contractAddress
+            final String contractAddress
     ) {
-        return ERC20Detailed.load(erc20contractAddress, getWeb3j(),
+        return ERC20Detailed.load(contractAddress, getWeb3j(),
                 Credentials.create(privateKey), new DefaultGasProvider());
     }
 

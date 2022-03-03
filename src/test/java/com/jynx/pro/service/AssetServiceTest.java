@@ -5,9 +5,11 @@ import com.jynx.pro.constant.AssetStatus;
 import com.jynx.pro.constant.ProposalStatus;
 import com.jynx.pro.entity.Asset;
 import com.jynx.pro.entity.Proposal;
+import com.jynx.pro.entity.Vote;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.AddAssetRequest;
+import com.jynx.pro.request.CastVoteRequest;
 import com.jynx.pro.request.SingleItemRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -88,6 +90,69 @@ public class AssetServiceTest extends IntegrationTest {
         } catch(JynxProException e) {
             Assertions.assertEquals(e.getMessage(), ErrorCode.ENACT_BEFORE_CLOSE);
         }
+    }
+
+    @Test
+    public void testCannotVoteTwice() {
+        Proposal proposal = assetService.proposeToAdd(getAddAssetRequest(takerUser));
+        Assertions.assertEquals(proposal.getStatus(), ProposalStatus.CREATED);
+        CastVoteRequest voteRequest = new CastVoteRequest()
+                .setId(proposal.getId())
+                .setInFavour(true);
+        voteRequest.setUser(takerUser);
+        try {
+            proposalService.vote(voteRequest);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.ALREADY_VOTED);
+        }
+    }
+
+    @Test
+    public void testCannotVoteWhenDisabled() {
+        Proposal proposal = assetService.proposeToAdd(getAddAssetRequest(takerUser));
+        Assertions.assertEquals(proposal.getStatus(), ProposalStatus.CREATED);
+        CastVoteRequest voteRequest = new CastVoteRequest()
+                .setId(proposal.getId())
+                .setInFavour(true);
+        voteRequest.setUser(makerUser);
+        try {
+            proposalService.vote(voteRequest);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.VOTING_DISABLED);
+        }
+    }
+
+    @Test
+    public void testCannotVoteWhenProposalNotFound() {
+        Proposal proposal = assetService.proposeToAdd(getAddAssetRequest(takerUser));
+        Assertions.assertEquals(proposal.getStatus(), ProposalStatus.CREATED);
+        CastVoteRequest voteRequest = new CastVoteRequest()
+                .setId(UUID.randomUUID())
+                .setInFavour(true);
+        voteRequest.setUser(makerUser);
+        try {
+            proposalService.vote(voteRequest);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.PROPOSAL_NOT_FOUND);
+        }
+    }
+
+    @Test
+    public void testVoteWhenProposalOpen() throws InterruptedException {
+        Proposal proposal = assetService.proposeToAdd(getAddAssetRequest(takerUser));
+        Assertions.assertEquals(proposal.getStatus(), ProposalStatus.CREATED);
+        Thread.sleep(100L);
+        configService.setTimestamp(nowAsMillis());
+        proposalService.open();
+        CastVoteRequest voteRequest = new CastVoteRequest()
+                .setId(proposal.getId())
+                .setInFavour(true);
+        voteRequest.setUser(makerUser);
+        Vote vote = proposalService.vote(voteRequest);
+        Assertions.assertEquals(vote.getInFavour(), true);
     }
 
     @Test
