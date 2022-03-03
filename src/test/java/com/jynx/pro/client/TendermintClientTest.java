@@ -30,6 +30,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.utility.DockerImageName;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 @Slf4j
 @Testcontainers
@@ -59,7 +61,7 @@ public class TendermintClientTest extends IntegrationTest {
     public void setup() {
         initializeState(true);
         tendermint =
-                new GenericContainer(DockerImageName.parse("tendermint/tendermint:v0.33.8"))
+                new GenericContainer(DockerImageName.parse("tendermint/tendermint:v0.34.14"))
                         .withExposedPorts(26657)
                         .withCommand("node --abci grpc --proxy_app tcp://host.docker.internal:26658")
                         .withExtraHost("host.docker.internal", "host-gateway");
@@ -258,6 +260,29 @@ public class TendermintClientTest extends IntegrationTest {
     }
 
     @Test
+    public void testAmendMarket() {
+        Market market = addMarket();
+        AmendMarketRequest request = new AmendMarketRequest()
+                .setId(market.getId())
+                .setStepSize(2);
+        long[] times = proposalTimes();
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        String message = jsonUtils.toJson(request);
+        String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
+        request.setPublicKey(takerUser.getPublicKey());
+        request.setSignature(sig);
+        tendermintClient.amendMarket(request);
+        syncProposals();
+        ResponseEntity<Market> responseEntity = this.restTemplate.getForEntity(
+                String.format("http://localhost:%s/market/%s", port, market.getId().toString()), Market.class);
+        market = responseEntity.getBody();
+        Assertions.assertNotNull(market);
+        Assertions.assertEquals(market.getStepSize(), 2);
+    }
+
+    @Test
     public void testSuspendAndUnsuspendMarket() {
         Market market = addMarket();
         SingleItemRequest request = new SingleItemRequest()
@@ -284,6 +309,84 @@ public class TendermintClientTest extends IntegrationTest {
         market = responseEntity.getBody();
         Assertions.assertNotNull(market);
         Assertions.assertEquals(market.getStatus(), MarketStatus.ACTIVE);
+    }
+
+    @Test
+    public void testBulkOrderRequests() {
+        Market market = addMarket();
+        List<CreateOrderRequest> createRequest = new ArrayList<>();
+        for(int i=0; i<10; i++) {
+            createRequest.add(new CreateOrderRequest()
+                    .setTag(OrderTag.USER_GENERATED)
+                    .setType(OrderType.LIMIT)
+                    .setPostOnly(true)
+                    .setQuantity(BigDecimal.ONE)
+                    .setPrice(BigDecimal.ONE)
+                    .setSide(MarketSide.BUY)
+                    .setMarketId(market.getId()));
+        }
+        BulkCreateOrderRequest bulkCreateRequest = new BulkCreateOrderRequest()
+                .setOrders(createRequest);
+        String message = jsonUtils.toJson(bulkCreateRequest);
+        String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
+        bulkCreateRequest.setPublicKey(takerUser.getPublicKey());
+        bulkCreateRequest.setSignature(sig);
+        TransactionResponse<Order[]> txResponse = tendermintClient.createOrderMany(bulkCreateRequest);
+        Assertions.assertEquals(txResponse.getItem().length, 10);
+        ResponseEntity<OrderBook> responseEntity = this.restTemplate.getForEntity(
+                String.format("http://localhost:%s/market/%s/order-book", port,
+                        market.getId().toString()), OrderBook.class);
+        OrderBook orderBook = responseEntity.getBody();
+        Assertions.assertNotNull(orderBook);
+        Assertions.assertEquals(0, orderBook.getAsks().size());
+        Assertions.assertEquals(10, orderBook.getBids().size());
+        for(int i=0; i<10; i++) {
+            Assertions.assertEquals(orderBook.getBids().get(i).getQuantity().doubleValue(), 1d, 0.0001d);
+        }
+        List<AmendOrderRequest> amendRequest = new ArrayList<>();
+        for(int i=0; i<10; i++) {
+            amendRequest.add(new AmendOrderRequest()
+                    .setId(txResponse.getItem()[i].getId())
+                    .setQuantity(BigDecimal.TEN));
+        }
+        BulkAmendOrderRequest bulkAmendRequest = new BulkAmendOrderRequest()
+                .setOrders(amendRequest);
+        message = jsonUtils.toJson(bulkAmendRequest);
+        sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
+        bulkAmendRequest.setPublicKey(takerUser.getPublicKey());
+        bulkAmendRequest.setSignature(sig);
+        txResponse = tendermintClient.amendOrderMany(bulkAmendRequest);
+        Assertions.assertEquals(txResponse.getItem().length, 10);
+        responseEntity = this.restTemplate.getForEntity(
+                String.format("http://localhost:%s/market/%s/order-book", port,
+                        market.getId().toString()), OrderBook.class);
+        orderBook = responseEntity.getBody();
+        Assertions.assertNotNull(orderBook);
+        Assertions.assertEquals(0, orderBook.getAsks().size());
+        Assertions.assertEquals(10, orderBook.getBids().size());
+        for(int i=0; i<10; i++) {
+            Assertions.assertEquals(orderBook.getBids().get(i).getQuantity().doubleValue(), 10d, 0.0001d);
+        }
+        List<CancelOrderRequest> cancelRequest = new ArrayList<>();
+        for(int i=0; i<10; i++) {
+            cancelRequest.add(new CancelOrderRequest()
+                    .setId(txResponse.getItem()[i].getId()));
+        }
+        BulkCancelOrderRequest bulkCancelRequest = new BulkCancelOrderRequest()
+                .setOrders(cancelRequest);
+        message = jsonUtils.toJson(bulkCancelRequest);
+        sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
+        bulkCancelRequest.setPublicKey(takerUser.getPublicKey());
+        bulkCancelRequest.setSignature(sig);
+        txResponse = tendermintClient.cancelOrderMany(bulkCancelRequest);
+        Assertions.assertEquals(txResponse.getItem().length, 10);
+        responseEntity = this.restTemplate.getForEntity(
+                String.format("http://localhost:%s/market/%s/order-book", port,
+                        market.getId().toString()), OrderBook.class);
+        orderBook = responseEntity.getBody();
+        Assertions.assertNotNull(orderBook);
+        Assertions.assertEquals(0, orderBook.getAsks().size());
+        Assertions.assertEquals(0, orderBook.getBids().size());
     }
 
     @Test
@@ -316,7 +419,8 @@ public class TendermintClientTest extends IntegrationTest {
         tendermintClient.createOrder(buyRequest);
         tendermintClient.createOrder(sellRequest);
         ResponseEntity<OrderBook> responseEntity = this.restTemplate.getForEntity(
-                String.format("http://localhost:%s/market/%s/order-book", port, market.getId().toString()), OrderBook.class);
+                String.format("http://localhost:%s/market/%s/order-book", port,
+                        market.getId().toString()), OrderBook.class);
         OrderBook orderBook = responseEntity.getBody();
         Assertions.assertNotNull(orderBook);
         Assertions.assertTrue(orderBook.getAsks().size() > 0);
@@ -344,7 +448,8 @@ public class TendermintClientTest extends IntegrationTest {
         request.setSignature(sig);
         TransactionResponse<Order> newOrder = tendermintClient.createOrder(request);
         ResponseEntity<OrderBook> responseEntity = this.restTemplate.getForEntity(
-                String.format("http://localhost:%s/market/%s/order-book", port, market.getId().toString()), OrderBook.class);
+                String.format("http://localhost:%s/market/%s/order-book", port,
+                        market.getId().toString()), OrderBook.class);
         OrderBook orderBook = responseEntity.getBody();
         Assertions.assertNotNull(orderBook);
         Assertions.assertTrue(orderBook.getAsks().size() > 0);
@@ -359,7 +464,8 @@ public class TendermintClientTest extends IntegrationTest {
         cancelOrderRequest.setSignature(sig);
         tendermintClient.cancelOrder(cancelOrderRequest);
         responseEntity = this.restTemplate.getForEntity(
-                String.format("http://localhost:%s/market/%s/order-book", port, market.getId().toString()), OrderBook.class);
+                String.format("http://localhost:%s/market/%s/order-book", port,
+                        market.getId().toString()), OrderBook.class);
         orderBook = responseEntity.getBody();
         Assertions.assertNotNull(orderBook);
         Assertions.assertEquals(0, orderBook.getAsks().size());
@@ -383,7 +489,8 @@ public class TendermintClientTest extends IntegrationTest {
         request.setSignature(sig);
         TransactionResponse<Order> newOrder = tendermintClient.createOrder(request);
         ResponseEntity<OrderBook> responseEntity = this.restTemplate.getForEntity(
-                String.format("http://localhost:%s/market/%s/order-book", port, market.getId().toString()), OrderBook.class);
+                String.format("http://localhost:%s/market/%s/order-book", port,
+                        market.getId().toString()), OrderBook.class);
         OrderBook orderBook = responseEntity.getBody();
         Assertions.assertNotNull(orderBook);
         Assertions.assertTrue(orderBook.getAsks().size() > 0);
@@ -399,7 +506,8 @@ public class TendermintClientTest extends IntegrationTest {
         amendOrderRequest.setSignature(sig);
         tendermintClient.amendOrder(amendOrderRequest);
         responseEntity = this.restTemplate.getForEntity(
-                String.format("http://localhost:%s/market/%s/order-book", port, market.getId().toString()), OrderBook.class);
+                String.format("http://localhost:%s/market/%s/order-book", port,
+                        market.getId().toString()), OrderBook.class);
         orderBook = responseEntity.getBody();
         Assertions.assertNotNull(orderBook);
         Assertions.assertTrue(orderBook.getAsks().size() > 0);
@@ -410,7 +518,8 @@ public class TendermintClientTest extends IntegrationTest {
 
     @Test
     public void testVote() {
-        Proposal proposal = getAssetProposal(-1, 10, 20);
+        Proposal proposal = getAssetProposal(-1000, 10000, 20000);
+        syncProposals();
         CastVoteRequest castVoteRequest = new CastVoteRequest()
                 .setId(proposal.getId())
                 .setInFavour(true);
@@ -419,7 +528,41 @@ public class TendermintClientTest extends IntegrationTest {
         castVoteRequest.setSignature(sig);
         castVoteRequest.setPublicKey(PUBLIC_KEY2);
         TransactionResponse<Vote> txResponse = tendermintClient.castVote(castVoteRequest);
-        log.info(txResponse.getItem().toString());
+        Assertions.assertEquals(txResponse.getItem().getInFavour(), true);
+    }
+
+    private Withdrawal createWithdrawal() {
+        Asset asset = addAsset();
+        syncProposals();
+        CreateWithdrawalRequest request = new CreateWithdrawalRequest()
+                .setAmount(BigDecimal.TEN)
+                .setAssetId(asset.getId())
+                .setDestination("0x0A41");
+        String message = jsonUtils.toJson(request);
+        String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
+        request.setSignature(sig);
+        request.setPublicKey(PUBLIC_KEY);
+        TransactionResponse<Withdrawal> txResponse = tendermintClient.createWithdrawal(request);
+        Assertions.assertEquals(txResponse.getItem().getStatus(), WithdrawalStatus.PENDING);
+        return txResponse.getItem();
+    }
+
+    @Test
+    public void testCreateWithdrawal() {
+        createWithdrawal();
+    }
+
+    @Test
+    public void testCancelWithdrawal() {
+        Withdrawal withdrawal = createWithdrawal();
+        SingleItemRequest request = new SingleItemRequest()
+                .setId(withdrawal.getId());
+        String message = jsonUtils.toJson(request);
+        String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
+        request.setSignature(sig);
+        request.setPublicKey(PUBLIC_KEY);
+        TransactionResponse<Withdrawal> txResponse = tendermintClient.cancelWithdrawal(request);
+        Assertions.assertEquals(txResponse.getItem().getStatus(), WithdrawalStatus.CANCELED);
     }
 
     private void waitForBlockchain() {

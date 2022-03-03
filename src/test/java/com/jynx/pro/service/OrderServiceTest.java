@@ -8,14 +8,11 @@ import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.model.OrderBook;
 import com.jynx.pro.model.OrderBookItem;
-import com.jynx.pro.request.AmendOrderRequest;
-import com.jynx.pro.request.CancelOrderRequest;
-import com.jynx.pro.request.CreateOrderRequest;
+import com.jynx.pro.request.*;
 import lombok.Data;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.*;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -668,7 +665,9 @@ public class OrderServiceTest extends IntegrationTest {
         CreateOrderRequest createOrderRequest = getCreateOrderRequest(market.getId(), BigDecimal.valueOf(5),
                 BigDecimal.ONE, MarketSide.BUY, OrderType.LIMIT, makerUser);
         List<CreateOrderRequest> bulkCreateRequest = Arrays.asList(createOrderRequest, createOrderRequest);
-        List<Order> orders = orderService.createMany(bulkCreateRequest);
+        BulkCreateOrderRequest bulkCreate = new BulkCreateOrderRequest().setOrders(bulkCreateRequest);
+        bulkCreate.setUser(makerUser);
+        List<Order> orders = orderService.createMany(bulkCreate);
         orders.forEach(o -> Assertions.assertEquals(o.getStatus(), OrderStatus.OPEN));
         List<AmendOrderRequest> bulkAmendRequest = Arrays.asList(new AmendOrderRequest(), new AmendOrderRequest());
         for(int i=0; i< orders.size(); i++) {
@@ -676,7 +675,9 @@ public class OrderServiceTest extends IntegrationTest {
             bulkAmendRequest.get(i).setQuantity(BigDecimal.valueOf(2));
             bulkAmendRequest.get(i).setUser(makerUser);
         }
-        orders = orderService.amendMany(bulkAmendRequest);
+        BulkAmendOrderRequest bulkAmend = new BulkAmendOrderRequest().setOrders(bulkAmendRequest);
+        bulkAmend.setUser(makerUser);
+        orders = orderService.amendMany(bulkAmend);
         orders.forEach(o -> Assertions.assertEquals(o.getQuantity().setScale(dps, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(2).setScale(dps, RoundingMode.HALF_UP)));
         List<CancelOrderRequest> bulkCancelRequest = Arrays.asList(new CancelOrderRequest(), new CancelOrderRequest());
@@ -684,7 +685,9 @@ public class OrderServiceTest extends IntegrationTest {
             bulkCancelRequest.get(i).setId(orders.get(i).getId());
             bulkCancelRequest.get(i).setUser(makerUser);
         }
-        orders = orderService.cancelMany(bulkCancelRequest);
+        BulkCancelOrderRequest bulkCancel = new BulkCancelOrderRequest().setOrders(bulkCancelRequest);
+        bulkCancel.setUser(makerUser);
+        orders = orderService.cancelMany(bulkCancel);
         orders.forEach(o -> Assertions.assertEquals(o.getStatus(), OrderStatus.CANCELED));
     }
 
@@ -695,7 +698,7 @@ public class OrderServiceTest extends IntegrationTest {
             for(int i=0; i<30; i++) {
                 request.add(new CreateOrderRequest());
             }
-            orderService.createMany(request);
+            orderService.createMany(new BulkCreateOrderRequest().setOrders(request));
             Assertions.fail();
         } catch(JynxProException e) {
             Assertions.assertEquals(e.getMessage(), ErrorCode.MAX_BULK_EXCEEDED);
@@ -705,7 +708,7 @@ public class OrderServiceTest extends IntegrationTest {
             for(int i=0; i<30; i++) {
                 request.add(new AmendOrderRequest());
             }
-            orderService.amendMany(request);
+            orderService.amendMany(new BulkAmendOrderRequest().setOrders(request));
             Assertions.fail();
         } catch(JynxProException e) {
             Assertions.assertEquals(e.getMessage(), ErrorCode.MAX_BULK_EXCEEDED);
@@ -715,7 +718,7 @@ public class OrderServiceTest extends IntegrationTest {
             for(int i=0; i<30; i++) {
                 request.add(new CancelOrderRequest());
             }
-            orderService.cancelMany(request);
+            orderService.cancelMany(new BulkCancelOrderRequest().setOrders(request));
             Assertions.fail();
         } catch(JynxProException e) {
             Assertions.assertEquals(e.getMessage(), ErrorCode.MAX_BULK_EXCEEDED);

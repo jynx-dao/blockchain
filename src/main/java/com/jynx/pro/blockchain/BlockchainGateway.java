@@ -14,12 +14,13 @@ import com.jynx.pro.utils.CryptoUtils;
 import com.jynx.pro.utils.JSONUtils;
 import io.grpc.stub.StreamObserver;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.binary.Hex;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
-import tendermint.abci.types.ABCIApplicationGrpc;
-import tendermint.abci.types.Types;
+import tendermint.abci.ABCIApplicationGrpc;
+import tendermint.abci.Types;
 
 import javax.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
@@ -52,6 +53,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Autowired
     private UserService userService;
     @Autowired
+    private ValidatorService validatorService;
+    @Autowired
     private AppStateManager appStateManager;
     @Autowired
     private DatabaseTransactionManager databaseTransactionManager;
@@ -69,6 +72,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         checkTransactions.put(TendermintTransaction.CREATE_ORDER, this::checkCreateOrder);
         checkTransactions.put(TendermintTransaction.CANCEL_ORDER, this::checkCancelOrder);
         checkTransactions.put(TendermintTransaction.AMEND_ORDER, this::checkAmendOrder);
+        checkTransactions.put(TendermintTransaction.CREATE_ORDER_MANY, this::checkCreateOrderMany);
+        checkTransactions.put(TendermintTransaction.CANCEL_ORDER_MANY, this::checkCancelOrderMany);
+        checkTransactions.put(TendermintTransaction.AMEND_ORDER_MANY, this::checkAmendOrderMany);
         checkTransactions.put(TendermintTransaction.CREATE_WITHDRAWAL, this::checkCreateWithdrawal);
         checkTransactions.put(TendermintTransaction.CANCEL_WITHDRAWAL, this::checkCancelWithdrawal);
         checkTransactions.put(TendermintTransaction.ADD_MARKET, this::checkAddMarket);
@@ -88,6 +94,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         deliverTransactions.put(TendermintTransaction.CREATE_ORDER, this::createOrder);
         deliverTransactions.put(TendermintTransaction.CANCEL_ORDER, this::cancelOrder);
         deliverTransactions.put(TendermintTransaction.AMEND_ORDER, this::amendOrder);
+        deliverTransactions.put(TendermintTransaction.CREATE_ORDER_MANY, this::createOrderMany);
+        deliverTransactions.put(TendermintTransaction.CANCEL_ORDER_MANY, this::cancelOrderMany);
+        deliverTransactions.put(TendermintTransaction.AMEND_ORDER_MANY, this::amendOrderMany);
         deliverTransactions.put(TendermintTransaction.CREATE_WITHDRAWAL, this::createWithdrawal);
         deliverTransactions.put(TendermintTransaction.CANCEL_WITHDRAWAL, this::cancelWithdrawal);
         deliverTransactions.put(TendermintTransaction.ADD_MARKET, this::addMarket);
@@ -217,33 +226,54 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         // TODO
     }
 
-    private Object castVote(
+    private void checkCreateOrderMany(
             final String txAsJson
     ) {
-        CastVoteRequest request = jsonUtils.fromJson(txAsJson, CastVoteRequest.class);
-        verifySignature(request);
-        return proposalService.vote(request);
+        // TODO
+    }
+
+    private void checkCancelOrderMany(
+            final String txAsJson
+    ) {
+        // TODO
+    }
+
+    private void checkAmendOrderMany(
+            final String txAsJson
+    ) {
+        // TODO
     }
 
     private Object confirmEthereumEvents(
             final String txAsJson
     ) {
-//        verifySignature(request); // TODO - verify validator
+        EmptyRequest request = jsonUtils.fromJson(txAsJson, EmptyRequest.class);
+        verifySignature(request, true);
         return ethereumService.confirmEvents();
     }
 
     private Object syncProposals(
             final String txAsJson
     ) {
-//        verifySignature(request); // TODO - verify validator
+        EmptyRequest request = jsonUtils.fromJson(txAsJson, EmptyRequest.class);
+        verifySignature(request, true);
         return proposalService.sync();
     }
 
     private Object settleMarkets(
             final String txAsJson
     ) {
-//        verifySignature(request); // TODO - verify validator
+        EmptyRequest request = jsonUtils.fromJson(txAsJson, EmptyRequest.class);
+        verifySignature(request, true);
         return marketService.settleMarkets();
+    }
+
+    private Object castVote(
+            final String txAsJson
+    ) {
+        CastVoteRequest request = jsonUtils.fromJson(txAsJson, CastVoteRequest.class);
+        verifySignature(request);
+        return proposalService.vote(request);
     }
 
     private Object createWithdrawal(
@@ -342,11 +372,48 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         return orderService.amend(request);
     }
 
+    private Object createOrderMany(
+            final String txAsJson
+    ) {
+        BulkCreateOrderRequest request = jsonUtils.fromJson(txAsJson, BulkCreateOrderRequest.class);
+        verifySignature(request);
+        return orderService.createMany(request);
+    }
+
+    private Object cancelOrderMany(
+            final String txAsJson
+    ) {
+        BulkCancelOrderRequest request = jsonUtils.fromJson(txAsJson, BulkCancelOrderRequest.class);
+        verifySignature(request);
+        return orderService.cancelMany(request);
+    }
+
+    private Object amendOrderMany(
+            final String txAsJson
+    ) {
+        BulkAmendOrderRequest request = jsonUtils.fromJson(txAsJson, BulkAmendOrderRequest.class);
+        verifySignature(request);
+        return orderService.amendMany(request);
+    }
+
     private void verifySignature(
-            final SignedRequest request
+            final SignedRequest request,
+            final boolean isValidator
     ) {
         String signature = request.getSignature();
         String publicKey = request.getPublicKey();
+        if(isValidator) {
+            try {
+                String publicKeyAsBase64 = Base64.getEncoder().encodeToString(Hex.decodeHex(request.getPublicKey()));
+                boolean result = validatorService.isValidator(publicKeyAsBase64);
+                if(!result) {
+                    throw new JynxProException(ErrorCode.SIGNATURE_INVALID);
+                }
+            } catch(Exception e) {
+                log.debug(e.getMessage(), e);
+                throw new JynxProException(ErrorCode.SIGNATURE_INVALID);
+            }
+        }
         request.setSignature(null);
         request.setPublicKey(null);
         String message = jsonUtils.toJson(request);
@@ -358,6 +425,12 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         request.setUser(user);
         request.setSignature(signature);
         request.setPublicKey(publicKey);
+    }
+
+    private void verifySignature(
+            final SignedRequest request
+    ) {
+        verifySignature(request, false);
     }
 
     private Object deliverTransaction(
@@ -390,9 +463,14 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     }
 
     @Override
-    public void initChain(tendermint.abci.types.Types.RequestInitChain request,
-                          io.grpc.stub.StreamObserver<tendermint.abci.types.Types.ResponseInitChain> responseObserver) {
+    public void initChain(tendermint.abci.Types.RequestInitChain request,
+                          io.grpc.stub.StreamObserver<tendermint.abci.Types.ResponseInitChain> responseObserver) {
         Types.ResponseInitChain resp = Types.ResponseInitChain.newBuilder().build();
+        request.getValidatorsList().forEach(v -> {
+            String publicKey = Base64.getEncoder().encodeToString(
+                    request.getValidatorsList().get(0).getPubKey().getEd25519().toByteArray());
+            validatorService.add(publicKey);
+        });
         request.getAppStateBytes(); // TODO - load config from genesis
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
@@ -417,13 +495,12 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         long millis = (req.getHeader().getTime().getSeconds() * 1000) +
                 Math.round(req.getHeader().getTime().getNanos() / 1000000d);
         configService.setTimestamp(millis);
-        String proposerAddress = req.getHeader().getProposerAddress().toStringUtf8();
+        String proposerAddress = Hex.encodeHexString(req.getHeader().getProposerAddress().toByteArray());
         if(validatorAddress.equals(proposerAddress)) {
             tendermintClient.confirmEthereumEvents(new EmptyRequest()); // TODO - add public key and signature
             tendermintClient.settleMarkets(new EmptyRequest()); // TODO - add public key and signature
             tendermintClient.syncProposals(new EmptyRequest()); // TODO - add public key and signature
             // TODO - propagate latest Ethereum events
-            // TODO - risk management / liquidations?? [if we decide it's better to do it once per block...]
         }
         responseObserver.onNext(resp);
         responseObserver.onCompleted();

@@ -183,21 +183,21 @@ public class TendermintClient {
     }
 
     public TransactionResponse<Order[]> createOrderMany(
-            final List<CreateOrderRequest> request
+            final BulkCreateOrderRequest request
     ) {
         return processTransaction(request, Order[].class,
                 TendermintTransaction.CREATE_ORDER_MANY, ErrorCode.CREATE_ORDER_FAILED);
     }
 
     public TransactionResponse<Order[]> amendOrderMany(
-            final List<AmendOrderRequest> request
+            final BulkAmendOrderRequest request
     ) {
         return processTransaction(request, Order[].class,
                 TendermintTransaction.AMEND_ORDER_MANY, ErrorCode.AMEND_ORDER_FAILED);
     }
 
     public TransactionResponse<Order[]> cancelOrderMany(
-            final List<CancelOrderRequest> request
+            final BulkCancelOrderRequest request
     ) {
         return processTransaction(request, Order[].class,
                 TendermintTransaction.CANCEL_ORDER_MANY, ErrorCode.CANCEL_ORDER_FAILED);

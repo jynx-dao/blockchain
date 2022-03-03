@@ -8,7 +8,6 @@ import com.jynx.pro.entity.Withdrawal;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.request.CreateWithdrawalRequest;
 import com.jynx.pro.request.SingleItemRequest;
-import lombok.With;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;

@@ -151,7 +151,7 @@
                             <goal>run</goal>
                         </goals>
                         <configuration>
-                            <protocVersion>3.7.1</protocVersion>
+                            <protocVersion>3.19.4</protocVersion>
                             <includeDirectories>
                                 <include>src/main/proto</include>
                             </includeDirectories>

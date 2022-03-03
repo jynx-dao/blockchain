@@ -9,9 +9,7 @@ import com.jynx.pro.model.OrderBookItem;
 import com.jynx.pro.repository.AccountRepository;
 import com.jynx.pro.repository.OrderHistoryRepository;
 import com.jynx.pro.repository.OrderRepository;
-import com.jynx.pro.request.AmendOrderRequest;
-import com.jynx.pro.request.CancelOrderRequest;
-import com.jynx.pro.request.CreateOrderRequest;
+import com.jynx.pro.request.*;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -305,11 +303,11 @@ public class OrderService {
         BigDecimal markPrice = getMidPrice(market);
         marketService.updateLastPrice(lastPrice, markPrice, market);
         auctionService.checkTriggers(market);
+        positionService.updatePassiveLiquidity(market);
         if(!markPrice.setScale(dps, RoundingMode.HALF_UP)
                 .equals(originalMarkPrice.setScale(dps, RoundingMode.HALF_UP))) {
             executeStopOrders(market);
             positionService.executeLiquidations(markPrice, market);
-            positionService.updatePassiveLiquidity(market);
         }
     }
 
@@ -727,49 +725,52 @@ public class OrderService {
     /**
      * Create many {@link Order}s in a single request
      *
-     * @param requests list of {@link CreateOrderRequest}
+     * @param request {@link BulkCreateOrderRequest}
      *
      * @return list of {@link Order}
      */
     public List<Order> createMany(
-            final List<CreateOrderRequest> requests
+            final BulkCreateOrderRequest request
     ) {
-        if(requests.size() > MAX_BULK) {
+        if(request.getOrders().size() > MAX_BULK) {
             throw new JynxProException(ErrorCode.MAX_BULK_EXCEEDED);
         }
-        return requests.stream().map(this::create).collect(Collectors.toList());
+        request.getOrders().forEach(o -> o.setUser(request.getUser()));
+        return request.getOrders().stream().map(this::create).collect(Collectors.toList());
     }
 
     /**
      * Amend many {@link Order}s in a single request
      *
-     * @param requests list of {@link AmendOrderRequest}
+     * @param request {@link AmendOrderRequest}
      *
      * @return list of {@link Order}
      */
     public List<Order> amendMany(
-            final List<AmendOrderRequest> requests
+            final BulkAmendOrderRequest request
     ) {
-        if(requests.size() > MAX_BULK) {
+        if(request.getOrders().size() > MAX_BULK) {
             throw new JynxProException(ErrorCode.MAX_BULK_EXCEEDED);
         }
-        return requests.stream().map(this::amend).collect(Collectors.toList());
+        request.getOrders().forEach(o -> o.setUser(request.getUser()));
+        return request.getOrders().stream().map(this::amend).collect(Collectors.toList());
     }
 
     /**
      * Cancel many {@link Order}s in a single request
      *
-     * @param requests list of {@link CancelOrderRequest}
+     * @param request {@link BulkCancelOrderRequest}
      *
      * @return list of {@link Order}
      */
     public List<Order> cancelMany(
-            final List<CancelOrderRequest> requests
+            final BulkCancelOrderRequest request
     ) {
-        if(requests.size() > MAX_BULK) {
+        if(request.getOrders().size() > MAX_BULK) {
             throw new JynxProException(ErrorCode.MAX_BULK_EXCEEDED);
         }
-        return requests.stream().map(this::cancel).collect(Collectors.toList());
+        request.getOrders().forEach(o -> o.setUser(request.getUser()));
+        return request.getOrders().stream().map(this::cancel).collect(Collectors.toList());
     }
 
     /**

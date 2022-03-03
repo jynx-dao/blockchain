@@ -1,9 +1,7 @@
 package com.jynx.pro.controller;
 
 import com.jynx.pro.entity.Order;
-import com.jynx.pro.request.AmendOrderRequest;
-import com.jynx.pro.request.CancelOrderRequest;
-import com.jynx.pro.request.CreateOrderRequest;
+import com.jynx.pro.request.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
@@ -38,21 +36,21 @@ public class OrderController extends AbstractController {
 
     @PostMapping("/batch")
     public ResponseEntity<List<Order>> createMany(
-            @RequestBody List<CreateOrderRequest> request
+            @RequestBody BulkCreateOrderRequest request
     ) {
         return ResponseEntity.ok(Arrays.asList(tendermintClient.createOrderMany(request).getItem()));
     }
 
     @PutMapping("/batch")
     public ResponseEntity<List<Order>> amendMany(
-            @RequestBody List<AmendOrderRequest> request
+            @RequestBody BulkAmendOrderRequest request
     ) {
         return ResponseEntity.ok(Arrays.asList(tendermintClient.amendOrderMany(request).getItem()));
     }
 
     @DeleteMapping("/batch")
     public ResponseEntity<List<Order>> cancelMany(
-            @RequestBody List<CancelOrderRequest> request
+            @RequestBody BulkCancelOrderRequest request
     ) {
         return ResponseEntity.ok(Arrays.asList(tendermintClient.cancelOrderMany(request).getItem()));
     }
