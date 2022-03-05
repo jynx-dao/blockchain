@@ -79,6 +79,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Value("${batch.block.frequency}")
     private Integer batchBlockFrequency;
 
+    // TODO - we need to protect against replay attacks
 
     private static final ExecutorService executorService = Executors.newCachedThreadPool();
     private final Map<TendermintTransaction, Function<String, Object>> deliverTransactions = new HashMap<>();
@@ -271,7 +272,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         BatchValidatorRequest request = jsonUtils.fromJson(txAsJson, BatchValidatorRequest.class);
-//        verifySignature(request, true);
+        verifySignature(request, true);
         return ethereumService.confirmEvents();
     }
 
@@ -287,7 +288,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         BatchValidatorRequest request = jsonUtils.fromJson(txAsJson, BatchValidatorRequest.class);
-//        verifySignature(request, true);
+        verifySignature(request, true);
         return marketService.settleMarkets();
     }
 
@@ -558,23 +559,27 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         if(validatorAddress.toLowerCase(Locale.ROOT).equals(proposerAddress.toLowerCase(Locale.ROOT)) &&
                 blockHeight % batchBlockFrequency == 0 && blockHeight > 1) {
             executorService.submit(() -> {
-                //            try {
-//                tendermintClient.confirmEthereumEvents(getBatchRequest(proposerAddress, blockHeight));
-//            } catch(Exception e) {
-//                log.error(ErrorCode.CONFIRM_ETHEREUM_EVENTS_FAILED, e);
-//            }
-//            try {
-//                tendermintClient.settleMarkets(getBatchRequest(proposerAddress, blockHeight));
-//            } catch(Exception e) {
-//                log.error(ErrorCode.SETTLE_MARKETS_FAILED, e);
-//            }
+                try {
+                    tendermintClient.confirmEthereumEvents(getBatchRequest(proposerAddress, blockHeight));
+                } catch (Exception e) {
+                    log.error(ErrorCode.CONFIRM_ETHEREUM_EVENTS_FAILED, e);
+                }
+            });
+            executorService.submit(() -> {
+                try {
+                    tendermintClient.settleMarkets(getBatchRequest(proposerAddress, blockHeight));
+                } catch (Exception e) {
+                    log.error(ErrorCode.SETTLE_MARKETS_FAILED, e);
+                }
+            });
+            executorService.submit(() -> {
                 try {
                     tendermintClient.syncProposals(getBatchRequest(proposerAddress, blockHeight));
                 } catch(Exception e) {
                     log.error(ErrorCode.SYNC_PROPOSALS_FAILED, e);
                 }
-                // TODO - propagate latest Ethereum events
             });
+            // TODO - propagate latest Ethereum events
         }
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
