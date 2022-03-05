@@ -1,6 +1,7 @@
 package com.jynx.pro.client;
 
 import com.jynx.pro.Application;
+import com.jynx.pro.blockchain.BlockchainGateway;
 import com.jynx.pro.blockchain.TendermintClient;
 import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.*;
@@ -14,6 +15,7 @@ import com.jynx.pro.utils.CryptoUtils;
 import com.jynx.pro.utils.JSONUtils;
 import com.jynx.pro.utils.SleepUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.json.JSONObject;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -27,8 +29,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.shaded.org.apache.commons.io.IOUtils;
 import org.testcontainers.utility.DockerImageName;
 
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -42,6 +47,8 @@ public class TendermintClientTest extends IntegrationTest {
 
     @Autowired
     private TendermintClient tendermintClient;
+    @Autowired
+    private BlockchainGateway blockchainGateway;
     @Autowired
     private AppStateManager appStateManager;
     @Autowired
@@ -57,16 +64,36 @@ public class TendermintClientTest extends IntegrationTest {
 
     public static GenericContainer tendermint;
 
+    private void updateTendermintKeys(
+            final String dest
+    ) {
+        try {
+            InputStream is = new FileInputStream(dest);
+            String jsonTxt = IOUtils.toString(is, "UTF-8");
+            JSONObject json = new JSONObject(jsonTxt);
+            String address = json.getString("address");
+            String privateKey = json.getJSONObject("priv_key").getString("value");
+            String publicKey = json.getJSONObject("pub_key").getString("value");
+            blockchainGateway.setValidatorAddress(address);
+            blockchainGateway.setValidatorPrivateKey(privateKey);
+            blockchainGateway.setValidatorPublicKey(publicKey );
+        } catch(Exception e) {
+            log.error(e.getMessage(), e);
+        }
+    }
+
     @BeforeEach
     public void setup() {
         initializeState(true);
-        // TODO - we must load the genesis file here somehow...
         tendermint =
                 new GenericContainer(DockerImageName.parse("tendermint/tendermint:v0.34.14"))
                         .withExposedPorts(26657)
                         .withCommand("node --abci grpc --proxy_app tcp://host.docker.internal:26658")
                         .withExtraHost("host.docker.internal", "host-gateway");
         tendermint.start();
+        String dest = "target/priv_validator_key.json";
+        tendermint.copyFileFromContainer("/tendermint/config/priv_validator_key.json", dest);
+        updateTendermintKeys(dest);
         int port = tendermint.getFirstMappedPort();
         String host = String.format("http://%s", tendermint.getHost());
         tendermintClient.setBaseUri(host);
@@ -136,14 +163,14 @@ public class TendermintClientTest extends IntegrationTest {
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         tendermintClient.suspendAsset(request);
-        syncProposals();
+        sleepUtils.sleep(2000L);
         ResponseEntity<Asset> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/asset/%s", port, asset.getId().toString()), Asset.class);
         asset = responseEntity.getBody();
         Assertions.assertNotNull(asset);
         Assertions.assertEquals(asset.getStatus(), AssetStatus.SUSPENDED);
         tendermintClient.unsuspendAsset(request);
-        syncProposals();
+        sleepUtils.sleep(2000L);
         responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/asset/%s", port, asset.getId().toString()), Asset.class);
         asset = responseEntity.getBody();
@@ -196,14 +223,6 @@ public class TendermintClientTest extends IntegrationTest {
         }
     }
 
-    private void syncProposals() {
-        sleepUtils.sleep(100L);
-        BatchValidatorRequest batchValidatorRequest = new BatchValidatorRequest();
-        batchValidatorRequest.setPublicKey("50505050505050505050505050505050");
-        tendermintClient.syncProposals(batchValidatorRequest);
-        sleepUtils.sleep(100L);
-    }
-
     private Asset getDai() {
         ResponseEntity<Asset[]> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/asset/all", port), Asset[].class);
@@ -221,7 +240,7 @@ public class TendermintClientTest extends IntegrationTest {
     private Market addMarket() {
         Asset asset = getDai();
         Assertions.assertNotNull(asset);
-        syncProposals();
+        sleepUtils.sleep(2000L);
         AddMarketRequest request = new AddMarketRequest()
                 .setName("Tesla Motors")
                 .setSettlementAssetId(asset.getId())
@@ -243,7 +262,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         TransactionResponse<Proposal> txResponse = tendermintClient.addMarket(request);
-        syncProposals();
+        sleepUtils.sleep(2000L);
         Assertions.assertEquals(txResponse.getItem().getStatus(), ProposalStatus.CREATED);
         ResponseEntity<Market> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/market/%s", port,
@@ -275,7 +294,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         tendermintClient.amendMarket(request);
-        syncProposals();
+        sleepUtils.sleep(2000L);
         ResponseEntity<Market> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/market/%s", port, market.getId().toString()), Market.class);
         market = responseEntity.getBody();
@@ -297,14 +316,14 @@ public class TendermintClientTest extends IntegrationTest {
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         tendermintClient.suspendMarket(request);
-        syncProposals();
+        sleepUtils.sleep(2000L);
         ResponseEntity<Market> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/market/%s", port, market.getId().toString()), Market.class);
         market = responseEntity.getBody();
         Assertions.assertNotNull(market);
         Assertions.assertEquals(market.getStatus(), MarketStatus.SUSPENDED);
         tendermintClient.unsuspendMarket(request);
-        syncProposals();
+        sleepUtils.sleep(2000L);
         responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/market/%s", port, market.getId().toString()), Market.class);
         market = responseEntity.getBody();
@@ -520,7 +539,7 @@ public class TendermintClientTest extends IntegrationTest {
     @Test
     public void testVote() {
         Proposal proposal = getAssetProposal(-1000, 10000, 20000);
-        syncProposals();
+        sleepUtils.sleep(2000L);
         CastVoteRequest castVoteRequest = new CastVoteRequest()
                 .setId(proposal.getId())
                 .setInFavour(true);
@@ -534,7 +553,7 @@ public class TendermintClientTest extends IntegrationTest {
 
     private Withdrawal createWithdrawal() {
         Asset asset = addAsset();
-        syncProposals();
+        sleepUtils.sleep(2000L);
         CreateWithdrawalRequest request = new CreateWithdrawalRequest()
                 .setAmount(BigDecimal.TEN)
                 .setAssetId(asset.getId())

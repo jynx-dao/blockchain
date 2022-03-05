@@ -13,6 +13,7 @@ import com.jynx.pro.service.*;
 import com.jynx.pro.utils.CryptoUtils;
 import com.jynx.pro.utils.JSONUtils;
 import io.grpc.stub.StreamObserver;
+import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Hex;
 import org.json.JSONException;
@@ -29,6 +30,8 @@ import java.util.Base64;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -64,13 +67,20 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private JSONUtils jsonUtils;
     @Autowired
     private CryptoUtils cryptoUtils;
+    @Setter
     @Value("${validator.address}")
     private String validatorAddress;
+    @Setter
     @Value("${validator.private.key}")
     private String validatorPrivateKey;
+    @Setter
     @Value("${validator.public.key}")
     private String validatorPublicKey;
+    @Value("${batch.block.frequency}")
+    private Integer batchBlockFrequency;
 
+
+    private static final ExecutorService executorService = Executors.newCachedThreadPool();
     private final Map<TendermintTransaction, Function<String, Object>> deliverTransactions = new HashMap<>();
     private final Map<TendermintTransaction, Consumer<String>> checkTransactions = new HashMap<>();
 
@@ -269,7 +279,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         BatchValidatorRequest request = jsonUtils.fromJson(txAsJson, BatchValidatorRequest.class);
-//        verifySignature(request, true);
+        verifySignature(request, true);
         return proposalService.sync();
     }
 
@@ -494,10 +504,11 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                 .setAddress(address)
                 .setHeight(height);
         String message = jsonUtils.toJson(request);
-        String hexKey = Hex.encodeHexString(Base64.getDecoder().decode(validatorPrivateKey));
-        String sig = cryptoUtils.sign(message, hexKey).orElse("");
+        String hexPrivateKey = Hex.encodeHexString(Base64.getDecoder().decode(validatorPrivateKey));
+        String hexPublicKey = Hex.encodeHexString(Base64.getDecoder().decode(validatorPublicKey));
+        String sig = cryptoUtils.sign(message, hexPrivateKey).orElse("");
         request.setSignature(sig);
-        request.setPublicKey(hexKey);
+        request.setPublicKey(hexPublicKey);
         return request;
     }
 
@@ -545,23 +556,25 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         String proposerAddress = Hex.encodeHexString(req.getHeader().getProposerAddress().toByteArray());
         long blockHeight = req.getHeader().getHeight();
         if(validatorAddress.toLowerCase(Locale.ROOT).equals(proposerAddress.toLowerCase(Locale.ROOT)) &&
-                blockHeight % 60 == 0) {
-            try {
-                tendermintClient.confirmEthereumEvents(getBatchRequest(proposerAddress, blockHeight));
-            } catch(Exception e) {
-                log.error(ErrorCode.CONFIRM_ETHEREUM_EVENTS_FAILED, e);
-            }
-            try {
-                tendermintClient.settleMarkets(getBatchRequest(proposerAddress, blockHeight));
-            } catch(Exception e) {
-                log.error(ErrorCode.SETTLE_MARKETS_FAILED, e);
-            }
-            try {
-                tendermintClient.syncProposals(getBatchRequest(proposerAddress, blockHeight));
-            } catch(Exception e) {
-                log.error(ErrorCode.SYNC_PROPOSALS_FAILED, e);
-            }
-            // TODO - propagate latest Ethereum events
+                blockHeight % batchBlockFrequency == 0 && blockHeight > 1) {
+            executorService.submit(() -> {
+                //            try {
+//                tendermintClient.confirmEthereumEvents(getBatchRequest(proposerAddress, blockHeight));
+//            } catch(Exception e) {
+//                log.error(ErrorCode.CONFIRM_ETHEREUM_EVENTS_FAILED, e);
+//            }
+//            try {
+//                tendermintClient.settleMarkets(getBatchRequest(proposerAddress, blockHeight));
+//            } catch(Exception e) {
+//                log.error(ErrorCode.SETTLE_MARKETS_FAILED, e);
+//            }
+                try {
+                    tendermintClient.syncProposals(getBatchRequest(proposerAddress, blockHeight));
+                } catch(Exception e) {
+                    log.error(ErrorCode.SYNC_PROPOSALS_FAILED, e);
+                }
+                // TODO - propagate latest Ethereum events
+            });
         }
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
