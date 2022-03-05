@@ -80,4 +80,5 @@ public class ErrorCode {
     public static final String CAST_VOTE_FAILED = "Failed to cast vote.";
     public static final String UNKNOWN_ERROR = "An unknown error occurred.";
     public static final String SIGNATURE_INVALID = "The signature is invalid.";
+    public static final String INVALID_APP_STATE = "Blockchain started with invalid app state.";
 }

@@ -72,6 +72,7 @@ public class StakeService {
             final Long blockNumber,
             final String txHash
     ) {
+        // TODO - don't duplicate events
         eventService.save(userService.getAndCreate(publicKey), blockNumber,
                 txHash, amount, EventType.REMOVE_STAKE);
     }
@@ -82,6 +83,7 @@ public class StakeService {
             final Long blockNumber,
             final String txHash
     ) {
+        // TODO - don't duplicate events
         eventService.save(userService.getAndCreate(publicKey), blockNumber,
                 txHash, amount, EventType.ADD_STAKE);
     }

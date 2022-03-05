@@ -18,16 +18,31 @@ public class ValidatorService {
     @Autowired
     private UUIDUtils uuidUtils;
 
+    /**
+     * Add a {@link Validator} to the database if it doesn't exist
+     *
+     * @param publicKey the validator's public key
+     */
     public void add(
             final String publicKey
     ) {
-        Validator validator = new Validator()
-                .setId(uuidUtils.next())
-                .setPublicKey(publicKey)
-                .setActive(true);
-        validatorRepository.save(validator);
+        Optional<Validator> validatorOptional = validatorRepository.findByPublicKey(publicKey);
+        if(validatorOptional.isEmpty()) {
+            Validator validator = new Validator()
+                    .setId(uuidUtils.next())
+                    .setPublicKey(publicKey)
+                    .setActive(true);
+            validatorRepository.save(validator);
+        }
     }
 
+    /**
+     * Check if a public key belongs to an active {@link Validator}
+     *
+     * @param publicKey the public key
+     *
+     * @return true / false
+     */
     public boolean isValidator(
             final String publicKey
     ) {

@@ -25,7 +25,6 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
-import java.util.List;
 import java.util.Optional;
 
 @Slf4j
@@ -127,21 +126,21 @@ public class TendermintClient {
     }
 
     public void confirmEthereumEvents(
-            final EmptyRequest request
+            final BatchValidatorRequest request
     ) {
         processTransaction(request, Object.class,
                 TendermintTransaction.CONFIRM_ETHEREUM_EVENTS, ErrorCode.CONFIRM_ETHEREUM_EVENTS_FAILED);
     }
 
     public void settleMarkets(
-            final EmptyRequest request
+            final BatchValidatorRequest request
     ) {
         processTransaction(request, Object.class,
                 TendermintTransaction.SETTLE_MARKETS, ErrorCode.SETTLE_MARKETS_FAILED);
     }
 
     public void syncProposals(
-            final EmptyRequest request
+            final BatchValidatorRequest request
     ) {
         processTransaction(request, Object.class,
                 TendermintTransaction.SYNC_PROPOSALS, ErrorCode.SYNC_PROPOSALS_FAILED);

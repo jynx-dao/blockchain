@@ -15,6 +15,7 @@ import com.jynx.pro.utils.JSONUtils;
 import io.grpc.stub.StreamObserver;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Hex;
+import org.json.JSONException;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -26,6 +27,7 @@ import javax.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -64,6 +66,10 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private CryptoUtils cryptoUtils;
     @Value("${validator.address}")
     private String validatorAddress;
+    @Value("${validator.private.key}")
+    private String validatorPrivateKey;
+    @Value("${validator.public.key}")
+    private String validatorPublicKey;
 
     private final Map<TendermintTransaction, Function<String, Object>> deliverTransactions = new HashMap<>();
     private final Map<TendermintTransaction, Consumer<String>> checkTransactions = new HashMap<>();
@@ -118,6 +124,13 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         setupCheckTransactions();
     }
 
+    /**
+     * Get {@link TendermintTransaction} from base64 transaction payload
+     *
+     * @param tx the transaction payload
+     *
+     * @return {@link TendermintTransaction}
+     */
     private TendermintTransaction getTendermintTx(
             final String tx
     ) {
@@ -247,7 +260,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private Object confirmEthereumEvents(
             final String txAsJson
     ) {
-        EmptyRequest request = jsonUtils.fromJson(txAsJson, EmptyRequest.class);
+        BatchValidatorRequest request = jsonUtils.fromJson(txAsJson, BatchValidatorRequest.class);
 //        verifySignature(request, true);
         return ethereumService.confirmEvents();
     }
@@ -255,7 +268,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private Object syncProposals(
             final String txAsJson
     ) {
-        EmptyRequest request = jsonUtils.fromJson(txAsJson, EmptyRequest.class);
+        BatchValidatorRequest request = jsonUtils.fromJson(txAsJson, BatchValidatorRequest.class);
 //        verifySignature(request, true);
         return proposalService.sync();
     }
@@ -263,7 +276,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private Object settleMarkets(
             final String txAsJson
     ) {
-        EmptyRequest request = jsonUtils.fromJson(txAsJson, EmptyRequest.class);
+        BatchValidatorRequest request = jsonUtils.fromJson(txAsJson, BatchValidatorRequest.class);
 //        verifySignature(request, true);
         return marketService.settleMarkets();
     }
@@ -396,6 +409,12 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         return orderService.amendMany(request);
     }
 
+    /**
+     * Verify the signature of a {@link SignedRequest}
+     *
+     * @param request {@link SignedRequest}
+     * @param isValidator check if the public key belongs to an active validator
+     */
     private void verifySignature(
             final SignedRequest request,
             final boolean isValidator
@@ -427,6 +446,11 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         request.setPublicKey(publicKey);
     }
 
+    /**
+     * Verify the signature of a {@link SignedRequest}
+     *
+     * @param request {@link SignedRequest}
+     */
     private void verifySignature(
             final SignedRequest request
     ) {
@@ -462,18 +486,39 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         }
     }
 
+    private BatchValidatorRequest getBatchRequest(
+            final String address,
+            final long height
+    ) {
+        BatchValidatorRequest request = new BatchValidatorRequest()
+                .setAddress(address)
+                .setHeight(height);
+        String message = jsonUtils.toJson(request);
+        String hexKey = Hex.encodeHexString(Base64.getDecoder().decode(validatorPrivateKey));
+        String sig = cryptoUtils.sign(message, hexKey).orElse("");
+        request.setSignature(sig);
+        request.setPublicKey(hexKey);
+        return request;
+    }
+
     @Override
     public void initChain(tendermint.abci.Types.RequestInitChain request,
                           io.grpc.stub.StreamObserver<tendermint.abci.Types.ResponseInitChain> responseObserver) {
         Types.ResponseInitChain resp = Types.ResponseInitChain.newBuilder().build();
         databaseTransactionManager.createTransaction();
+        String appState = request.getAppStateBytes().toStringUtf8();
+        try {
+            configService.initializeNetworkConfig(new JSONObject(appState));
+        } catch (JSONException e) {
+            log.error(e.getMessage(), e);
+            log.error(ErrorCode.INVALID_APP_STATE);
+        }
         request.getValidatorsList().forEach(v -> {
             String publicKey = Base64.getEncoder().encodeToString(
                     request.getValidatorsList().get(0).getPubKey().getEd25519().toByteArray());
             validatorService.add(publicKey);
         });
         databaseTransactionManager.commit();
-        request.getAppStateBytes(); // TODO - load config from genesis
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
@@ -498,10 +543,24 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                 Math.round(req.getHeader().getTime().getNanos() / 1000000d);
         configService.setTimestamp(millis);
         String proposerAddress = Hex.encodeHexString(req.getHeader().getProposerAddress().toByteArray());
-        if(validatorAddress.equals(proposerAddress)) {
-            tendermintClient.confirmEthereumEvents(new EmptyRequest()); // TODO - add public key and signature
-            tendermintClient.settleMarkets(new EmptyRequest()); // TODO - add public key and signature
-            tendermintClient.syncProposals(new EmptyRequest()); // TODO - add public key and signature
+        long blockHeight = req.getHeader().getHeight();
+        if(validatorAddress.toLowerCase(Locale.ROOT).equals(proposerAddress.toLowerCase(Locale.ROOT)) &&
+                blockHeight % 60 == 0) {
+            try {
+                tendermintClient.confirmEthereumEvents(getBatchRequest(proposerAddress, blockHeight));
+            } catch(Exception e) {
+                log.error(ErrorCode.CONFIRM_ETHEREUM_EVENTS_FAILED, e);
+            }
+            try {
+                tendermintClient.settleMarkets(getBatchRequest(proposerAddress, blockHeight));
+            } catch(Exception e) {
+                log.error(ErrorCode.SETTLE_MARKETS_FAILED, e);
+            }
+            try {
+                tendermintClient.syncProposals(getBatchRequest(proposerAddress, blockHeight));
+            } catch(Exception e) {
+                log.error(ErrorCode.SYNC_PROPOSALS_FAILED, e);
+            }
             // TODO - propagate latest Ethereum events
         }
         responseObserver.onNext(resp);

@@ -260,6 +260,7 @@ public class AccountService {
             final String txHash
     ) {
         User user = userService.getAndCreate(publicKey);
+        // TODO - don't duplicate events
         Event event = eventService.save(user, blockNumber,
                 txHash, amount, EventType.DEPOSIT_ASSET, assetAddress);
         Asset asset = assetService.getByAddress(assetAddress);

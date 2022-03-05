@@ -60,6 +60,7 @@ public class TendermintClientTest extends IntegrationTest {
     @BeforeEach
     public void setup() {
         initializeState(true);
+        // TODO - we must load the genesis file here somehow...
         tendermint =
                 new GenericContainer(DockerImageName.parse("tendermint/tendermint:v0.34.14"))
                         .withExposedPorts(26657)
@@ -197,9 +198,9 @@ public class TendermintClientTest extends IntegrationTest {
 
     private void syncProposals() {
         sleepUtils.sleep(100L);
-        EmptyRequest emptyRequest = new EmptyRequest();
-        emptyRequest.setPublicKey("50505050505050505050505050505050");
-        tendermintClient.syncProposals(emptyRequest);
+        BatchValidatorRequest batchValidatorRequest = new BatchValidatorRequest();
+        batchValidatorRequest.setPublicKey("50505050505050505050505050505050");
+        tendermintClient.syncProposals(batchValidatorRequest);
         sleepUtils.sleep(100L);
     }
 

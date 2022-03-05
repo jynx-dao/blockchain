@@ -1,21 +1,14 @@
 package com.jynx.pro.utils;
 
 import lombok.extern.slf4j.Slf4j;
-import net.i2p.crypto.eddsa.EdDSAEngine;
-import net.i2p.crypto.eddsa.EdDSAPrivateKey;
-import net.i2p.crypto.eddsa.EdDSAPublicKey;
-import net.i2p.crypto.eddsa.spec.EdDSANamedCurveTable;
-import net.i2p.crypto.eddsa.spec.EdDSAParameterSpec;
-import net.i2p.crypto.eddsa.spec.EdDSAPrivateKeySpec;
-import net.i2p.crypto.eddsa.spec.EdDSAPublicKeySpec;
 import org.apache.commons.codec.binary.Hex;
+import org.bouncycastle.crypto.Signer;
+import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters;
+import org.bouncycastle.crypto.params.Ed25519PublicKeyParameters;
+import org.bouncycastle.crypto.signers.Ed25519Signer;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.PrivateKey;
-import java.security.PublicKey;
-import java.security.Signature;
 import java.util.Optional;
 
 @Slf4j
@@ -35,13 +28,12 @@ public class CryptoUtils {
             final String privateKey
     ) {
         try {
-            EdDSAParameterSpec spec = EdDSANamedCurveTable.getByName(EdDSANamedCurveTable.ED_25519);
-            Signature signature = new EdDSAEngine(MessageDigest.getInstance(spec.getHashAlgorithm()));
-            EdDSAPrivateKeySpec privKey = new EdDSAPrivateKeySpec(Hex.decodeHex(privateKey), spec);
-            PrivateKey signingKey = new EdDSAPrivateKey(privKey);
-            signature.initSign(signingKey);
-            signature.update(message.getBytes(StandardCharsets.UTF_8));
-            return Optional.of(Hex.encodeHexString(signature.sign()));
+            byte[] messageAsBytes = message.getBytes(StandardCharsets.UTF_8);
+            Signer signer = new Ed25519Signer();
+            signer.init(true, new Ed25519PrivateKeyParameters(Hex.decodeHex(privateKey), 0));
+            signer.update(messageAsBytes, 0, messageAsBytes.length);
+            byte[] signature = signer.generateSignature();
+            return Optional.of(Hex.encodeHexString(signature));
         } catch(Exception e) {
             log.error(e.getMessage(), e);
         }
@@ -63,13 +55,11 @@ public class CryptoUtils {
             final String publicKey
     ) {
         try {
-            EdDSAParameterSpec spec = EdDSANamedCurveTable.getByName(EdDSANamedCurveTable.ED_25519);
-            Signature signature = new EdDSAEngine(MessageDigest.getInstance(spec.getHashAlgorithm()));
-            EdDSAPublicKeySpec pubKey = new EdDSAPublicKeySpec(Hex.decodeHex(publicKey), spec);
-            PublicKey vKey = new EdDSAPublicKey(pubKey);
-            signature.initVerify(vKey);
-            signature.update(message.getBytes(StandardCharsets.UTF_8));
-            return signature.verify(Hex.decodeHex(sig));
+            byte[] messageAsBytes = message.getBytes(StandardCharsets.UTF_8);
+            Signer verifier = new Ed25519Signer();
+            verifier.init(false, new Ed25519PublicKeyParameters(Hex.decodeHex(publicKey), 0));
+            verifier.update(messageAsBytes, 0, messageAsBytes.length);
+            return verifier.verifySignature(Hex.decodeHex(sig));
         } catch(Exception e) {
             log.error(e.getMessage(), e);
         }
