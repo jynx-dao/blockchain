@@ -64,6 +64,8 @@ public class TendermintClientTest extends IntegrationTest {
 
     public static GenericContainer tendermint;
 
+    // TODO - remove direct calls to TendermintClient and proxy everything via REST (it will increase test coverage)
+
     private void updateTendermintKeys(
             final String dest
     ) {

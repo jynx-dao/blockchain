@@ -535,6 +535,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         return request;
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void initChain(tendermint.abci.Types.RequestInitChain request,
                           io.grpc.stub.StreamObserver<tendermint.abci.Types.ResponseInitChain> responseObserver) {
@@ -557,6 +560,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         responseObserver.onCompleted();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void checkTx(Types.RequestCheckTx req, StreamObserver<Types.ResponseCheckTx> responseObserver) {
         String tx = req.getTx().toStringUtf8();
@@ -569,6 +575,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         responseObserver.onCompleted();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void beginBlock(Types.RequestBeginBlock req, StreamObserver<Types.ResponseBeginBlock> responseObserver) {
         Types.ResponseBeginBlock resp = Types.ResponseBeginBlock.newBuilder().build();
@@ -605,6 +614,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         responseObserver.onCompleted();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void endBlock(Types.RequestEndBlock req, StreamObserver<Types.ResponseEndBlock> responseObserver) {
         // TODO - update validators
@@ -614,6 +626,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         responseObserver.onCompleted();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void deliverTx(Types.RequestDeliverTx req, StreamObserver<Types.ResponseDeliverTx> responseObserver) {
         String tx = req.getTx().toStringUtf8();
@@ -632,6 +647,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         responseObserver.onCompleted();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void commit(Types.RequestCommit req, StreamObserver<Types.ResponseCommit> responseObserver) {
         Types.ResponseCommit resp = Types.ResponseCommit.newBuilder()
@@ -642,6 +660,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         responseObserver.onCompleted();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void echo(Types.RequestEcho request, StreamObserver<Types.ResponseEcho> responseObserver) {
         Types.ResponseEcho response = Types.ResponseEcho.newBuilder().setMessage(request.getMessage()).build();
@@ -649,6 +670,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         responseObserver.onCompleted();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void info(Types.RequestInfo request, StreamObserver<Types.ResponseInfo> responseObserver) {
         Types.ResponseInfo response = Types.ResponseInfo.newBuilder().build();
@@ -656,6 +680,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         responseObserver.onCompleted();
     }
 
+    /**
+     * {@inheritDoc}
+     */
     @Override
     public void flush(Types.RequestFlush request, StreamObserver<Types.ResponseFlush> responseObserver) {
         Types.ResponseFlush response = Types.ResponseFlush.newBuilder().build();
