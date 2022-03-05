@@ -16,6 +16,13 @@ public class ValidatorRepository extends EntityRepository<Validator> {
         return Validator.class;
     }
 
+    /**
+     * Get {@link Validator} by public key
+     *
+     * @param publicKey the validator's public key
+     *
+     * @return {@link Optional <Validator>}
+     */
     public Optional<Validator> findByPublicKey(
             final String publicKey
     ) {

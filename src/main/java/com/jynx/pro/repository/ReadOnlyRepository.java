@@ -1,6 +1,5 @@
 package com.jynx.pro.repository;
 
-import com.jynx.pro.constant.KlineInterval;
 import com.jynx.pro.constant.MarketSide;
 import com.jynx.pro.constant.OrderStatus;
 import com.jynx.pro.constant.OrderType;
@@ -8,7 +7,10 @@ import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.manager.DatabaseTransactionManager;
-import com.jynx.pro.model.*;
+import com.jynx.pro.model.MarketStatistics;
+import com.jynx.pro.model.OrderBook;
+import com.jynx.pro.model.OrderBookItem;
+import com.jynx.pro.model.Quote;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
@@ -18,7 +20,10 @@ import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Path;
 import javax.persistence.criteria.Root;
 import java.math.BigDecimal;
-import java.util.*;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Repository
@@ -412,5 +417,27 @@ public class ReadOnlyRepository {
         query = query.select(rootType).where(cb.equal(market_id, marketId), cb.greaterThan(tradeExecuted, from),
                 cb.lessThan(tradeExecuted, to));
         return getEntityManager().createQuery(query).getResultList();
+    }
+
+    /**
+     * Get {@link Validator} by public key
+     *
+     * @param publicKey the validator's public key
+     *
+     * @return {@link Optional<Validator>}
+     */
+    public Optional<Validator> findByPublicKey(
+            final String publicKey
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Validator> query = cb.createQuery(Validator.class);
+        Root<Validator> rootType = query.from(Validator.class);
+        Path<String> userPublicKey = rootType.get("publicKey");
+        query = query.select(rootType).where(cb.equal(userPublicKey, publicKey));
+        try {
+            return Optional.of(getEntityManager().createQuery(query).getSingleResult());
+        } catch(Exception e) {
+            return Optional.empty();
+        }
     }
 }

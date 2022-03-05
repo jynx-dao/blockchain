@@ -1,6 +1,7 @@
 package com.jynx.pro.service;
 
 import com.jynx.pro.entity.Validator;
+import com.jynx.pro.repository.ReadOnlyRepository;
 import com.jynx.pro.repository.ValidatorRepository;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +16,8 @@ public class ValidatorService {
 
     @Autowired
     private ValidatorRepository validatorRepository;
+    @Autowired
+    private ReadOnlyRepository readOnlyRepository;
     @Autowired
     private UUIDUtils uuidUtils;
 
@@ -46,7 +49,7 @@ public class ValidatorService {
     public boolean isValidator(
             final String publicKey
     ) {
-        Optional<Validator> validatorOptional = validatorRepository.findByPublicKey(publicKey);
+        Optional<Validator> validatorOptional = readOnlyRepository.findByPublicKey(publicKey);
         if(validatorOptional.isEmpty()) return false;
         return validatorOptional.get().getActive();
     }

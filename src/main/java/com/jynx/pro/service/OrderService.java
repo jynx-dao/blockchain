@@ -605,7 +605,7 @@ public class OrderService {
      *
      * @param request {@link CreateOrderRequest}
      */
-    private void validate(
+    public void validate(
             final CreateOrderRequest request
     ) {
         if(OrderType.STOP_MARKET.equals(request.getType())) {
