@@ -1,6 +1,7 @@
 package com.jynx.pro.blockchain;
 
 import com.google.protobuf.ByteString;
+import com.google.protobuf.Timestamp;
 import com.jynx.pro.constant.TendermintTransaction;
 import com.jynx.pro.entity.User;
 import com.jynx.pro.error.ErrorCode;
@@ -497,6 +498,27 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         }
     }
 
+    /**
+     * Get the block timestamp in milliseconds
+     *
+     * @param time {@link Timestamp}
+     *
+     * @return timestamp in milliseconds
+     */
+    private Long getBlockTimeAsMillis(
+            final Timestamp time
+    ) {
+        return (time.getSeconds() * 1000) + Math.round(time.getNanos() / 1000000d);
+    }
+
+    /**
+     * Get {@link BatchValidatorRequest} signed by the node
+     *
+     * @param address the address of the node
+     * @param height the current block height
+     *
+     * @return {@link BatchValidatorRequest}
+     */
     private BatchValidatorRequest getBatchRequest(
             final String address,
             final long height
@@ -551,9 +573,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     public void beginBlock(Types.RequestBeginBlock req, StreamObserver<Types.ResponseBeginBlock> responseObserver) {
         Types.ResponseBeginBlock resp = Types.ResponseBeginBlock.newBuilder().build();
         databaseTransactionManager.createTransaction();
-        long millis = (req.getHeader().getTime().getSeconds() * 1000) +
-                Math.round(req.getHeader().getTime().getNanos() / 1000000d);
-        configService.setTimestamp(millis);
+        configService.setTimestamp(getBlockTimeAsMillis(req.getHeader().getTime()));
         String proposerAddress = Hex.encodeHexString(req.getHeader().getProposerAddress().toByteArray());
         long blockHeight = req.getHeader().getHeight();
         if(validatorAddress.toLowerCase(Locale.ROOT).equals(proposerAddress.toLowerCase(Locale.ROOT)) &&
