@@ -7,6 +7,7 @@ import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.AddMarketRequest;
 import com.jynx.pro.request.AmendMarketRequest;
+import com.jynx.pro.request.BatchValidatorRequest;
 import com.jynx.pro.request.SingleItemRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -462,7 +463,7 @@ public class MarketServiceTest extends IntegrationTest {
         market = marketRepository.save(market);
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.ONE, MarketSide.SELL, OrderType.MARKET, takerUser));
-        marketService.settleMarkets();
+        marketService.settleMarkets(new BatchValidatorRequest());
         market = marketRepository.findById(market.getId()).orElse(new Market());
         BigDecimal makerFee = BigDecimal.valueOf(45590).multiply(market.getMakerFee());
         List<Position> positions = positionRepository.findByMarket(market);
@@ -500,7 +501,7 @@ public class MarketServiceTest extends IntegrationTest {
         Market market = createOrderBook(10, 10, 1);
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.ONE, MarketSide.BUY, OrderType.MARKET, takerUser));
-        marketService.settleMarkets();
+        marketService.settleMarkets(new BatchValidatorRequest());
         BigDecimal makerFee = BigDecimal.valueOf(45610).multiply(market.getMakerFee());
         BigDecimal takerFee = BigDecimal.valueOf(45610).multiply(market.getTakerFee());
         List<Position> positions = positionRepository.findByMarket(market);

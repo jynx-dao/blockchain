@@ -9,6 +9,7 @@ import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.ProposalRepository;
 import com.jynx.pro.repository.VoteRepository;
+import com.jynx.pro.request.BatchValidatorRequest;
 import com.jynx.pro.request.CastVoteRequest;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -47,7 +48,10 @@ public class ProposalService {
      *
      * @return the updated {@link List<Proposal>}
      */
-    public List<Proposal> sync() {
+    public List<Proposal> sync(
+            final BatchValidatorRequest request
+    ) {
+        log.debug(request.toString());
         List<Proposal> proposals = new ArrayList<>();
         proposals.addAll(open());
         proposals.addAll(reject());

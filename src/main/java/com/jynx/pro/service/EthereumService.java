@@ -5,6 +5,7 @@ import com.jynx.pro.ethereum.ERC20Detailed;
 import com.jynx.pro.ethereum.JynxPro_Bridge;
 import com.jynx.pro.ethereum.type.EthereumType;
 import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.request.BatchValidatorRequest;
 import com.jynx.pro.utils.PriceUtils;
 import com.jynx.pro.utils.SleepUtils;
 import lombok.Setter;
@@ -138,7 +139,10 @@ public class EthereumService {
     /**
      * Processes confirmed events (i.e. after sufficient Ethereum blocks have been mined)
      */
-    public List<com.jynx.pro.entity.Event> confirmEvents() {
+    public List<com.jynx.pro.entity.Event> confirmEvents(
+            final BatchValidatorRequest request
+    ) {
+        log.debug(request.toString());
         List<com.jynx.pro.entity.Event> confirmedEvents = new ArrayList<>();
         try {
             BigInteger blockNumber = getWeb3j().ethBlockNumber().send().getBlockNumber();

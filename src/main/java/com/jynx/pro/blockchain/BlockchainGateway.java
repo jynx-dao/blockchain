@@ -3,12 +3,12 @@ package com.jynx.pro.blockchain;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Timestamp;
 import com.jynx.pro.constant.TendermintTransaction;
-import com.jynx.pro.entity.Order;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.manager.AppStateManager;
 import com.jynx.pro.manager.DatabaseTransactionManager;
 import com.jynx.pro.model.CheckTxResult;
+import com.jynx.pro.model.TransactionConfig;
 import com.jynx.pro.request.*;
 import com.jynx.pro.service.*;
 import com.jynx.pro.utils.CryptoUtils;
@@ -30,8 +30,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
 @Slf4j
 @Component
@@ -78,61 +76,116 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private Integer batchBlockFrequency;
 
     private static final Set<String> nonceHistory = new HashSet<>();
-
-    // TODO - remove duplicated code by using generics for deliverTx and checkTx
-
     private static final ExecutorService executorService = Executors.newFixedThreadPool(1);
-    private final Map<TendermintTransaction, Function<String, Object>> deliverTransactions = new HashMap<>();
-    private final Map<TendermintTransaction, Consumer<String>> checkTransactions = new HashMap<>();
+    private final Map<TendermintTransaction, TransactionConfig> transactionSettings = new HashMap<>();
 
-    private void setupCheckTransactions() {
-        checkTransactions.put(TendermintTransaction.CREATE_ORDER, this::checkCreateOrder);
-        checkTransactions.put(TendermintTransaction.CANCEL_ORDER, this::checkCancelOrder);
-        checkTransactions.put(TendermintTransaction.AMEND_ORDER, this::checkAmendOrder);
-        checkTransactions.put(TendermintTransaction.CREATE_ORDER_MANY, this::checkCreateOrderMany);
-        checkTransactions.put(TendermintTransaction.CANCEL_ORDER_MANY, this::checkCancelOrderMany);
-        checkTransactions.put(TendermintTransaction.AMEND_ORDER_MANY, this::checkAmendOrderMany);
-        checkTransactions.put(TendermintTransaction.CREATE_WITHDRAWAL, this::checkCreateWithdrawal);
-        checkTransactions.put(TendermintTransaction.CANCEL_WITHDRAWAL, this::checkCancelWithdrawal);
-        checkTransactions.put(TendermintTransaction.ADD_MARKET, this::checkAddMarket);
-        checkTransactions.put(TendermintTransaction.AMEND_MARKET, this::checkAmendMarket);
-        checkTransactions.put(TendermintTransaction.SUSPEND_MARKET, this::checkSuspendMarket);
-        checkTransactions.put(TendermintTransaction.UNSUSPEND_MARKET, this::checkUnsuspendMarket);
-        checkTransactions.put(TendermintTransaction.ADD_ASSET, this::checkAddAsset);
-        checkTransactions.put(TendermintTransaction.SUSPEND_ASSET, this::checkSuspendAsset);
-        checkTransactions.put(TendermintTransaction.UNSUSPEND_ASSET, this::checkUnsuspendAsset);
-        checkTransactions.put(TendermintTransaction.CONFIRM_ETHEREUM_EVENTS, this::checkConfirmEthereumEvents);
-        checkTransactions.put(TendermintTransaction.SYNC_PROPOSALS, this::checkSyncProposals);
-        checkTransactions.put(TendermintTransaction.SETTLE_MARKETS, this::checkSettleMarkets);
-        checkTransactions.put(TendermintTransaction.CAST_VOTE, this::checkCastVote);
+    /**
+     * Initialize transaction settings
+     */
+    private void initializeSettings() {
+        transactionSettings.put(TendermintTransaction.CREATE_ORDER,
+                new TransactionConfig<CreateOrderRequest>()
+                    .setDeliverFn(orderService::create)
+                    .setProtectedFn(false)
+                    .setRequestType(CreateOrderRequest.class));
+        transactionSettings.put(TendermintTransaction.CANCEL_ORDER,
+                new TransactionConfig<CancelOrderRequest>()
+                    .setDeliverFn(orderService::cancel)
+                    .setProtectedFn(false)
+                    .setRequestType(CancelOrderRequest.class));
+        transactionSettings.put(TendermintTransaction.AMEND_ORDER,
+                new TransactionConfig<AmendOrderRequest>()
+                    .setDeliverFn(orderService::amend)
+                    .setProtectedFn(false)
+                    .setRequestType(AmendOrderRequest.class));
+        transactionSettings.put(TendermintTransaction.CREATE_ORDER_MANY,
+                new TransactionConfig<BulkCreateOrderRequest>()
+                    .setDeliverFn(orderService::createMany)
+                    .setProtectedFn(false)
+                    .setRequestType(BulkCreateOrderRequest.class));
+        transactionSettings.put(TendermintTransaction.CANCEL_ORDER_MANY,
+                new TransactionConfig<BulkCancelOrderRequest>()
+                    .setDeliverFn(orderService::cancelMany)
+                    .setProtectedFn(false)
+                    .setRequestType(BulkCancelOrderRequest.class));
+        transactionSettings.put(TendermintTransaction.AMEND_ORDER_MANY,
+                new TransactionConfig<BulkAmendOrderRequest>()
+                    .setDeliverFn(orderService::amendMany)
+                    .setProtectedFn(false)
+                    .setRequestType(BulkAmendOrderRequest.class));
+        transactionSettings.put(TendermintTransaction.CREATE_WITHDRAWAL,
+                new TransactionConfig<CreateWithdrawalRequest>()
+                    .setDeliverFn(accountService::createWithdrawal)
+                    .setProtectedFn(false)
+                    .setRequestType(CreateWithdrawalRequest.class));
+        transactionSettings.put(TendermintTransaction.CANCEL_WITHDRAWAL,
+                new TransactionConfig<SingleItemRequest>()
+                    .setDeliverFn(accountService::cancelWithdrawal)
+                    .setProtectedFn(false)
+                    .setRequestType(SingleItemRequest.class));
+        transactionSettings.put(TendermintTransaction.ADD_MARKET,
+                new TransactionConfig<AddMarketRequest>()
+                    .setDeliverFn(marketService::proposeToAdd)
+                    .setProtectedFn(false)
+                    .setRequestType(AddMarketRequest.class));
+        transactionSettings.put(TendermintTransaction.AMEND_MARKET,
+                new TransactionConfig<AmendMarketRequest>()
+                    .setDeliverFn(marketService::proposeToAmend)
+                    .setProtectedFn(false)
+                    .setRequestType(AmendMarketRequest.class));
+        transactionSettings.put(TendermintTransaction.SUSPEND_MARKET,
+                new TransactionConfig<SingleItemRequest>()
+                    .setDeliverFn(marketService::proposeToSuspend)
+                    .setProtectedFn(false)
+                    .setRequestType(SingleItemRequest.class));
+        transactionSettings.put(TendermintTransaction.UNSUSPEND_MARKET,
+                new TransactionConfig<SingleItemRequest>()
+                    .setDeliverFn(marketService::proposeToUnsuspend)
+                    .setProtectedFn(false)
+                    .setRequestType(SingleItemRequest.class));
+        transactionSettings.put(TendermintTransaction.ADD_ASSET,
+                new TransactionConfig<AddAssetRequest>()
+                    .setDeliverFn(assetService::proposeToAdd)
+                    .setProtectedFn(false)
+                    .setRequestType(AddAssetRequest.class));
+        transactionSettings.put(TendermintTransaction.SUSPEND_ASSET,
+                new TransactionConfig<SingleItemRequest>()
+                    .setDeliverFn(assetService::proposeToSuspend)
+                    .setProtectedFn(false)
+                    .setRequestType(SingleItemRequest.class));
+        transactionSettings.put(TendermintTransaction.UNSUSPEND_ASSET,
+                new TransactionConfig<SingleItemRequest>()
+                    .setDeliverFn(assetService::proposeToUnsuspend)
+                    .setProtectedFn(false)
+                    .setRequestType(SingleItemRequest.class));
+        transactionSettings.put(TendermintTransaction.CAST_VOTE,
+                new TransactionConfig<CastVoteRequest>()
+                    .setDeliverFn(proposalService::vote)
+                    .setProtectedFn(false)
+                    .setRequestType(CastVoteRequest.class));
+        transactionSettings.put(TendermintTransaction.CONFIRM_ETHEREUM_EVENTS,
+                new TransactionConfig<BatchValidatorRequest>()
+                    .setDeliverFn(ethereumService::confirmEvents)
+                    .setProtectedFn(true)
+                    .setRequestType(BatchValidatorRequest.class));
+        transactionSettings.put(TendermintTransaction.SYNC_PROPOSALS,
+                new TransactionConfig<BatchValidatorRequest>()
+                    .setDeliverFn(proposalService::sync)
+                    .setProtectedFn(true)
+                    .setRequestType(BatchValidatorRequest.class));
+        transactionSettings.put(TendermintTransaction.SETTLE_MARKETS,
+                new TransactionConfig<BatchValidatorRequest>()
+                    .setDeliverFn(marketService::settleMarkets)
+                    .setProtectedFn(true)
+                    .setRequestType(BatchValidatorRequest.class));
     }
 
-    private void setupDeliverTransactions() {
-        deliverTransactions.put(TendermintTransaction.CREATE_ORDER, this::createOrder);
-        deliverTransactions.put(TendermintTransaction.CANCEL_ORDER, this::cancelOrder);
-        deliverTransactions.put(TendermintTransaction.AMEND_ORDER, this::amendOrder);
-        deliverTransactions.put(TendermintTransaction.CREATE_ORDER_MANY, this::createOrderMany);
-        deliverTransactions.put(TendermintTransaction.CANCEL_ORDER_MANY, this::cancelOrderMany);
-        deliverTransactions.put(TendermintTransaction.AMEND_ORDER_MANY, this::amendOrderMany);
-        deliverTransactions.put(TendermintTransaction.CREATE_WITHDRAWAL, this::createWithdrawal);
-        deliverTransactions.put(TendermintTransaction.CANCEL_WITHDRAWAL, this::cancelWithdrawal);
-        deliverTransactions.put(TendermintTransaction.ADD_MARKET, this::addMarket);
-        deliverTransactions.put(TendermintTransaction.AMEND_MARKET, this::amendMarket);
-        deliverTransactions.put(TendermintTransaction.SUSPEND_MARKET, this::suspendMarket);
-        deliverTransactions.put(TendermintTransaction.UNSUSPEND_MARKET, this::unsuspendMarket);
-        deliverTransactions.put(TendermintTransaction.ADD_ASSET, this::addAsset);
-        deliverTransactions.put(TendermintTransaction.SUSPEND_ASSET, this::suspendAsset);
-        deliverTransactions.put(TendermintTransaction.UNSUSPEND_ASSET, this::unsuspendAsset);
-        deliverTransactions.put(TendermintTransaction.CONFIRM_ETHEREUM_EVENTS, this::confirmEthereumEvents);
-        deliverTransactions.put(TendermintTransaction.SYNC_PROPOSALS, this::syncProposals);
-        deliverTransactions.put(TendermintTransaction.SETTLE_MARKETS, this::settleMarkets);
-        deliverTransactions.put(TendermintTransaction.CAST_VOTE, this::castVote);
-    }
-
+    /**
+     * Setup class-level config immediately after construction of Spring Bean
+     */
     @PostConstruct
     private void setup() {
-        setupDeliverTransactions();
-        setupCheckTransactions();
+        initializeSettings();
     }
 
     /**
@@ -152,341 +205,6 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         } catch(Exception e) {
             return TendermintTransaction.UNKNOWN;
         }
-    }
-
-    private void checkCastVote(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, CastVoteRequest.class));
-    }
-
-    private void checkConfirmEthereumEvents(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, BatchValidatorRequest.class), true);
-    }
-
-    private void checkSyncProposals(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, BatchValidatorRequest.class), true);
-    }
-
-    private void checkSettleMarkets(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, BatchValidatorRequest.class), true);
-    }
-
-    private void checkCreateWithdrawal(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, CreateWithdrawalRequest.class));
-    }
-
-    private void checkCancelWithdrawal(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, SingleItemRequest.class));
-    }
-
-    private void checkAddMarket(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, AddMarketRequest.class));
-    }
-
-    private void checkAmendMarket(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, AmendMarketRequest.class));
-    }
-
-    private void checkSuspendMarket(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, SingleItemRequest.class));
-    }
-
-    private void checkUnsuspendMarket(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, SingleItemRequest.class));
-    }
-
-    private void checkAddAsset(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, AddAssetRequest.class));
-    }
-
-    private void checkSuspendAsset(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, SingleItemRequest.class));
-    }
-
-    private void checkUnsuspendAsset(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, SingleItemRequest.class));
-    }
-
-    private void checkCreateOrder(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, CreateOrderRequest.class));
-    }
-
-    private void checkCancelOrder(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, CancelOrderRequest.class));
-    }
-
-    private void checkAmendOrder(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, AmendOrderRequest.class));
-    }
-
-    private void checkCreateOrderMany(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, BulkCreateOrderRequest.class));
-    }
-
-    private void checkCancelOrderMany(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, BulkCancelOrderRequest.class));
-    }
-
-    private void checkAmendOrderMany(
-            final String txAsJson
-    ) {
-        verifySignature(jsonUtils.fromJson(txAsJson, BulkAmendOrderRequest.class));
-    }
-
-    private Object confirmEthereumEvents(
-            final String txAsJson
-    ) {
-        BatchValidatorRequest request = jsonUtils.fromJson(txAsJson, BatchValidatorRequest.class);
-        synchronized (nonceHistory) {
-            nonceHistory.add(request.getNonce());
-        }
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return ethereumService.confirmEvents();
-    }
-
-    private Object syncProposals(
-            final String txAsJson
-    ) {
-        BatchValidatorRequest request = jsonUtils.fromJson(txAsJson, BatchValidatorRequest.class);
-        synchronized (nonceHistory) {
-            nonceHistory.add(request.getNonce());
-        }
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return proposalService.sync();
-    }
-
-    private Object settleMarkets(
-            final String txAsJson
-    ) {
-        BatchValidatorRequest request = jsonUtils.fromJson(txAsJson, BatchValidatorRequest.class);
-        synchronized (nonceHistory) {
-            nonceHistory.add(request.getNonce());
-        }
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return marketService.settleMarkets();
-    }
-
-    private Object castVote(
-            final String txAsJson
-    ) {
-        CastVoteRequest request = jsonUtils.fromJson(txAsJson, CastVoteRequest.class);
-        synchronized (nonceHistory) {
-            nonceHistory.add(request.getNonce());
-        }
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return proposalService.vote(request);
-    }
-
-    private Object createWithdrawal(
-            final String txAsJson
-    ) {
-        CreateWithdrawalRequest request = jsonUtils.fromJson(txAsJson, CreateWithdrawalRequest.class);
-        synchronized (nonceHistory) {
-            nonceHistory.add(request.getNonce());
-        }
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return accountService.createWithdrawal(request);
-    }
-
-    private Object cancelWithdrawal(
-            final String txAsJson
-    ) {
-        SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
-        synchronized (nonceHistory) {
-            nonceHistory.add(request.getNonce());
-        }
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return accountService.cancelWithdrawal(request);
-    }
-
-    private Object addMarket(
-            final String txAsJson
-    ) {
-        AddMarketRequest request = jsonUtils.fromJson(txAsJson, AddMarketRequest.class);
-        synchronized (nonceHistory) {
-            nonceHistory.add(request.getNonce());
-        }
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return marketService.proposeToAdd(request);
-    }
-
-    private Object amendMarket(
-            final String txAsJson
-    ) {
-        AmendMarketRequest request = jsonUtils.fromJson(txAsJson, AmendMarketRequest.class);
-        synchronized (nonceHistory) {
-            nonceHistory.add(request.getNonce());
-        }
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return marketService.proposeToAmend(request);
-    }
-
-    private Object suspendMarket(
-            final String txAsJson
-    ) {
-        SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
-        synchronized (nonceHistory) {
-            nonceHistory.add(request.getNonce());
-        }
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return marketService.proposeToSuspend(request);
-    }
-
-    private Object unsuspendMarket(
-            final String txAsJson
-    ) {
-        SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
-        synchronized (nonceHistory) {
-            nonceHistory.add(request.getNonce());
-        }
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return marketService.proposeToUnsuspend(request);
-    }
-
-    private Object addAsset(
-            final String txAsJson
-    ) {
-        AddAssetRequest request = jsonUtils.fromJson(txAsJson, AddAssetRequest.class);
-        synchronized (nonceHistory) {
-            nonceHistory.add(request.getNonce());
-        }
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return assetService.proposeToAdd(request);
-    }
-
-    private Object suspendAsset(
-            final String txAsJson
-    ) {
-        SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
-        synchronized (nonceHistory) {
-            nonceHistory.add(request.getNonce());
-        }
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return assetService.proposeToSuspend(request);
-    }
-
-    private Object unsuspendAsset(
-            final String txAsJson
-    ) {
-        SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
-        synchronized (nonceHistory) {
-            nonceHistory.add(request.getNonce());
-        }
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return assetService.proposeToUnsuspend(request);
-    }
-
-    private Object createOrder(
-            final String txAsJson
-    ) {
-        CreateOrderRequest request = jsonUtils.fromJson(txAsJson, CreateOrderRequest.class);
-        synchronized (nonceHistory) {
-            nonceHistory.add(request.getNonce());
-        }
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return orderService.create(request);
-    }
-
-    private Object cancelOrder(
-            final String txAsJson
-    ) {
-        CancelOrderRequest request = jsonUtils.fromJson(txAsJson, CancelOrderRequest.class);
-        synchronized (nonceHistory) {
-            nonceHistory.add(request.getNonce());
-        }
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return orderService.cancel(request);
-    }
-
-    private Object amendOrder(
-            final String txAsJson
-    ) {
-        AmendOrderRequest request = jsonUtils.fromJson(txAsJson, AmendOrderRequest.class);
-        synchronized (nonceHistory) {
-            nonceHistory.add(request.getNonce());
-        }
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return orderService.amend(request);
-    }
-
-    /**
-     * Create multiple orders at once
-     *
-     * @param txAsJson the transaction payload
-     *
-     * @return {@link List<Order>}
-     */
-    private Object createOrderMany(
-            final String txAsJson
-    ) {
-        BulkCreateOrderRequest request = jsonUtils.fromJson(txAsJson, BulkCreateOrderRequest.class);
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return orderService.createMany(request);
-    }
-
-    /**
-     * Cancel multiple orders at once
-     *
-     * @param txAsJson the transaction payload
-     *
-     * @return {@link List<Order>}
-     */
-    private Object cancelOrderMany(
-            final String txAsJson
-    ) {
-        BulkCancelOrderRequest request = jsonUtils.fromJson(txAsJson, BulkCancelOrderRequest.class);
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return orderService.cancelMany(request);
-    }
-
-    /**
-     * Amend multiple orders at once
-     *
-     * @param txAsJson the transaction payload
-     *
-     * @return {@link List<Order>}
-     */
-    private Object amendOrderMany(
-            final String txAsJson
-    ) {
-        BulkAmendOrderRequest request = jsonUtils.fromJson(txAsJson, BulkAmendOrderRequest.class);
-        request.setUser(userService.getAndCreate(request.getPublicKey()));
-        return orderService.amendMany(request);
     }
 
     /**
@@ -530,23 +248,27 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     }
 
     /**
-     * Verify the signature of a {@link SignedRequest}
+     * Generic function to handle the delivery of transactions. This function implements the following:
+     * 1. Replay protection
+     * 2. Updating the app state
+     * 3. Propagate write transactions to application
      *
-     * @param request {@link SignedRequest}
+     * @param tx the raw base64 transaction
+     * @param tendermintTx {@link TendermintTransaction}
+     *
+     * @return the response from the application
      */
-    private void verifySignature(
-            final SignedRequest request
-    ) {
-        verifySignature(request, false);
-    }
-
     private Object deliverTransaction(
             final String tx,
             final TendermintTransaction tendermintTx
     ) {
         String txAsJson = new String(Base64.getDecoder().decode(tx.getBytes(StandardCharsets.UTF_8)));
         try {
-            Object result = deliverTransactions.get(tendermintTx).apply(txAsJson);
+            SignedRequest request = (SignedRequest) jsonUtils.fromJson(txAsJson,
+                    transactionSettings.get(tendermintTx).getRequestType());
+            nonceHistory.add(request.getNonce());
+            request.setUser(userService.getAndCreate(request.getPublicKey()));
+            Object result = transactionSettings.get(tendermintTx).getDeliverFn().apply(request);
             appStateManager.update(result.hashCode());
             return result;
         } catch(Exception e) {
@@ -556,13 +278,25 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         }
     }
 
+    /**
+     * Generic function to handle the checkTx step. This function implements the following:
+     * 1. Signature verification
+     * 2. Replay protection
+     *
+     * @param tx the raw base64 transaction
+     * @param tendermintTx {@link TendermintTransaction}
+     *
+     * @return {@link CheckTxResult}
+     */
     private CheckTxResult checkTransaction(
             final String tx,
             final TendermintTransaction tendermintTx
     ) {
         String txAsJson = new String(Base64.getDecoder().decode(tx.getBytes(StandardCharsets.UTF_8)));
         try {
-            checkTransactions.get(tendermintTx).accept(txAsJson);
+            SignedRequest request = (SignedRequest) jsonUtils.fromJson(txAsJson,
+                    transactionSettings.get(tendermintTx).getRequestType());
+            verifySignature(request, transactionSettings.get(tendermintTx).isProtectedFn());
             return new CheckTxResult().setCode(0);
         } catch(Exception e) {
             log.error(e.getMessage(), e);

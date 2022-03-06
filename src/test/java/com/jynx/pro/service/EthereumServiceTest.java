@@ -5,6 +5,7 @@ import com.jynx.pro.constant.WithdrawalStatus;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.request.BatchValidatorRequest;
 import com.jynx.pro.request.CreateWithdrawalRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -111,7 +112,7 @@ public class EthereumServiceTest extends IntegrationTest {
             ethereumHelper.stakeTokens(JYNX_KEY, amount);
         }
         Thread.sleep(30000L);
-        ethereumService.confirmEvents();
+        ethereumService.confirmEvents(new BatchValidatorRequest());
         List<Event> events = eventRepository.findByConfirmed(false);
         Assertions.assertEquals(events.size(), 0);
         Optional<User> user = userRepository.findByPublicKey(JYNX_KEY);
@@ -130,7 +131,7 @@ public class EthereumServiceTest extends IntegrationTest {
         ethereumHelper.approveDai(ethereumHelper.getJynxProBridge().getContractAddress(), amount);
         ethereumHelper.depositAsset(asset.getAddress(), amount, JYNX_KEY);
         Thread.sleep(30000L);
-        ethereumService.confirmEvents();
+        ethereumService.confirmEvents(new BatchValidatorRequest());
         List<Event> events = eventRepository.findByConfirmed(false);
         Assertions.assertEquals(events.size(), 0);
         Optional<User> user = userRepository.findByPublicKey(JYNX_KEY);
@@ -187,7 +188,7 @@ public class EthereumServiceTest extends IntegrationTest {
     public void testConfirmEventsFailed() {
         ganache.stop();
         setupComplete = false;
-        List<Event> events = ethereumService.confirmEvents();
+        List<Event> events = ethereumService.confirmEvents(new BatchValidatorRequest());
         Assertions.assertEquals(events.size(), 0);
     }
 }

@@ -7,6 +7,7 @@ import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.*;
 import com.jynx.pro.request.AddMarketRequest;
 import com.jynx.pro.request.AmendMarketRequest;
+import com.jynx.pro.request.BatchValidatorRequest;
 import com.jynx.pro.request.SingleItemRequest;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -81,7 +82,10 @@ public class MarketService {
         accountService.reconcileNegativeBalance(account.getUser(), market);
     }
 
-    public List<Market> settleMarkets() {
+    public List<Market> settleMarkets(
+            final BatchValidatorRequest request
+    ) {
+        log.debug(request.toString());
         List<Market> markets = marketRepository.findByStatusIn(List.of(MarketStatus.ACTIVE, MarketStatus.SUSPENDED));
         for(Market market : markets) {
             int dps = market.getSettlementAsset().getDecimalPlaces();
