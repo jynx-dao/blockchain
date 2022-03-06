@@ -1,8 +1,11 @@
 package com.jynx.pro.service;
 
+import com.jynx.pro.blockchain.BlockchainGateway;
+import com.jynx.pro.blockchain.TendermintClient;
 import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.helper.EthereumHelper;
+import com.jynx.pro.manager.AppStateManager;
 import com.jynx.pro.manager.DatabaseTransactionManager;
 import com.jynx.pro.model.OrderBook;
 import com.jynx.pro.model.OrderBookItem;
@@ -13,6 +16,7 @@ import com.jynx.pro.request.CreateOrderRequest;
 import com.jynx.pro.utils.PriceUtils;
 import com.jynx.pro.utils.SleepUtils;
 import com.jynx.pro.utils.UUIDUtils;
+import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.testcontainers.containers.GenericContainer;
@@ -26,6 +30,7 @@ import java.time.ZoneOffset;
 import java.util.Optional;
 import java.util.UUID;
 
+@Slf4j
 public abstract class IntegrationTest {
 
     protected static final String PRIVATE_KEY = "1498b5467a63dffa2dc9d9e069caf075d16fc33fdd4c3b01bfadae6433767d93";
@@ -94,6 +99,12 @@ public abstract class IntegrationTest {
     protected DatabaseTransactionManager databaseTransactionManager;
     @Autowired
     protected OrderService orderService;
+    @Autowired
+    protected AppStateManager appStateManager;
+    @Autowired
+    protected TendermintClient tendermintClient;
+    @Autowired
+    protected BlockchainGateway blockchainGateway;
 
     protected static final String ETH_ADDRESS = "0xd7E1236C08731C3632519DCd1A581bFe6876a3B2";
     protected static final String ETH_PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
@@ -111,6 +122,15 @@ public abstract class IntegrationTest {
     protected User degenUser;
     protected User takerUser;
     protected User makerUser;
+
+    protected void waitForBlockchain() {
+        long blockHeight = appStateManager.getBlockHeight();
+        while(blockHeight < 1) {
+            blockHeight = appStateManager.getBlockHeight();
+            log.info("Block height = {}", blockHeight);
+            sleepUtils.sleep(500L);
+        }
+    }
 
     protected Asset createAndEnactAsset(
             final boolean activate

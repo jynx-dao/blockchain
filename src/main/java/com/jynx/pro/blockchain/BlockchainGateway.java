@@ -54,6 +54,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Autowired
     private UserService userService;
     @Autowired
+    private StakeService stakeService;
+    @Autowired
     private ValidatorService validatorService;
     @Autowired
     private AppStateManager appStateManager;
@@ -85,99 +87,114 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private void initializeSettings() {
         transactionSettings.put(TendermintTransaction.CREATE_ORDER,
                 new TransactionConfig<CreateOrderRequest>()
-                    .setDeliverFn(orderService::create)
-                    .setProtectedFn(false)
-                    .setRequestType(CreateOrderRequest.class));
+                        .setDeliverFn(orderService::create)
+                        .setProtectedFn(false)
+                        .setRequestType(CreateOrderRequest.class));
         transactionSettings.put(TendermintTransaction.CANCEL_ORDER,
                 new TransactionConfig<CancelOrderRequest>()
-                    .setDeliverFn(orderService::cancel)
-                    .setProtectedFn(false)
-                    .setRequestType(CancelOrderRequest.class));
+                        .setDeliverFn(orderService::cancel)
+                        .setProtectedFn(false)
+                        .setRequestType(CancelOrderRequest.class));
         transactionSettings.put(TendermintTransaction.AMEND_ORDER,
                 new TransactionConfig<AmendOrderRequest>()
-                    .setDeliverFn(orderService::amend)
-                    .setProtectedFn(false)
-                    .setRequestType(AmendOrderRequest.class));
+                        .setDeliverFn(orderService::amend)
+                        .setProtectedFn(false)
+                        .setRequestType(AmendOrderRequest.class));
         transactionSettings.put(TendermintTransaction.CREATE_ORDER_MANY,
                 new TransactionConfig<BulkCreateOrderRequest>()
-                    .setDeliverFn(orderService::createMany)
-                    .setProtectedFn(false)
-                    .setRequestType(BulkCreateOrderRequest.class));
+                        .setDeliverFn(orderService::createMany)
+                        .setProtectedFn(false)
+                        .setRequestType(BulkCreateOrderRequest.class));
         transactionSettings.put(TendermintTransaction.CANCEL_ORDER_MANY,
                 new TransactionConfig<BulkCancelOrderRequest>()
-                    .setDeliverFn(orderService::cancelMany)
-                    .setProtectedFn(false)
-                    .setRequestType(BulkCancelOrderRequest.class));
+                        .setDeliverFn(orderService::cancelMany)
+                        .setProtectedFn(false)
+                        .setRequestType(BulkCancelOrderRequest.class));
         transactionSettings.put(TendermintTransaction.AMEND_ORDER_MANY,
                 new TransactionConfig<BulkAmendOrderRequest>()
-                    .setDeliverFn(orderService::amendMany)
-                    .setProtectedFn(false)
-                    .setRequestType(BulkAmendOrderRequest.class));
+                        .setDeliverFn(orderService::amendMany)
+                        .setProtectedFn(false)
+                        .setRequestType(BulkAmendOrderRequest.class));
         transactionSettings.put(TendermintTransaction.CREATE_WITHDRAWAL,
                 new TransactionConfig<CreateWithdrawalRequest>()
-                    .setDeliverFn(accountService::createWithdrawal)
-                    .setProtectedFn(false)
-                    .setRequestType(CreateWithdrawalRequest.class));
+                        .setDeliverFn(accountService::createWithdrawal)
+                        .setProtectedFn(false)
+                        .setRequestType(CreateWithdrawalRequest.class));
         transactionSettings.put(TendermintTransaction.CANCEL_WITHDRAWAL,
                 new TransactionConfig<SingleItemRequest>()
-                    .setDeliverFn(accountService::cancelWithdrawal)
-                    .setProtectedFn(false)
-                    .setRequestType(SingleItemRequest.class));
+                        .setDeliverFn(accountService::cancelWithdrawal)
+                        .setProtectedFn(false)
+                        .setRequestType(SingleItemRequest.class));
         transactionSettings.put(TendermintTransaction.ADD_MARKET,
                 new TransactionConfig<AddMarketRequest>()
-                    .setDeliverFn(marketService::proposeToAdd)
-                    .setProtectedFn(false)
-                    .setRequestType(AddMarketRequest.class));
+                        .setDeliverFn(marketService::proposeToAdd)
+                        .setProtectedFn(false)
+                        .setRequestType(AddMarketRequest.class));
         transactionSettings.put(TendermintTransaction.AMEND_MARKET,
                 new TransactionConfig<AmendMarketRequest>()
-                    .setDeliverFn(marketService::proposeToAmend)
-                    .setProtectedFn(false)
-                    .setRequestType(AmendMarketRequest.class));
+                        .setDeliverFn(marketService::proposeToAmend)
+                        .setProtectedFn(false)
+                        .setRequestType(AmendMarketRequest.class));
         transactionSettings.put(TendermintTransaction.SUSPEND_MARKET,
                 new TransactionConfig<SingleItemRequest>()
-                    .setDeliverFn(marketService::proposeToSuspend)
-                    .setProtectedFn(false)
-                    .setRequestType(SingleItemRequest.class));
+                        .setDeliverFn(marketService::proposeToSuspend)
+                        .setProtectedFn(false)
+                        .setRequestType(SingleItemRequest.class));
         transactionSettings.put(TendermintTransaction.UNSUSPEND_MARKET,
                 new TransactionConfig<SingleItemRequest>()
-                    .setDeliverFn(marketService::proposeToUnsuspend)
-                    .setProtectedFn(false)
-                    .setRequestType(SingleItemRequest.class));
+                        .setDeliverFn(marketService::proposeToUnsuspend)
+                        .setProtectedFn(false)
+                        .setRequestType(SingleItemRequest.class));
         transactionSettings.put(TendermintTransaction.ADD_ASSET,
                 new TransactionConfig<AddAssetRequest>()
-                    .setDeliverFn(assetService::proposeToAdd)
-                    .setProtectedFn(false)
-                    .setRequestType(AddAssetRequest.class));
+                        .setDeliverFn(assetService::proposeToAdd)
+                        .setProtectedFn(false)
+                        .setRequestType(AddAssetRequest.class));
         transactionSettings.put(TendermintTransaction.SUSPEND_ASSET,
                 new TransactionConfig<SingleItemRequest>()
-                    .setDeliverFn(assetService::proposeToSuspend)
-                    .setProtectedFn(false)
-                    .setRequestType(SingleItemRequest.class));
+                        .setDeliverFn(assetService::proposeToSuspend)
+                        .setProtectedFn(false)
+                        .setRequestType(SingleItemRequest.class));
         transactionSettings.put(TendermintTransaction.UNSUSPEND_ASSET,
                 new TransactionConfig<SingleItemRequest>()
-                    .setDeliverFn(assetService::proposeToUnsuspend)
-                    .setProtectedFn(false)
-                    .setRequestType(SingleItemRequest.class));
+                        .setDeliverFn(assetService::proposeToUnsuspend)
+                        .setProtectedFn(false)
+                        .setRequestType(SingleItemRequest.class));
         transactionSettings.put(TendermintTransaction.CAST_VOTE,
                 new TransactionConfig<CastVoteRequest>()
-                    .setDeliverFn(proposalService::vote)
-                    .setProtectedFn(false)
-                    .setRequestType(CastVoteRequest.class));
+                        .setDeliverFn(proposalService::vote)
+                        .setProtectedFn(false)
+                        .setRequestType(CastVoteRequest.class));
         transactionSettings.put(TendermintTransaction.CONFIRM_ETHEREUM_EVENTS,
                 new TransactionConfig<BatchValidatorRequest>()
-                    .setDeliverFn(ethereumService::confirmEvents)
-                    .setProtectedFn(true)
-                    .setRequestType(BatchValidatorRequest.class));
+                        .setDeliverFn(ethereumService::confirmEvents)
+                        .setProtectedFn(true)
+                        .setRequestType(BatchValidatorRequest.class));
         transactionSettings.put(TendermintTransaction.SYNC_PROPOSALS,
                 new TransactionConfig<BatchValidatorRequest>()
-                    .setDeliverFn(proposalService::sync)
-                    .setProtectedFn(true)
-                    .setRequestType(BatchValidatorRequest.class));
+                        .setDeliverFn(proposalService::sync)
+                        .setProtectedFn(true)
+                        .setRequestType(BatchValidatorRequest.class));
         transactionSettings.put(TendermintTransaction.SETTLE_MARKETS,
                 new TransactionConfig<BatchValidatorRequest>()
-                    .setDeliverFn(marketService::settleMarkets)
-                    .setProtectedFn(true)
-                    .setRequestType(BatchValidatorRequest.class));
+                        .setDeliverFn(marketService::settleMarkets)
+                        .setProtectedFn(true)
+                        .setRequestType(BatchValidatorRequest.class));
+        transactionSettings.put(TendermintTransaction.ADD_STAKE,
+                new TransactionConfig<UpdateStakeRequest>()
+                        .setDeliverFn(stakeService::add)
+                        .setProtectedFn(true)
+                        .setRequestType(UpdateStakeRequest.class));
+        transactionSettings.put(TendermintTransaction.REMOVE_STAKE,
+                new TransactionConfig<UpdateStakeRequest>()
+                        .setDeliverFn(stakeService::remove)
+                        .setProtectedFn(true)
+                        .setRequestType(UpdateStakeRequest.class));
+        transactionSettings.put(TendermintTransaction.DEPOSIT_ASSET,
+                new TransactionConfig<DepositAssetRequest>()
+                        .setDeliverFn(accountService::deposit)
+                        .setProtectedFn(true)
+                        .setRequestType(DepositAssetRequest.class));
     }
 
     /**

@@ -79,4 +79,7 @@ public class ErrorCode {
     public static final String INVALID_APP_STATE = "Blockchain started with invalid app state.";
     public static final String NONCE_ALREADY_USED = "Nonce already used.";
     public static final String NONCE_MANDATORY = "Nonce is mandatory.";
+    public static final String ADD_STAKE_FAILED = "Failed to add stake.";
+    public static final String REMOVE_STAKE_FAILED = "Failed to remove stake.";
+    public static final String DEPOSIT_ASSET_FAILED = "Failed to deposit asset.";
 }

@@ -3,10 +3,7 @@ package com.jynx.pro.blockchain;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jynx.pro.constant.TendermintTransaction;
-import com.jynx.pro.entity.Order;
-import com.jynx.pro.entity.Proposal;
-import com.jynx.pro.entity.Vote;
-import com.jynx.pro.entity.Withdrawal;
+import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.*;
@@ -145,6 +142,27 @@ public class TendermintClient {
     ) {
         processTransaction(request, Object.class,
                 TendermintTransaction.SYNC_PROPOSALS, ErrorCode.SYNC_PROPOSALS_FAILED);
+    }
+
+    public void addStake(
+            final UpdateStakeRequest request
+    ) {
+        processTransaction(request, Event.class,
+                TendermintTransaction.ADD_STAKE, ErrorCode.ADD_STAKE_FAILED);
+    }
+
+    public void removeStake(
+            final UpdateStakeRequest request
+    ) {
+        processTransaction(request, Event.class,
+                TendermintTransaction.REMOVE_STAKE, ErrorCode.REMOVE_STAKE_FAILED);
+    }
+
+    public void depositAsset(
+            final DepositAssetRequest request
+    ) {
+        processTransaction(request, Event.class,
+                TendermintTransaction.DEPOSIT_ASSET, ErrorCode.DEPOSIT_ASSET_FAILED);
     }
 
     public TransactionResponse<Withdrawal> createWithdrawal(

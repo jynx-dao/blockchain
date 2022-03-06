@@ -1,13 +1,18 @@
 package com.jynx.pro.service;
 
+import com.jynx.pro.blockchain.TendermintClient;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.ethereum.ERC20Detailed;
 import com.jynx.pro.ethereum.JynxPro_Bridge;
 import com.jynx.pro.ethereum.type.EthereumType;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.BatchValidatorRequest;
+import com.jynx.pro.request.DepositAssetRequest;
+import com.jynx.pro.request.SignedRequest;
+import com.jynx.pro.request.UpdateStakeRequest;
+import com.jynx.pro.utils.CryptoUtils;
+import com.jynx.pro.utils.JSONUtils;
 import com.jynx.pro.utils.PriceUtils;
-import com.jynx.pro.utils.SleepUtils;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.DecoderException;
@@ -50,12 +55,8 @@ public class EthereumService {
     @Value("${ethereum.rpc.port}")
     private Integer rpcPort;
     @Value("${ethereum.private.key}")
-    private String privateKey;
+    private String ethereumPrivateKey;
 
-    @Autowired
-    private AccountService accountService;
-    @Autowired
-    private StakeService stakeService;
     @Autowired
     private EventService eventService;
     @Autowired
@@ -63,7 +64,18 @@ public class EthereumService {
     @Autowired
     private PriceUtils priceUtils;
     @Autowired
-    private SleepUtils sleepUtils;
+    private JSONUtils jsonUtils;
+    @Autowired
+    private CryptoUtils cryptoUtils;
+    @Autowired
+    private TendermintClient tendermintClient;
+
+    @Setter
+    @Value("${validator.private.key}")
+    private String validatorPrivateKey;
+    @Setter
+    @Value("${validator.public.key}")
+    private String validatorPublicKey;
 
     private final Event ADD_STAKE = new Event("AddStake", Arrays.asList(
             EthereumType.ADDRESS,
@@ -209,6 +221,18 @@ public class EthereumService {
         return result;
     }
 
+    private void addSignatureToRequest(
+            final SignedRequest request
+    ) {
+        request.setNonce(getNonce().toString());
+        String message = jsonUtils.toJson(request);
+        String hexPrivateKey = Hex.encodeHexString(Base64.getDecoder().decode(validatorPrivateKey));
+        String hexPublicKey = Hex.encodeHexString(Base64.getDecoder().decode(validatorPublicKey));
+        String sig = cryptoUtils.sign(message, hexPrivateKey).orElse("");
+        request.setSignature(sig);
+        request.setPublicKey(hexPublicKey);
+    }
+
     /**
      * Initialize the Ethereum event filters
      */
@@ -219,21 +243,38 @@ public class EthereumService {
             String eventHash = ethLog.getTopics().get(0);
             String txHash = ethLog.getTransactionHash();
             BigInteger blockNumber = ethLog.getBlockNumber();
-            // TODO - the proposer should deliver these events via deliverTx [??]
-            // TODO - else this is effectively happening "off-chain"
             if(eventHash.equals(ADD_STAKE_HASH)) {
                 BigInteger amount = decodeUint256(ethLog, 1);
                 String jynxKey = decodeBytes32(ethLog, 2);
-                stakeService.add(amount, jynxKey, blockNumber.longValue(), txHash);
+                UpdateStakeRequest request = new UpdateStakeRequest()
+                        .setAmount(amount)
+                        .setPublicKey(jynxKey)
+                        .setTxHash(txHash)
+                        .setBlockNumber(blockNumber.longValue());
+                addSignatureToRequest(request);
+                tendermintClient.addStake(request); // TODO - this needs to be signed [by validator]
             } else if(eventHash.equals(REMOVE_STAKE_HASH)) {
                 BigInteger amount = decodeUint256(ethLog, 1);
                 String jynxKey = decodeBytes32(ethLog, 2);
-                stakeService.remove(amount, jynxKey, blockNumber.longValue(), txHash);
+                UpdateStakeRequest request = new UpdateStakeRequest()
+                        .setAmount(amount)
+                        .setPublicKey(jynxKey)
+                        .setTxHash(txHash)
+                        .setBlockNumber(blockNumber.longValue());
+                addSignatureToRequest(request);
+                tendermintClient.removeStake(request); // TODO - this needs to be signed [by validator]
             } else if(eventHash.equals(DEPOSIT_ASSET_HASH)) {
-                String asset = decodeAddress(ethLog, 1);
+                String assetAddress = decodeAddress(ethLog, 1);
                 BigInteger amount = decodeUint256(ethLog, 2);
                 String jynxKey = decodeBytes32(ethLog, 3);
-                accountService.deposit(asset, amount, jynxKey, blockNumber.longValue(), txHash);
+                DepositAssetRequest request = new DepositAssetRequest()
+                        .setAssetAddress(assetAddress)
+                        .setAmount(amount)
+                        .setPublicKey(jynxKey)
+                        .setTxHash(txHash)
+                        .setBlockNumber(blockNumber.longValue());
+                addSignatureToRequest(request);
+                tendermintClient.depositAsset(request); // TODO - this needs to be signed [by validator]
             }
         });
     }
@@ -260,7 +301,7 @@ public class EthereumService {
             final String contractAddress
     ) {
         return ERC20Detailed.load(contractAddress, getWeb3j(),
-                Credentials.create(privateKey), new DefaultGasProvider());
+                Credentials.create(ethereumPrivateKey), new DefaultGasProvider());
     }
 
     /**
@@ -317,7 +358,7 @@ public class EthereumService {
             final List<String> assets
     ) {
         try {
-            Credentials credentials = Credentials.create(privateKey);
+            Credentials credentials = Credentials.create(ethereumPrivateKey);
             JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.get().getBridgeAddress(), getWeb3j(),
                     credentials, new DefaultGasProvider());
             BigInteger nonce = getNonce();
@@ -349,7 +390,7 @@ public class EthereumService {
             final String asset
     ) {
         try {
-            Credentials credentials = Credentials.create(privateKey);
+            Credentials credentials = Credentials.create(ethereumPrivateKey);
             JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.get().getBridgeAddress(), getWeb3j(),
                     credentials, new DefaultGasProvider());
             BigInteger nonce = getNonce();
@@ -373,7 +414,7 @@ public class EthereumService {
             final String asset
     ) {
         try {
-            Credentials credentials = Credentials.create(privateKey);
+            Credentials credentials = Credentials.create(ethereumPrivateKey);
             JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.get().getBridgeAddress(), getWeb3j(),
                     credentials, new DefaultGasProvider());
             BigInteger nonce = getNonce();
@@ -404,7 +445,7 @@ public class EthereumService {
         function = new Function("", args2, Collections.emptyList());
         encodedArgs = FunctionEncoder.encode(function).substring(10);
         Sign.SignatureData signatureData = Sign.signMessage(Hex.decodeHex(encodedArgs),
-                ECKeyPair.create(Hex.decodeHex(privateKey.substring(2))));
+                ECKeyPair.create(Hex.decodeHex(ethereumPrivateKey.substring(2))));
         String signatureString = toSignatureString(signatureData).substring(2);
         return Hex.decodeHex(signatureString);
     }

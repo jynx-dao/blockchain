@@ -9,6 +9,7 @@ import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.*;
 import com.jynx.pro.request.CreateWithdrawalRequest;
+import com.jynx.pro.request.DepositAssetRequest;
 import com.jynx.pro.request.SingleItemRequest;
 import com.jynx.pro.utils.PriceUtils;
 import com.jynx.pro.utils.UUIDUtils;
@@ -252,28 +253,11 @@ public class AccountService {
         }
     }
 
-    public void deposit(
-            final String assetAddress,
-            final BigInteger amount,
-            final String publicKey,
-            final Long blockNumber,
-            final String txHash
+    public Event deposit(
+            final DepositAssetRequest request
     ) {
-        User user = userService.getAndCreate(publicKey);
-        // TODO - don't duplicate events
-        Event event = eventService.save(user, blockNumber,
-                txHash, amount, EventType.DEPOSIT_ASSET, assetAddress);
-        Asset asset = assetService.getByAddress(assetAddress);
-        int dps = ethereumService.decimalPlaces(asset.getAddress());
-        Deposit deposit = new Deposit()
-                .setAmount(priceUtils.fromBigInteger(amount, dps))
-                .setId(uuidUtils.next())
-                .setAsset(asset)
-                .setStatus(DepositStatus.PENDING)
-                .setEvent(event)
-                .setUser(user)
-                .setCreated(configService.getTimestamp());
-        depositRepository.save(deposit);
+        return eventService.save(userService.getAndCreate(request.getPublicKey()), request.getBlockNumber(),
+                request.getTxHash(), request.getAmount(), EventType.DEPOSIT_ASSET, request.getAssetAddress());
     }
 
     public void credit(

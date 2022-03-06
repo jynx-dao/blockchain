@@ -46,12 +46,6 @@ import java.util.List;
 public class TendermintClientTest extends IntegrationTest {
 
     @Autowired
-    private TendermintClient tendermintClient;
-    @Autowired
-    private BlockchainGateway blockchainGateway;
-    @Autowired
-    private AppStateManager appStateManager;
-    @Autowired
     private TestRestTemplate restTemplate;
     @Autowired
     private SleepUtils sleepUtils;
@@ -78,7 +72,7 @@ public class TendermintClientTest extends IntegrationTest {
             String publicKey = json.getJSONObject("pub_key").getString("value");
             blockchainGateway.setValidatorAddress(address);
             blockchainGateway.setValidatorPrivateKey(privateKey);
-            blockchainGateway.setValidatorPublicKey(publicKey );
+            blockchainGateway.setValidatorPublicKey(publicKey);
         } catch(Exception e) {
             log.error(e.getMessage(), e);
         }
@@ -626,14 +620,5 @@ public class TendermintClientTest extends IntegrationTest {
         request.setPublicKey(PUBLIC_KEY);
         TransactionResponse<Withdrawal> txResponse = tendermintClient.cancelWithdrawal(request);
         Assertions.assertEquals(txResponse.getItem().getStatus(), WithdrawalStatus.CANCELED);
-    }
-
-    private void waitForBlockchain() {
-        long blockHeight = appStateManager.getBlockHeight();
-        while(blockHeight < 1) {
-            blockHeight = appStateManager.getBlockHeight();
-            log.info("Block height = {}", blockHeight);
-            sleepUtils.sleep(500L);
-        }
     }
 }

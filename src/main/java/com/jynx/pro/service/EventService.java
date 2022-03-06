@@ -1,16 +1,15 @@
 package com.jynx.pro.service;
 
 import com.jynx.pro.constant.Blockchain;
+import com.jynx.pro.constant.DepositStatus;
 import com.jynx.pro.constant.EventType;
-import com.jynx.pro.entity.Deposit;
-import com.jynx.pro.entity.Event;
-import com.jynx.pro.entity.Stake;
-import com.jynx.pro.entity.User;
+import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.DepositRepository;
 import com.jynx.pro.repository.EventRepository;
 import com.jynx.pro.repository.StakeRepository;
+import com.jynx.pro.utils.PriceUtils;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -20,6 +19,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -36,7 +36,29 @@ public class EventService {
     @Autowired
     private AccountService accountService;
     @Autowired
+    private EthereumService ethereumService;
+    @Autowired
+    private AssetService assetService;
+    @Autowired
+    private ConfigService configService;
+    @Autowired
     private UUIDUtils uuidUtils;
+    @Autowired
+    private PriceUtils priceUtils;
+
+    private Optional<Event> findMatchingEvent(
+            final BigInteger amount,
+            final String publicKey,
+            final Long blockNumber,
+            final String txHash,
+            final EventType eventType
+    ) {
+        return eventRepository.findByHash(txHash).stream().filter(e ->
+                e.getAmount().doubleValue() == amount.doubleValue() &&
+                        e.getUser().getPublicKey().equals(publicKey) &&
+                        e.getBlockNumber().equals(blockNumber) &&
+                        e.getType().equals(eventType)).findFirst();
+    }
 
     public Event save(
             final User user,
@@ -44,8 +66,12 @@ public class EventService {
             final String txHash,
             final BigInteger amount,
             final EventType type,
-            final String asset
+            final String assetAddress
     ) {
+        Optional<Event> existingEvent = findMatchingEvent(amount, user.getPublicKey(), blockNumber, txHash, type);
+        if(existingEvent.isPresent()) {
+            return existingEvent.get();
+        }
         double modifier = Math.pow(10, 18);
         Event event = new Event()
                 .setId(uuidUtils.next())
@@ -57,10 +83,24 @@ public class EventService {
                 .setType(type)
                 .setAmount(BigDecimal.valueOf(amount.doubleValue())
                         .divide(BigDecimal.valueOf(modifier), 8, RoundingMode.HALF_DOWN));
-        if(asset != null) {
-            event.setAsset(asset);
+        if(assetAddress != null) {
+            event.setAsset(assetAddress);
+            Asset asset = assetService.getByAddress(assetAddress);
+            int dps = ethereumService.decimalPlaces(asset.getAddress());
+            Deposit deposit = new Deposit()
+                    .setAmount(priceUtils.fromBigInteger(amount, dps))
+                    .setId(uuidUtils.next())
+                    .setAsset(asset)
+                    .setStatus(DepositStatus.PENDING)
+                    .setEvent(event)
+                    .setUser(user)
+                    .setCreated(configService.getTimestamp());
+            event = eventRepository.save(event);
+            depositRepository.save(deposit);
+        } else {
+            event = eventRepository.save(event);
         }
-        return eventRepository.save(event);
+        return event;
     }
 
     public Event save(

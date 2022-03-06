@@ -1,18 +1,19 @@
 package com.jynx.pro.service;
 
 import com.jynx.pro.constant.EventType;
+import com.jynx.pro.entity.Event;
 import com.jynx.pro.entity.Stake;
 import com.jynx.pro.entity.User;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.StakeRepository;
+import com.jynx.pro.request.UpdateStakeRequest;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
 
 @Slf4j
 @Service
@@ -56,6 +57,13 @@ public class StakeService {
         }
     }
 
+    /**
+     * Get {@link Stake} for {@link User} and create if it doesn't exist
+     *
+     * @param user {@link User}
+     *
+     * @return {@link Stake}
+     */
     public Stake getAndCreate(
             final User user
     ) {
@@ -66,25 +74,31 @@ public class StakeService {
                         .setAmount(BigDecimal.ZERO));
     }
 
-    public void remove(
-            final BigInteger amount,
-            final String publicKey,
-            final Long blockNumber,
-            final String txHash
+    /**
+     * Add an {@link Event} to remove stake from public key
+     *
+     * @param request {@link UpdateStakeRequest}
+     *
+     * @return {@link Event}
+     */
+    public Event remove(
+            final UpdateStakeRequest request
     ) {
-        // TODO - don't duplicate events
-        eventService.save(userService.getAndCreate(publicKey), blockNumber,
-                txHash, amount, EventType.REMOVE_STAKE);
+        return eventService.save(userService.getAndCreate(request.getPublicKey()), request.getBlockNumber(),
+                request.getTxHash(), request.getAmount(), EventType.REMOVE_STAKE);
     }
 
-    public void add(
-            final BigInteger amount,
-            final String publicKey,
-            final Long blockNumber,
-            final String txHash
+    /**
+     * Add an {@link Event} to add stake to public key
+     *
+     * @param request {@link UpdateStakeRequest}
+     *
+     * @return {@link Event}
+     */
+    public Event add(
+            final UpdateStakeRequest request
     ) {
-        // TODO - don't duplicate events
-        eventService.save(userService.getAndCreate(publicKey), blockNumber,
-                txHash, amount, EventType.ADD_STAKE);
+        return eventService.save(userService.getAndCreate(request.getPublicKey()), request.getBlockNumber(),
+                request.getTxHash(), request.getAmount(), EventType.ADD_STAKE);
     }
 }

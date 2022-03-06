@@ -30,6 +30,24 @@ public class EventRepository extends EntityRepository<Event> {
         return getEntityManager().createQuery(query).getResultList();
     }
 
+    /**
+     * Get {@link Event}s by tx hash
+     *
+     * @param hash tx hash
+     *
+     * @return {@link List<Event>}
+     */
+    public List<Event> findByHash(
+            final String hash
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Event> query = cb.createQuery(getType());
+        Root<Event> rootType = query.from(getType());
+        Path<String> hash_attr = rootType.get("hash");
+        query = query.select(rootType).where(cb.equal(hash_attr, hash));
+        return getEntityManager().createQuery(query).getResultList();
+    }
+
     @Override
     public Class<Event> getType() {
         return Event.class;

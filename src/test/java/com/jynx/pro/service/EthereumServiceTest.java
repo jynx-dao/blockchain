@@ -8,15 +8,18 @@ import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.BatchValidatorRequest;
 import com.jynx.pro.request.CreateWithdrawalRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.Assertions;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.json.JSONObject;
+import org.junit.jupiter.api.*;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
+import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.shaded.org.apache.commons.io.IOUtils;
+import org.testcontainers.utility.DockerImageName;
 import org.web3j.utils.Convert;
 
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
@@ -25,21 +28,63 @@ import java.util.Optional;
 
 @Slf4j
 @Testcontainers
-@ActiveProfiles("test")
-@SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
+@Disabled
+@ActiveProfiles("tendermint")
+@SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class EthereumServiceTest extends IntegrationTest {
+
+    // TODO - requires Tendermint to be running
 
     private static final String JYNX_KEY = "02d47b3068c9ff8e25eec7c83b74eb2c61073a1862f925b644b4b234c21e83dd";
 
+    public static GenericContainer tendermint;
+
+    // TODO - remove direct calls to TendermintClient and proxy everything via REST (it will increase test coverage)
+
+    private void updateTendermintKeys(
+            final String dest
+    ) {
+        try {
+            InputStream is = new FileInputStream(dest);
+            String jsonTxt = IOUtils.toString(is, "UTF-8");
+            JSONObject json = new JSONObject(jsonTxt);
+            String address = json.getString("address");
+            String privateKey = json.getJSONObject("priv_key").getString("value");
+            String publicKey = json.getJSONObject("pub_key").getString("value");
+            blockchainGateway.setValidatorAddress(address);
+            blockchainGateway.setValidatorPrivateKey(privateKey);
+            blockchainGateway.setValidatorPublicKey(publicKey);
+            ethereumService.setValidatorPrivateKey(privateKey);
+            ethereumService.setValidatorPublicKey(publicKey);
+        } catch(Exception e) {
+            log.error(e.getMessage(), e);
+        }
+    }
+
     @BeforeEach
     public void setup() {
-        initializeState();
-        databaseTransactionManager.createTransaction();
+        initializeState(true);
+        tendermint =
+                new GenericContainer(DockerImageName.parse("tendermint/tendermint:v0.34.14"))
+                        .withExposedPorts(26657)
+                        .withCommand("node --abci grpc --proxy_app tcp://host.docker.internal:26658")
+                        .withExtraHost("host.docker.internal", "host-gateway");
+        tendermint.start();
+        String dest = "target/priv_validator_key.json";
+        tendermint.copyFileFromContainer("/tendermint/config/priv_validator_key.json", dest);
+        updateTendermintKeys(dest);
+        int port = tendermint.getFirstMappedPort();
+        String host = String.format("http://%s", tendermint.getHost());
+        tendermintClient.setBaseUri(host);
+        tendermintClient.setPort(port);
+        log.info("Tendermint URL = {}:{}", host, port);
+        waitForBlockchain();
     }
 
     @AfterEach
     public void shutdown() {
-        databaseTransactionManager.commit();
+        tendermint.stop();
+        appStateManager.setBlockHeight(0);
         clearState();
     }
 
