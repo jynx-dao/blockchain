@@ -6,6 +6,7 @@ import com.jynx.pro.ethereum.JynxPro_Bridge;
 import com.jynx.pro.ethereum.type.EthereumType;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.utils.PriceUtils;
+import com.jynx.pro.utils.SleepUtils;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.DecoderException;
@@ -60,6 +61,8 @@ public class EthereumService {
     private ConfigService configService;
     @Autowired
     private PriceUtils priceUtils;
+    @Autowired
+    private SleepUtils sleepUtils;
 
     private final Event ADD_STAKE = new Event("AddStake", Arrays.asList(
             EthereumType.ADDRESS,
@@ -421,7 +424,8 @@ public class EthereumService {
      *
      * @return the nonce as {@link BigInteger}
      */
-    private BigInteger getNonce() {
+    public BigInteger getNonce() {
+        sleepUtils.sleep(1L);
         return new BigInteger(256, new SecureRandom());
     }
 }

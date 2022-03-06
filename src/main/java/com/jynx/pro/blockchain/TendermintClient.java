@@ -11,6 +11,7 @@ import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.*;
 import com.jynx.pro.response.TransactionResponse;
+import com.jynx.pro.service.EthereumService;
 import com.jynx.pro.utils.SleepUtils;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.JsonNode;

@@ -55,10 +55,6 @@ public class ErrorCode {
     public static final String CANNOT_GET_POLYGON_PRICE = "Cannot get price from Polygon.";
     public static final String USER_NOT_FOUND = "User was not found.";
     public static final String ACCOUNT_NOT_FOUND = "Account was not found.";
-    public static final String FROM_AFTER_TO = "From timestamp cannot be after to timestamp.";
-    public static final String FROM_MANDATORY = "From timestamp is mandatory.";
-    public static final String TO_MANDATORY = "To timestamp is mandatory.";
-    public static final String MARKET_ID_MANDATORY = "Market ID is mandatory.";
     public static final String INTERVAL_MANDATORY = "Interval is mandatory.";
     public static final String TX_NOT_CREATED = "Write transaction not created.";
     public static final String FAILED_TO_BUILD_URL = "Could not build Tendermint request URL.";
@@ -81,4 +77,6 @@ public class ErrorCode {
     public static final String UNKNOWN_ERROR = "An unknown error occurred.";
     public static final String SIGNATURE_INVALID = "The signature is invalid.";
     public static final String INVALID_APP_STATE = "Blockchain started with invalid app state.";
+    public static final String NONCE_ALREADY_USED = "Nonce already used.";
+    public static final String NONCE_MANDATORY = "Nonce is mandatory.";
 }

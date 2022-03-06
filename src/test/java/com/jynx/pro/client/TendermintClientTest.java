@@ -125,6 +125,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        request.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(request);
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
@@ -160,6 +161,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        request.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(request);
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
@@ -171,6 +173,17 @@ public class TendermintClientTest extends IntegrationTest {
         asset = responseEntity.getBody();
         Assertions.assertNotNull(asset);
         Assertions.assertEquals(asset.getStatus(), AssetStatus.SUSPENDED);
+        request = new SingleItemRequest()
+                .setId(asset.getId());
+        times = proposalTimes();
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setNonce(ethereumService.getNonce().toString());
+        message = jsonUtils.toJson(request);
+        sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
+        request.setPublicKey(takerUser.getPublicKey());
+        request.setSignature(sig);
         tendermintClient.unsuspendAsset(request);
         sleepUtils.sleep(2000L);
         responseEntity = this.restTemplate.getForEntity(
@@ -190,6 +203,7 @@ public class TendermintClientTest extends IntegrationTest {
         long[] times = proposalTimes();
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        request.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(request);
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
@@ -213,6 +227,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        request.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(request);
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
@@ -259,6 +274,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        request.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(request);
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
@@ -291,6 +307,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        request.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(request);
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
@@ -313,6 +330,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        request.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(request);
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
@@ -324,6 +342,17 @@ public class TendermintClientTest extends IntegrationTest {
         market = responseEntity.getBody();
         Assertions.assertNotNull(market);
         Assertions.assertEquals(market.getStatus(), MarketStatus.SUSPENDED);
+        request = new SingleItemRequest()
+                .setId(market.getId());
+        times = proposalTimes();
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setNonce(ethereumService.getNonce().toString());
+        message = jsonUtils.toJson(request);
+        sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
+        request.setPublicKey(takerUser.getPublicKey());
+        request.setSignature(sig);
         tendermintClient.unsuspendMarket(request);
         sleepUtils.sleep(2000L);
         responseEntity = this.restTemplate.getForEntity(
@@ -349,6 +378,7 @@ public class TendermintClientTest extends IntegrationTest {
         }
         BulkCreateOrderRequest bulkCreateRequest = new BulkCreateOrderRequest()
                 .setOrders(createRequest);
+        bulkCreateRequest.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(bulkCreateRequest);
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         bulkCreateRequest.setPublicKey(takerUser.getPublicKey());
@@ -373,6 +403,7 @@ public class TendermintClientTest extends IntegrationTest {
         }
         BulkAmendOrderRequest bulkAmendRequest = new BulkAmendOrderRequest()
                 .setOrders(amendRequest);
+        bulkAmendRequest.setNonce(ethereumService.getNonce().toString());
         message = jsonUtils.toJson(bulkAmendRequest);
         sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         bulkAmendRequest.setPublicKey(takerUser.getPublicKey());
@@ -396,6 +427,7 @@ public class TendermintClientTest extends IntegrationTest {
         }
         BulkCancelOrderRequest bulkCancelRequest = new BulkCancelOrderRequest()
                 .setOrders(cancelRequest);
+        bulkCancelRequest.setNonce(ethereumService.getNonce().toString());
         message = jsonUtils.toJson(bulkCancelRequest);
         sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         bulkCancelRequest.setPublicKey(takerUser.getPublicKey());
@@ -430,6 +462,8 @@ public class TendermintClientTest extends IntegrationTest {
                 .setPrice(BigDecimal.valueOf(1.1))
                 .setSide(MarketSide.SELL)
                 .setMarketId(market.getId());
+        sellRequest.setNonce(ethereumService.getNonce().toString());
+        buyRequest.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(buyRequest);
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         buyRequest.setPublicKey(takerUser.getPublicKey());
@@ -464,6 +498,7 @@ public class TendermintClientTest extends IntegrationTest {
                 .setPrice(BigDecimal.valueOf(1.1))
                 .setSide(MarketSide.SELL)
                 .setMarketId(market.getId());
+        request.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(request);
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
@@ -480,6 +515,7 @@ public class TendermintClientTest extends IntegrationTest {
                 BigDecimal.valueOf(1.1).doubleValue(), 0.0001d);
         CancelOrderRequest cancelOrderRequest = new CancelOrderRequest()
                 .setId(newOrder.getItem().getId());
+        cancelOrderRequest.setNonce(ethereumService.getNonce().toString());
         message = jsonUtils.toJson(cancelOrderRequest);
         sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         cancelOrderRequest.setPublicKey(takerUser.getPublicKey());
@@ -505,6 +541,7 @@ public class TendermintClientTest extends IntegrationTest {
                 .setPrice(BigDecimal.valueOf(1.1))
                 .setSide(MarketSide.SELL)
                 .setMarketId(market.getId());
+        request.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(request);
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
@@ -522,6 +559,7 @@ public class TendermintClientTest extends IntegrationTest {
         AmendOrderRequest amendOrderRequest = new AmendOrderRequest()
                 .setId(newOrder.getItem().getId())
                 .setPrice(BigDecimal.valueOf(1.2));
+        amendOrderRequest.setNonce(ethereumService.getNonce().toString());
         message = jsonUtils.toJson(amendOrderRequest);
         sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         amendOrderRequest.setPublicKey(takerUser.getPublicKey());
@@ -545,6 +583,7 @@ public class TendermintClientTest extends IntegrationTest {
         CastVoteRequest castVoteRequest = new CastVoteRequest()
                 .setId(proposal.getId())
                 .setInFavour(true);
+        castVoteRequest.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(castVoteRequest);
         String sig = cryptoUtils.sign(message, PRIVATE_KEY2).orElse("");
         castVoteRequest.setSignature(sig);
@@ -560,6 +599,7 @@ public class TendermintClientTest extends IntegrationTest {
                 .setAmount(BigDecimal.TEN)
                 .setAssetId(asset.getId())
                 .setDestination("0x0A41");
+        request.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(request);
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setSignature(sig);
@@ -579,6 +619,7 @@ public class TendermintClientTest extends IntegrationTest {
         Withdrawal withdrawal = createWithdrawal();
         SingleItemRequest request = new SingleItemRequest()
                 .setId(withdrawal.getId());
+        request.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(request);
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setSignature(sig);

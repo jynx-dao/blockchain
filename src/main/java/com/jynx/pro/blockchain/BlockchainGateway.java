@@ -26,6 +26,7 @@ import tendermint.abci.ABCIApplicationGrpc;
 import tendermint.abci.Types;
 
 import javax.annotation.PostConstruct;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -77,9 +78,11 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Value("${batch.block.frequency}")
     private Integer batchBlockFrequency;
 
+    private static final Set<String> nonceHistory = new HashSet<>();
+
     // TODO - we need to protect against replay attacks
 
-    private static final ExecutorService executorService = Executors.newCachedThreadPool();
+    private static final ExecutorService executorService = Executors.newFixedThreadPool(1);
     private final Map<TendermintTransaction, Function<String, Object>> deliverTransactions = new HashMap<>();
     private final Map<TendermintTransaction, Consumer<String>> checkTransactions = new HashMap<>();
 
@@ -270,6 +273,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         BatchValidatorRequest request = jsonUtils.fromJson(txAsJson, BatchValidatorRequest.class);
+        synchronized (nonceHistory) {
+            nonceHistory.add(request.getNonce());
+        }
         request.setUser(userService.getAndCreate(request.getPublicKey()));
         return ethereumService.confirmEvents();
     }
@@ -278,6 +284,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         BatchValidatorRequest request = jsonUtils.fromJson(txAsJson, BatchValidatorRequest.class);
+        synchronized (nonceHistory) {
+            nonceHistory.add(request.getNonce());
+        }
         request.setUser(userService.getAndCreate(request.getPublicKey()));
         return proposalService.sync();
     }
@@ -286,6 +295,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         BatchValidatorRequest request = jsonUtils.fromJson(txAsJson, BatchValidatorRequest.class);
+        synchronized (nonceHistory) {
+            nonceHistory.add(request.getNonce());
+        }
         request.setUser(userService.getAndCreate(request.getPublicKey()));
         return marketService.settleMarkets();
     }
@@ -294,6 +306,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         CastVoteRequest request = jsonUtils.fromJson(txAsJson, CastVoteRequest.class);
+        synchronized (nonceHistory) {
+            nonceHistory.add(request.getNonce());
+        }
         request.setUser(userService.getAndCreate(request.getPublicKey()));
         return proposalService.vote(request);
     }
@@ -302,6 +317,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         CreateWithdrawalRequest request = jsonUtils.fromJson(txAsJson, CreateWithdrawalRequest.class);
+        synchronized (nonceHistory) {
+            nonceHistory.add(request.getNonce());
+        }
         request.setUser(userService.getAndCreate(request.getPublicKey()));
         return accountService.createWithdrawal(request);
     }
@@ -310,6 +328,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
+        synchronized (nonceHistory) {
+            nonceHistory.add(request.getNonce());
+        }
         request.setUser(userService.getAndCreate(request.getPublicKey()));
         return accountService.cancelWithdrawal(request);
     }
@@ -318,6 +339,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         AddMarketRequest request = jsonUtils.fromJson(txAsJson, AddMarketRequest.class);
+        synchronized (nonceHistory) {
+            nonceHistory.add(request.getNonce());
+        }
         request.setUser(userService.getAndCreate(request.getPublicKey()));
         return marketService.proposeToAdd(request);
     }
@@ -326,6 +350,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         AmendMarketRequest request = jsonUtils.fromJson(txAsJson, AmendMarketRequest.class);
+        synchronized (nonceHistory) {
+            nonceHistory.add(request.getNonce());
+        }
         request.setUser(userService.getAndCreate(request.getPublicKey()));
         return marketService.proposeToAmend(request);
     }
@@ -334,6 +361,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
+        synchronized (nonceHistory) {
+            nonceHistory.add(request.getNonce());
+        }
         request.setUser(userService.getAndCreate(request.getPublicKey()));
         return marketService.proposeToSuspend(request);
     }
@@ -342,6 +372,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
+        synchronized (nonceHistory) {
+            nonceHistory.add(request.getNonce());
+        }
         request.setUser(userService.getAndCreate(request.getPublicKey()));
         return marketService.proposeToUnsuspend(request);
     }
@@ -350,6 +383,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         AddAssetRequest request = jsonUtils.fromJson(txAsJson, AddAssetRequest.class);
+        synchronized (nonceHistory) {
+            nonceHistory.add(request.getNonce());
+        }
         request.setUser(userService.getAndCreate(request.getPublicKey()));
         return assetService.proposeToAdd(request);
     }
@@ -358,6 +394,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
+        synchronized (nonceHistory) {
+            nonceHistory.add(request.getNonce());
+        }
         request.setUser(userService.getAndCreate(request.getPublicKey()));
         return assetService.proposeToSuspend(request);
     }
@@ -366,6 +405,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         SingleItemRequest request = jsonUtils.fromJson(txAsJson, SingleItemRequest.class);
+        synchronized (nonceHistory) {
+            nonceHistory.add(request.getNonce());
+        }
         request.setUser(userService.getAndCreate(request.getPublicKey()));
         return assetService.proposeToUnsuspend(request);
     }
@@ -374,6 +416,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         CreateOrderRequest request = jsonUtils.fromJson(txAsJson, CreateOrderRequest.class);
+        synchronized (nonceHistory) {
+            nonceHistory.add(request.getNonce());
+        }
         request.setUser(userService.getAndCreate(request.getPublicKey()));
         return orderService.create(request);
     }
@@ -382,6 +427,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         CancelOrderRequest request = jsonUtils.fromJson(txAsJson, CancelOrderRequest.class);
+        synchronized (nonceHistory) {
+            nonceHistory.add(request.getNonce());
+        }
         request.setUser(userService.getAndCreate(request.getPublicKey()));
         return orderService.cancel(request);
     }
@@ -390,6 +438,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String txAsJson
     ) {
         AmendOrderRequest request = jsonUtils.fromJson(txAsJson, AmendOrderRequest.class);
+        synchronized (nonceHistory) {
+            nonceHistory.add(request.getNonce());
+        }
         request.setUser(userService.getAndCreate(request.getPublicKey()));
         return orderService.amend(request);
     }
@@ -451,6 +502,13 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     ) {
         String signature = request.getSignature();
         String publicKey = request.getPublicKey();
+        if(request.getNonce() == null) {
+            throw new JynxProException(ErrorCode.NONCE_MANDATORY);
+        }
+        log.debug("{} = {}", request.getNonce(), request);
+        if(nonceHistory.contains(request.getNonce())) {
+            throw new JynxProException(ErrorCode.NONCE_ALREADY_USED);
+        }
         if(isValidator) {
             try {
                 String publicKeyAsBase64 = Base64.getEncoder().encodeToString(Hex.decodeHex(request.getPublicKey()));
@@ -541,6 +599,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         BatchValidatorRequest request = new BatchValidatorRequest()
                 .setAddress(address)
                 .setHeight(height);
+        request.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(request);
         String hexPrivateKey = Hex.encodeHexString(Base64.getDecoder().decode(validatorPrivateKey));
         String hexPublicKey = Hex.encodeHexString(Base64.getDecoder().decode(validatorPublicKey));
