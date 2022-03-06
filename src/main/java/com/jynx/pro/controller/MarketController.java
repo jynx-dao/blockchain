@@ -60,7 +60,7 @@ public class MarketController extends AbstractController {
             @RequestParam("to") Long to,
             @RequestParam("interval") KlineInterval interval
     ) {
-        List<Trade> trades = readOnlyRepository.findByMarketIdAndExecutedGreaterThanAndExecutedLessThan(
+        List<Trade> trades = readOnlyRepository.getTradesByMarketIdAndExecutedGreaterThanAndExecutedLessThan(
                         id, from, to).stream()
                 .sorted(Comparator.comparing(Trade::getExecuted))
                 .collect(Collectors.toList());

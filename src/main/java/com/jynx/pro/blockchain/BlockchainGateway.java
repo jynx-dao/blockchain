@@ -411,28 +411,12 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         long blockHeight = req.getHeader().getHeight();
         if(validatorAddress.toLowerCase(Locale.ROOT).equals(proposerAddress.toLowerCase(Locale.ROOT)) &&
                 blockHeight % batchBlockFrequency == 0 && blockHeight > 1) {
-            executorService.submit(() -> {
-                try {
-                    tendermintClient.confirmEthereumEvents(getBatchRequest(proposerAddress, blockHeight));
-                } catch (Exception e) {
-                    log.error(ErrorCode.CONFIRM_ETHEREUM_EVENTS_FAILED, e);
-                }
-            });
-            executorService.submit(() -> {
-                try {
-                    tendermintClient.settleMarkets(getBatchRequest(proposerAddress, blockHeight));
-                } catch (Exception e) {
-                    log.error(ErrorCode.SETTLE_MARKETS_FAILED, e);
-                }
-            });
-            executorService.submit(() -> {
-                try {
-                    tendermintClient.syncProposals(getBatchRequest(proposerAddress, blockHeight));
-                } catch(Exception e) {
-                    log.error(ErrorCode.SYNC_PROPOSALS_FAILED, e);
-                }
-            });
-            // TODO - propagate latest Ethereum events
+            executorService.submit(() -> tendermintClient.confirmEthereumEvents(
+                    getBatchRequest(proposerAddress, blockHeight)));
+            executorService.submit(() -> tendermintClient.settleMarkets(
+                    getBatchRequest(proposerAddress, blockHeight)));
+            executorService.submit(() -> tendermintClient.syncProposals(
+                    getBatchRequest(proposerAddress, blockHeight)));
         }
         responseObserver.onNext(resp);
         responseObserver.onCompleted();

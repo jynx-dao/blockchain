@@ -76,6 +76,8 @@ public abstract class IntegrationTest {
     @Autowired
     protected EventRepository eventRepository;
     @Autowired
+    protected ReadOnlyRepository readOnlyRepository;
+    @Autowired
     protected PriceUtils priceUtils;
     @Autowired
     protected SleepUtils sleepUtils;

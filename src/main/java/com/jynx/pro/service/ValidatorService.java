@@ -49,7 +49,7 @@ public class ValidatorService {
     public boolean isValidator(
             final String publicKey
     ) {
-        Optional<Validator> validatorOptional = readOnlyRepository.findByPublicKey(publicKey);
+        Optional<Validator> validatorOptional = readOnlyRepository.getValidatorByPublicKey(publicKey);
         if(validatorOptional.isEmpty()) return false;
         return validatorOptional.get().getActive();
     }

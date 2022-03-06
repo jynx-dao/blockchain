@@ -153,15 +153,14 @@ public class EthereumServiceTest extends IntegrationTest {
             ethereumHelper.stakeTokens(JYNX_KEY, amount);
         }
         Thread.sleep(30000L);
-//        ethereumService.confirmEvents(new BatchValidatorRequest());
-//        List<Event> events = eventRepository.findByConfirmed(false);
-//        Assertions.assertEquals(events.size(), 0);
-//        Optional<User> user = userRepository.findByPublicKey(JYNX_KEY);
-//        Assertions.assertTrue(user.isPresent());
-//        Optional<Stake> stake = stakeRepository.findByUser(user.get());
-//        Assertions.assertTrue(stake.isPresent());
-//        Assertions.assertEquals(stake.get().getAmount().setScale(2, RoundingMode.HALF_UP),
-//                BigDecimal.valueOf(expectedStake).setScale(2, RoundingMode.HALF_UP));
+        List<Event> events = readOnlyRepository.getEventsByConfirmed(false);
+        Assertions.assertEquals(events.size(), 0);
+        Optional<User> user = readOnlyRepository.getUserByPublicKey(JYNX_KEY);
+        Assertions.assertTrue(user.isPresent());
+        Optional<Stake> stake = readOnlyRepository.getStakeByUser(user.get());
+        Assertions.assertTrue(stake.isPresent());
+        Assertions.assertEquals(stake.get().getAmount().setScale(2, RoundingMode.HALF_UP),
+                BigDecimal.valueOf(expectedStake).setScale(2, RoundingMode.HALF_UP));
     }
 
     private Asset depositAsset() throws Exception {

@@ -404,7 +404,7 @@ public class ReadOnlyRepository {
      *
      * @return {@link List<Trade>}
      */
-    public List<Trade> findByMarketIdAndExecutedGreaterThanAndExecutedLessThan(
+    public List<Trade> getTradesByMarketIdAndExecutedGreaterThanAndExecutedLessThan(
             final UUID marketId,
             final Long from,
             final Long to
@@ -426,7 +426,7 @@ public class ReadOnlyRepository {
      *
      * @return {@link Optional<Validator>}
      */
-    public Optional<Validator> findByPublicKey(
+    public Optional<Validator> getValidatorByPublicKey(
             final String publicKey
     ) {
         CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
@@ -434,6 +434,46 @@ public class ReadOnlyRepository {
         Root<Validator> rootType = query.from(Validator.class);
         Path<String> userPublicKey = rootType.get("publicKey");
         query = query.select(rootType).where(cb.equal(userPublicKey, publicKey));
+        try {
+            return Optional.of(getEntityManager().createQuery(query).getSingleResult());
+        } catch(Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Get {@link Event}s by confirmed flag
+     *
+     * @param confirmed true / false
+     *
+     * @return {@link List<Event>}
+     */
+    public List<Event> getEventsByConfirmed(
+            final boolean confirmed
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Event> query = cb.createQuery(Event.class);
+        Root<Event> rootType = query.from(Event.class);
+        Path<Boolean> eventConfirmed = rootType.get("confirmed");
+        query = query.select(rootType).where(cb.equal(eventConfirmed, confirmed));
+        return getEntityManager().createQuery(query).getResultList();
+    }
+
+    /**
+     * Get {@link Stake} by {@link User}
+     *
+     * @param user {@link User}
+     *
+     * @return {@link Optional<Stake>}
+     */
+    public Optional<Stake> getStakeByUser(
+            final User user
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Stake> query = cb.createQuery(Stake.class);
+        Root<Stake> rootType = query.from(Stake.class);
+        Path<UUID> user_id = rootType.join("user").get("id");
+        query = query.select(rootType).where(cb.equal(user_id, user.getId()));
         try {
             return Optional.of(getEntityManager().createQuery(query).getSingleResult());
         } catch(Exception e) {
