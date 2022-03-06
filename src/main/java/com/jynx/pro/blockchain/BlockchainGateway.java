@@ -26,7 +26,6 @@ import tendermint.abci.ABCIApplicationGrpc;
 import tendermint.abci.Types;
 
 import javax.annotation.PostConstruct;
-import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -80,7 +79,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
 
     private static final Set<String> nonceHistory = new HashSet<>();
 
-    // TODO - we need to protect against replay attacks
+    // TODO - remove duplicated code by using generics for deliverTx and checkTx
 
     private static final ExecutorService executorService = Executors.newFixedThreadPool(1);
     private final Map<TendermintTransaction, Function<String, Object>> deliverTransactions = new HashMap<>();

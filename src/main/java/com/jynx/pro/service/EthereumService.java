@@ -425,7 +425,6 @@ public class EthereumService {
      * @return the nonce as {@link BigInteger}
      */
     public BigInteger getNonce() {
-        sleepUtils.sleep(1L);
         return new BigInteger(256, new SecureRandom());
     }
 }
