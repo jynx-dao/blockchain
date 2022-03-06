@@ -59,6 +59,31 @@ public class ReadOnlyRepository {
     }
 
     /**
+     * Get {@link Account} by user ID and asset ID
+     *
+     * @param userId the user ID
+     * @param assetId the asset ID
+     *
+     * @return {@link Optional} {@link Account}
+     */
+    public Optional<Account> getAccountByUserIdAndAssetId(
+            final UUID userId,
+            final UUID assetId
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Account> query = cb.createQuery(Account.class);
+        Root<Account> rootType = query.from(Account.class);
+        Path<UUID> user_id = rootType.join("user").get("id");
+        Path<UUID> asset_id = rootType.join("asset").get("id");
+        query = query.select(rootType).where(cb.equal(user_id, userId), cb.equal(asset_id, assetId));
+        try {
+            return Optional.of(getEntityManager().createQuery(query).getSingleResult());
+        } catch(Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
      * Get {@link Deposit}s by account ID and user ID
      *
      * @param accountId the account ID
@@ -474,6 +499,28 @@ public class ReadOnlyRepository {
         Root<Stake> rootType = query.from(Stake.class);
         Path<UUID> user_id = rootType.join("user").get("id");
         query = query.select(rootType).where(cb.equal(user_id, user.getId()));
+        try {
+            return Optional.of(getEntityManager().createQuery(query).getSingleResult());
+        } catch(Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Get {@link Withdrawal} by ID
+     *
+     * @param id the withdrawal ID
+     *
+     * @return {@link Optional<Withdrawal>}
+     */
+    public Optional<Withdrawal> getWithdrawalById(
+            final UUID id
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Withdrawal> query = cb.createQuery(Withdrawal.class);
+        Root<Withdrawal> rootType = query.from(Withdrawal.class);
+        Path<UUID> withdrawal_id = rootType.get("id");
+        query = query.select(rootType).where(cb.equal(withdrawal_id, id));
         try {
             return Optional.of(getEntityManager().createQuery(query).getSingleResult());
         } catch(Exception e) {

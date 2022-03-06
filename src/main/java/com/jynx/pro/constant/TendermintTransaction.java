@@ -21,6 +21,7 @@ public enum TendermintTransaction {
     ADD_STAKE, // TODO
     REMOVE_STAKE, // TODO
     DEPOSIT_ASSET, // TODO
+    WITHDRAW_ASSETS, // TODO
     CONFIRM_ETHEREUM_EVENTS,
     SETTLE_MARKETS,
     SYNC_PROPOSALS,

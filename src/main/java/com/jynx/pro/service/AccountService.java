@@ -234,8 +234,10 @@ public class AccountService {
     /**
      * Process all pending withdrawals
      */
-    public void processWithdrawals() {
-        List<Withdrawal> withdrawals = withdrawalRepository.findByStatus(WithdrawalStatus.PENDING);
+    public void processWithdrawals(
+            final List<Withdrawal> withdrawals
+    ) {
+        // TODO - this should happen at the end of the block ??
         List<List<Withdrawal>> batches = ListUtils.partition(withdrawals, WITHDRAWAL_BATCH_SIZE);
         for(List<Withdrawal> batch : batches) {
             List<String> destinations = batch.stream().map(Withdrawal::getDestination)
@@ -245,12 +247,26 @@ public class AccountService {
             List<String> assets = batch.stream().map(w -> w.getAsset().getAddress())
                     .collect(Collectors.toList());
             TransactionReceipt transactionReceipt = ethereumService.withdrawAssets(destinations, amounts, assets);
-            for(Withdrawal withdrawal : batch) {
-                withdrawal.setStatus(WithdrawalStatus.DEBITED);
-                withdrawal.setTxHash(transactionReceipt.getTransactionHash());
-            }
-            withdrawalRepository.saveAll(batch);
+            updateWithdrawalStatus(batch, transactionReceipt);
         }
+    }
+
+    /**
+     * Update the withdrawal statuses
+     *
+     * @param batch a batch of {@link Withdrawal}s
+     * @param transactionReceipt {@link TransactionReceipt} from Ethereum
+     */
+    private void updateWithdrawalStatus(
+            final List<Withdrawal> batch,
+            final TransactionReceipt transactionReceipt
+    ) {
+        // TODO - use deliverTx for the state update
+        for(Withdrawal withdrawal : batch) {
+            withdrawal.setStatus(WithdrawalStatus.DEBITED);
+            withdrawal.setTxHash(transactionReceipt.getTransactionHash());
+        }
+        withdrawalRepository.saveAll(batch);
     }
 
     public Event deposit(

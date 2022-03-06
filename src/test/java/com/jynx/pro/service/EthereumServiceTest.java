@@ -5,12 +5,14 @@ import com.jynx.pro.constant.WithdrawalStatus;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.model.OrderBook;
 import com.jynx.pro.request.BatchValidatorRequest;
 import com.jynx.pro.request.CreateWithdrawalRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.junit.jupiter.api.*;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -32,8 +34,6 @@ import java.util.Optional;
 @ActiveProfiles("tendermint")
 @SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class EthereumServiceTest extends IntegrationTest {
-
-    private static final String JYNX_KEY = "02d47b3068c9ff8e25eec7c83b74eb2c61073a1862f925b644b4b234c21e83dd";
 
     public static GenericContainer tendermint;
 
@@ -65,6 +65,7 @@ public class EthereumServiceTest extends IntegrationTest {
                         .withExposedPorts(26657)
                         .withCommand("node --abci grpc --proxy_app tcp://host.docker.internal:26658")
                         .withExtraHost("host.docker.internal", "host-gateway");
+//        tendermint.withCopyFileToContainer(); // TODO - could be used to copy the app state to genesis [??]
         tendermint.start();
         String dest = "target/priv_validator_key.json";
         tendermint.copyFileFromContainer("/tendermint/config/priv_validator_key.json", dest);
@@ -148,14 +149,14 @@ public class EthereumServiceTest extends IntegrationTest {
         BigInteger amount = BigInteger.valueOf(100).multiply(BigInteger.valueOf(modifier));
         ethereumHelper.approveJynx(ethereumHelper.getJynxProBridge().getContractAddress(), amount);
         if(unstake) {
-            ethereumHelper.removeTokens(JYNX_KEY, amount);
+            ethereumHelper.removeTokens(PUBLIC_KEY, amount);
         } else {
-            ethereumHelper.stakeTokens(JYNX_KEY, amount);
+            ethereumHelper.stakeTokens(PUBLIC_KEY, amount);
         }
         Thread.sleep(30000L);
         List<Event> events = readOnlyRepository.getEventsByConfirmed(false);
         Assertions.assertEquals(events.size(), 0);
-        Optional<User> user = readOnlyRepository.getUserByPublicKey(JYNX_KEY);
+        Optional<User> user = readOnlyRepository.getUserByPublicKey(PUBLIC_KEY);
         Assertions.assertTrue(user.isPresent());
         Optional<Stake> stake = readOnlyRepository.getStakeByUser(user.get());
         Assertions.assertTrue(stake.isPresent());
@@ -164,24 +165,23 @@ public class EthereumServiceTest extends IntegrationTest {
     }
 
     private Asset depositAsset() throws Exception {
-        Asset asset = createAndEnactAsset(true);
+        Asset asset = getDai();
         boolean assetActive = ethereumHelper.getJynxProBridge().assets(asset.getAddress()).send();
         Assertions.assertTrue(assetActive);
         BigInteger amount = priceUtils.toBigInteger(BigDecimal.TEN);
         ethereumHelper.approveDai(ethereumHelper.getJynxProBridge().getContractAddress(), amount);
-        ethereumHelper.depositAsset(asset.getAddress(), amount, JYNX_KEY);
+        ethereumHelper.depositAsset(asset.getAddress(), amount, PUBLIC_KEY);
         Thread.sleep(30000L);
-        ethereumService.confirmEvents(new BatchValidatorRequest());
-        List<Event> events = eventRepository.findByConfirmed(false);
+        List<Event> events = readOnlyRepository.getEventsByConfirmed(false);
         Assertions.assertEquals(events.size(), 0);
-        Optional<User> user = userRepository.findByPublicKey(JYNX_KEY);
+        Optional<User> user = readOnlyRepository.getUserByPublicKey(PUBLIC_KEY);
         Assertions.assertTrue(user.isPresent());
-        Optional<Account> account = accountRepository.findByUserAndAsset(user.get(), asset);
+        Optional<Account> account = readOnlyRepository.getAccountByUserIdAndAssetId(user.get().getId(), asset.getId());
         Assertions.assertTrue(account.isPresent());
         Assertions.assertEquals(account.get().getBalance().setScale(2, RoundingMode.HALF_UP),
-                BigDecimal.TEN.setScale(2, RoundingMode.HALF_UP));
+                BigDecimal.valueOf(1000000010).setScale(2, RoundingMode.HALF_UP));
         Assertions.assertEquals(account.get().getAvailableBalance().setScale(2, RoundingMode.HALF_UP),
-                BigDecimal.TEN.setScale(2, RoundingMode.HALF_UP));
+                BigDecimal.valueOf(1000000010).setScale(2, RoundingMode.HALF_UP));
         Assertions.assertEquals(account.get().getMarginBalance().setScale(2, RoundingMode.HALF_UP),
                 BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
         return asset;
@@ -190,36 +190,40 @@ public class EthereumServiceTest extends IntegrationTest {
     private void withdrawAsset(
             final Asset asset
     ) {
-        Optional<User> user = userRepository.findByPublicKey(JYNX_KEY);
-        Assertions.assertTrue(user.isPresent());
         CreateWithdrawalRequest request = new CreateWithdrawalRequest();
-        request.setUser(user.get());
         request.setAssetId(asset.getId());
         request.setAmount(BigDecimal.TEN);
         request.setDestination(ethereumHelper.getJynxToken().getContractAddress());
-        Withdrawal withdrawal = accountService.createWithdrawal(request);
-        accountService.processWithdrawals();
-        Optional<Withdrawal> withdrawalOptional = withdrawalRepository.findById(withdrawal.getId());
+        request.setNonce(ethereumService.getNonce().toString());
+        String message = jsonUtils.toJson(request);
+        String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
+        request.setPublicKey(takerUser.getPublicKey());
+        request.setSignature(sig);
+        ResponseEntity<Withdrawal> responseEntity = this.restTemplate.postForEntity(
+                String.format("http://localhost:%s/account/withdraw", port), request, Withdrawal.class);
+        Assertions.assertNotNull(responseEntity.getBody());
+        sleepUtils.sleep(30000L);
+        Optional<Withdrawal> withdrawalOptional = readOnlyRepository.getWithdrawalById(responseEntity.getBody().getId());
         Assertions.assertTrue(withdrawalOptional.isPresent());
         Assertions.assertEquals(withdrawalOptional.get().getStatus(), WithdrawalStatus.DEBITED);
-        Optional<Account> account = accountRepository.findByUserAndAsset(user.get(), asset);
+        Optional<Account> account = readOnlyRepository.getAccountByUserIdAndAssetId(
+                withdrawalOptional.get().getUser().getId(), asset.getId());
         Assertions.assertTrue(account.isPresent());
         Assertions.assertEquals(account.get().getBalance().setScale(2, RoundingMode.HALF_UP),
-                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+                BigDecimal.valueOf(1000000000).setScale(2, RoundingMode.HALF_UP));
         Assertions.assertEquals(account.get().getAvailableBalance().setScale(2, RoundingMode.HALF_UP),
-                BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
+                BigDecimal.valueOf(1000000000).setScale(2, RoundingMode.HALF_UP));
         Assertions.assertEquals(account.get().getMarginBalance().setScale(2, RoundingMode.HALF_UP),
                 BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP));
     }
 
     @Test
     public void testStakeAndRemoveTokens() throws InterruptedException {
-        stakeTokens(100, false);
-        stakeTokens(0, true);
+        stakeTokens(700000100, false);
+        stakeTokens(700000000, true);
     }
 
     @Test
-    @Disabled
     public void testDepositAndWithdrawAsset() throws Exception {
         Asset asset = depositAsset();
         withdrawAsset(asset);

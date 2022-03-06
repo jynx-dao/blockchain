@@ -13,12 +13,13 @@ import com.jynx.pro.repository.*;
 import com.jynx.pro.request.AddAssetRequest;
 import com.jynx.pro.request.AddMarketRequest;
 import com.jynx.pro.request.CreateOrderRequest;
-import com.jynx.pro.utils.PriceUtils;
-import com.jynx.pro.utils.SleepUtils;
-import com.jynx.pro.utils.UUIDUtils;
+import com.jynx.pro.utils.*;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.web.server.LocalServerPort;
+import org.springframework.http.ResponseEntity;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
@@ -39,8 +40,19 @@ public abstract class IntegrationTest {
     protected static final String PRIVATE_KEY2 = "17f914594153922eb49c240bda6e7272e6d1e68e3fe0340482fc40dcb2f93581";
     protected static final String PUBLIC_KEY2 = "e123a8e4ea5394f84261f3b33b99cf98fc72f00a2c5a5a536ae79131f6f0f451";
 
+    @LocalServerPort
+    protected int port;
+
+    @Autowired
+    protected TestRestTemplate restTemplate;
     @Autowired
     protected UUIDUtils uuidUtils;
+    @Autowired
+    protected SleepUtils sleepUtils;
+    @Autowired
+    protected CryptoUtils cryptoUtils;
+    @Autowired
+    protected JSONUtils jsonUtils;
     @Autowired
     protected EthereumHelper ethereumHelper;
     @Autowired
@@ -79,8 +91,6 @@ public abstract class IntegrationTest {
     protected ReadOnlyRepository readOnlyRepository;
     @Autowired
     protected PriceUtils priceUtils;
-    @Autowired
-    protected SleepUtils sleepUtils;
     @Autowired
     protected DepositRepository depositRepository;
     @Autowired
@@ -124,6 +134,20 @@ public abstract class IntegrationTest {
     protected User degenUser;
     protected User takerUser;
     protected User makerUser;
+
+    protected Asset getDai() {
+        ResponseEntity<Asset[]> responseEntity = this.restTemplate.getForEntity(
+                String.format("http://localhost:%s/asset/all", port), Asset[].class);
+        Asset[] assetArray = responseEntity.getBody();
+        Assertions.assertNotNull(assetArray);
+        Asset asset = null;
+        for (Asset value : assetArray) {
+            if (value.getName().equals("DAI")) {
+                asset = value;
+            }
+        }
+        return asset;
+    }
 
     protected void waitForBlockchain() {
         long blockHeight = appStateManager.getBlockHeight();
@@ -221,7 +245,7 @@ public abstract class IntegrationTest {
     protected Market createOrderBook(
             final int bids,
             final int asks
-    ) throws InterruptedException {
+    ) {
         return createOrderBook(bids, asks, 1);
     }
 
@@ -229,7 +253,7 @@ public abstract class IntegrationTest {
             final int bids,
             final int asks,
             final int stepSize
-    ) throws InterruptedException {
+    ) {
         Market market = createAndEnactMarket(true);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         for(int i=0; i<bids; i++) {

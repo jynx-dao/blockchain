@@ -3,12 +3,15 @@ package com.jynx.pro.blockchain;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Timestamp;
 import com.jynx.pro.constant.TendermintTransaction;
+import com.jynx.pro.constant.WithdrawalStatus;
+import com.jynx.pro.entity.Withdrawal;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.manager.AppStateManager;
 import com.jynx.pro.manager.DatabaseTransactionManager;
 import com.jynx.pro.model.CheckTxResult;
 import com.jynx.pro.model.TransactionConfig;
+import com.jynx.pro.repository.WithdrawalRepository;
 import com.jynx.pro.request.*;
 import com.jynx.pro.service.*;
 import com.jynx.pro.utils.CryptoUtils;
@@ -57,6 +60,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private StakeService stakeService;
     @Autowired
     private ValidatorService validatorService;
+    @Autowired
+    private WithdrawalRepository withdrawalRepository;
     @Autowired
     private AppStateManager appStateManager;
     @Autowired
@@ -417,6 +422,10 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                     getBatchRequest(proposerAddress, blockHeight)));
             executorService.submit(() -> tendermintClient.syncProposals(
                     getBatchRequest(proposerAddress, blockHeight)));
+            // TODO - this doesn't work with multiple validators, we need to collect a valid signature
+            //  bundle via consensus
+            List<Withdrawal> withdrawals = withdrawalRepository.findByStatus(WithdrawalStatus.PENDING);
+            accountService.processWithdrawals(withdrawals);
         }
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
