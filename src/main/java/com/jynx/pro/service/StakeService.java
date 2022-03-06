@@ -84,7 +84,7 @@ public class StakeService {
     public Event remove(
             final UpdateStakeRequest request
     ) {
-        return eventService.save(userService.getAndCreate(request.getPublicKey()), request.getBlockNumber(),
+        return eventService.save(userService.getAndCreate(request.getTargetKey()), request.getBlockNumber(),
                 request.getTxHash(), request.getAmount(), EventType.REMOVE_STAKE);
     }
 
@@ -98,7 +98,7 @@ public class StakeService {
     public Event add(
             final UpdateStakeRequest request
     ) {
-        return eventService.save(userService.getAndCreate(request.getPublicKey()), request.getBlockNumber(),
+        return eventService.save(userService.getAndCreate(request.getTargetKey()), request.getBlockNumber(),
                 request.getTxHash(), request.getAmount(), EventType.ADD_STAKE);
     }
 }

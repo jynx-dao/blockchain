@@ -248,7 +248,7 @@ public class EthereumService {
                 String jynxKey = decodeBytes32(ethLog, 2);
                 UpdateStakeRequest request = new UpdateStakeRequest()
                         .setAmount(amount)
-                        .setPublicKey(jynxKey)
+                        .setTargetKey(jynxKey)
                         .setTxHash(txHash)
                         .setBlockNumber(blockNumber.longValue());
                 addSignatureToRequest(request);
@@ -258,7 +258,7 @@ public class EthereumService {
                 String jynxKey = decodeBytes32(ethLog, 2);
                 UpdateStakeRequest request = new UpdateStakeRequest()
                         .setAmount(amount)
-                        .setPublicKey(jynxKey)
+                        .setTargetKey(jynxKey)
                         .setTxHash(txHash)
                         .setBlockNumber(blockNumber.longValue());
                 addSignatureToRequest(request);
@@ -270,7 +270,7 @@ public class EthereumService {
                 DepositAssetRequest request = new DepositAssetRequest()
                         .setAssetAddress(assetAddress)
                         .setAmount(amount)
-                        .setPublicKey(jynxKey)
+                        .setTargetKey(jynxKey)
                         .setTxHash(txHash)
                         .setBlockNumber(blockNumber.longValue());
                 addSignatureToRequest(request);

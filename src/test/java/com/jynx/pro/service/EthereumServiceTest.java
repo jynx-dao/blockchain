@@ -33,13 +33,9 @@ import java.util.Optional;
 @SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class EthereumServiceTest extends IntegrationTest {
 
-    // TODO - requires Tendermint to be running
-
     private static final String JYNX_KEY = "02d47b3068c9ff8e25eec7c83b74eb2c61073a1862f925b644b4b234c21e83dd";
 
     public static GenericContainer tendermint;
-
-    // TODO - remove direct calls to TendermintClient and proxy everything via REST (it will increase test coverage)
 
     private void updateTendermintKeys(
             final String dest

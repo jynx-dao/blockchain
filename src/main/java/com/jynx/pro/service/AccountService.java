@@ -256,7 +256,7 @@ public class AccountService {
     public Event deposit(
             final DepositAssetRequest request
     ) {
-        return eventService.save(userService.getAndCreate(request.getPublicKey()), request.getBlockNumber(),
+        return eventService.save(userService.getAndCreate(request.getTargetKey()), request.getBlockNumber(),
                 request.getTxHash(), request.getAmount(), EventType.DEPOSIT_ASSET, request.getAssetAddress());
     }
 

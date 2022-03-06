@@ -12,7 +12,7 @@ import java.math.BigInteger;
 public class DepositAssetRequest extends SignedRequest {
     private String assetAddress;
     private BigInteger amount;
-    private String publicKey;
+    private String targetKey;
     private Long blockNumber;
     private String txHash;
 }

@@ -11,7 +11,7 @@ import java.math.BigInteger;
 @Accessors(chain = true)
 public class UpdateStakeRequest extends SignedRequest {
     private BigInteger amount;
-    private String publicKey;
+    private String targetKey;
     private Long blockNumber;
     private String txHash;
 }
