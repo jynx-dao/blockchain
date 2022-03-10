@@ -3,8 +3,7 @@ package com.jynx.pro.blockchain;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Timestamp;
 import com.jynx.pro.constant.TendermintTransaction;
-import com.jynx.pro.constant.WithdrawalStatus;
-import com.jynx.pro.entity.Withdrawal;
+import com.jynx.pro.entity.WithdrawalBatch;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.manager.AppStateManager;
@@ -32,6 +31,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Component
@@ -379,6 +379,51 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     }
 
     /**
+     * Handles off-chain asynchronous actions
+     *
+     * @param proposerAddress the proposer's address
+     * @param blockHeight the current block height
+     */
+    private void handleProposerActions(
+            final String proposerAddress,
+            final long blockHeight
+    ) {
+        executorService.submit(() -> tendermintClient.confirmEthereumEvents(
+                getBatchRequest(proposerAddress, blockHeight)));
+        executorService.submit(() -> tendermintClient.settleMarkets(
+                getBatchRequest(proposerAddress, blockHeight)));
+        executorService.submit(() -> tendermintClient.syncProposals(
+                getBatchRequest(proposerAddress, blockHeight)));
+        executorService.submit(() -> tendermintClient.batchWithdrawals(
+                getBatchRequest(proposerAddress, blockHeight)));
+        executorService.submit(() -> {
+            try {
+                BulkSignWithdrawalRequest request = withdrawalService.signBatches(validatorPublicKey);
+                ethereumService.addSignatureToRequest(request);
+                if(request.getSignatures().size() > 0) {
+                    tendermintClient.signWithdrawals(request);
+                }
+            } catch(Exception e) {
+                log.error(e.getMessage(), e);
+            }
+        });
+        executorService.submit(() -> {
+            try {
+                List<WithdrawalBatch> batches = withdrawalService.getUnprocessedWithdrawalBatches();
+                if (batches.size() > 0) {
+                    List<UUID> ids = batches.stream().map(WithdrawalBatch::getId).collect(Collectors.toList());
+                    DebitWithdrawalsRequest request = new DebitWithdrawalsRequest().setBatchIds(ids);
+                    ethereumService.addSignatureToRequest(request);
+                    tendermintClient.debitWithdrawals(request);
+                    withdrawalService.withdrawSignedBatches(batches);
+                }
+            } catch(Exception e) {
+                log.error(e.getMessage(), e);
+            }
+        });
+    }
+
+    /**
      * {@inheritDoc}
      */
     @Override
@@ -430,32 +475,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         long blockHeight = req.getHeader().getHeight();
         if(validatorAddress.toLowerCase(Locale.ROOT).equals(proposerAddress.toLowerCase(Locale.ROOT)) &&
                 blockHeight % batchBlockFrequency == 0 && blockHeight > 1) {
-            executorService.submit(() -> tendermintClient.confirmEthereumEvents(
-                    getBatchRequest(proposerAddress, blockHeight)));
-            executorService.submit(() -> tendermintClient.settleMarkets(
-                    getBatchRequest(proposerAddress, blockHeight)));
-            executorService.submit(() -> tendermintClient.syncProposals(
-                    getBatchRequest(proposerAddress, blockHeight)));
-            executorService.submit(() -> tendermintClient.batchWithdrawals(
-                    getBatchRequest(proposerAddress, blockHeight)));
-            executorService.submit(() -> {
-                try {
-                    BulkSignWithdrawalRequest request = withdrawalService.signBatches(validatorPublicKey);
-                    ethereumService.addSignatureToRequest(request);
-                    if(request.getSignatures().size() > 0) {
-                        tendermintClient.signWithdrawals(request);
-                    }
-                } catch(Exception e) {
-                    log.error(e.getMessage());
-                }
-            });
-            executorService.submit(() -> {
-                DebitWithdrawalsRequest request = withdrawalService.withdrawSignedBatches();
-                ethereumService.addSignatureToRequest(request);
-                if(request.getBatchIds().size() > 0) {
-                    tendermintClient.debitWithdrawals(request);
-                }
-            });
+            handleProposerActions(proposerAddress, blockHeight);
         }
         responseObserver.onNext(resp);
         responseObserver.onCompleted();

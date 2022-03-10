@@ -115,7 +115,6 @@ public class WithdrawalService {
     public BulkSignWithdrawalRequest signBatches(
             final String publicKey
     ) {
-        // TODO - this needs to use the readOnlyRepository [I think...]
         List<WithdrawalBatch> pendingBatches = readOnlyRepository.getAllByEntity(WithdrawalBatch.class).stream()
                 .filter(w -> !w.getProcessed()).collect(Collectors.toList());
         Optional<Validator> validatorOptional = readOnlyRepository.getValidatorByPublicKey(publicKey);
@@ -154,15 +153,21 @@ public class WithdrawalService {
     }
 
     /**
-     * Withdraw signed batches
+     * Get unprocessed withdrawal batches
      *
-     * @return {@link DebitWithdrawalsRequest}
+     * @return {@link List<WithdrawalBatch>}
      */
-    public DebitWithdrawalsRequest withdrawSignedBatches() {
-        DebitWithdrawalsRequest request = new DebitWithdrawalsRequest();
-        List<WithdrawalBatch> batches = readOnlyRepository.getAllByEntity(WithdrawalBatch.class).stream()
+    public List<WithdrawalBatch> getUnprocessedWithdrawalBatches() {
+        return readOnlyRepository.getAllByEntity(WithdrawalBatch.class).stream()
                 .filter(w -> !w.getProcessed()).collect(Collectors.toList());
-        List<UUID> ids = new ArrayList<>();
+    }
+
+    /**
+     * Withdraw signed batches
+     */
+    public void withdrawSignedBatches(
+            final List<WithdrawalBatch> batches
+    ) {
         for(WithdrawalBatch batch : batches) {
             List<WithdrawalBatchSignature> batchSignatures = readOnlyRepository
                     .getSignatureByWithdrawalBatchId(batch.getId());
@@ -187,10 +192,8 @@ public class WithdrawalService {
                 }
                 byte[] signature = signatureStream.toByteArray();
                 ethereumService.withdrawAssets(destinations, amounts, assets, nonce, signature);
-                ids.add(batch.getId());
             }
         }
-        return request.setBatchIds(ids);
     }
 
     /**

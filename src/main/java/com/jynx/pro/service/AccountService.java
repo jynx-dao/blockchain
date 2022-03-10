@@ -213,6 +213,9 @@ public class AccountService {
         validate(request);
         Withdrawal withdrawal = withdrawalRepository.findById(request.getId())
                 .orElseThrow(() -> new JynxProException(ErrorCode.WITHDRAWAL_NOT_FOUND));
+        // TODO - we must ensure that we don't allow withdrawals to be cancelled that have already
+        // been processed on Ethereum, because the submission to Ethereum is happening "off-chain"
+        // by the proposer of the current block
         if(!withdrawal.getStatus().equals(WithdrawalStatus.PENDING)) {
             throw new JynxProException(ErrorCode.WITHDRAWAL_NOT_PENDING);
         }
@@ -229,24 +232,6 @@ public class AccountService {
                 .setTimestamp(configService.getTimestamp());
         transactionRepository.save(transaction);
         return withdrawalRepository.save(withdrawal);
-    }
-
-    /**
-     * Update the withdrawal statuses
-     *
-     * @param batch a batch of {@link Withdrawal}s
-     * @param transactionReceipt {@link TransactionReceipt} from Ethereum
-     */
-    private void updateWithdrawalStatus(
-            final List<Withdrawal> batch,
-            final TransactionReceipt transactionReceipt
-    ) {
-        // TODO - use deliverTx for the state update
-        for(Withdrawal withdrawal : batch) {
-            withdrawal.setStatus(WithdrawalStatus.DEBITED);
-            withdrawal.setTxHash(transactionReceipt.getTransactionHash());
-        }
-        withdrawalRepository.saveAll(batch);
     }
 
     public Event deposit(
