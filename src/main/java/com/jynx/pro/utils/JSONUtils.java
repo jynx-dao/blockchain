@@ -11,7 +11,14 @@ public class JSONUtils {
 
     private final ObjectMapper objectMapper;
 
-    public JSONUtils(ObjectMapper objectMapper) {
+    /**
+     * Construct Spring bean and configure {@link ObjectMapper}
+     *
+     * @param objectMapper the {@link ObjectMapper} bean
+     */
+    public JSONUtils(
+            final ObjectMapper objectMapper
+    ) {
         objectMapper.configure(SerializationFeature.FAIL_ON_EMPTY_BEANS, false);
         objectMapper.configure(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS, true);
         this.objectMapper = objectMapper;

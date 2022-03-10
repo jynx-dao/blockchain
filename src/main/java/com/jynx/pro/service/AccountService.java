@@ -232,26 +232,6 @@ public class AccountService {
     }
 
     /**
-     * Process all pending withdrawals
-     */
-    public void processWithdrawals(
-            final List<Withdrawal> withdrawals
-    ) {
-        // TODO - this should happen at the end of the block ??
-        List<List<Withdrawal>> batches = ListUtils.partition(withdrawals, WITHDRAWAL_BATCH_SIZE);
-        for(List<Withdrawal> batch : batches) {
-            List<String> destinations = batch.stream().map(Withdrawal::getDestination)
-                    .collect(Collectors.toList());
-            List<BigInteger> amounts = batch.stream().map(w -> priceUtils.toBigInteger(w.getAmount()))
-                    .collect(Collectors.toList());
-            List<String> assets = batch.stream().map(w -> w.getAsset().getAddress())
-                    .collect(Collectors.toList());
-            TransactionReceipt transactionReceipt = ethereumService.withdrawAssets(destinations, amounts, assets);
-            updateWithdrawalStatus(batch, transactionReceipt);
-        }
-    }
-
-    /**
      * Update the withdrawal statuses
      *
      * @param batch a batch of {@link Withdrawal}s

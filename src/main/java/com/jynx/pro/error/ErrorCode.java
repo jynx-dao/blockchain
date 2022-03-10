@@ -82,4 +82,7 @@ public class ErrorCode {
     public static final String ADD_STAKE_FAILED = "Failed to add stake.";
     public static final String REMOVE_STAKE_FAILED = "Failed to remove stake.";
     public static final String DEPOSIT_ASSET_FAILED = "Failed to deposit asset.";
+    public static final String SIGN_WITHDRAWALS_FAILED = "Failed to sign withdrawals.";
+    public static final String BATCH_WITHDRAWALS_FAILED = "Failed to batch withdrawals.";
+    public static final String DEBIT_WITHDRAWALS_FAILED = "Failed to debit withdrawals.";
 }

@@ -117,7 +117,9 @@ public class EthereumServiceTest extends IntegrationTest {
     @Test
     public void testWithdrawAssetsWithError() {
         try {
-            ethereumService.withdrawAssets(List.of("12345"), List.of(BigInteger.ONE), List.of("12345"));
+            BigInteger nonce = BigInteger.ONE;
+            byte[] signature = new byte[]{};
+            ethereumService.withdrawAssets(List.of("12345"), List.of(BigInteger.ONE), List.of("12345"), nonce, signature);
             Assertions.fail();
         } catch(JynxProException e) {
             Assertions.assertEquals(e.getMessage(), ErrorCode.CANNOT_WITHDRAW_ASSETS);
@@ -204,6 +206,11 @@ public class EthereumServiceTest extends IntegrationTest {
         Assertions.assertNotNull(responseEntity.getBody());
         sleepUtils.sleep(30000L);
         Optional<Withdrawal> withdrawalOptional = readOnlyRepository.getWithdrawalById(responseEntity.getBody().getId());
+        try {
+            readOnlyRepository.getAllByEntity(WithdrawalBatch.class);
+        } catch(Exception e) {
+            log.error(e.getMessage(), e);
+        }
         Assertions.assertTrue(withdrawalOptional.isPresent());
         Assertions.assertEquals(withdrawalOptional.get().getStatus(), WithdrawalStatus.DEBITED);
         Optional<Account> account = readOnlyRepository.getAccountByUserIdAndAssetId(

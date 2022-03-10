@@ -148,7 +148,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         tendermintClient.suspendAsset(request);
-        sleepUtils.sleep(2000L);
+        sleepUtils.sleep(3000L);
         ResponseEntity<Asset> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/asset/%s", port, asset.getId().toString()), Asset.class);
         asset = responseEntity.getBody();
@@ -166,7 +166,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         tendermintClient.unsuspendAsset(request);
-        sleepUtils.sleep(2000L);
+        sleepUtils.sleep(3000L);
         responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/asset/%s", port, asset.getId().toString()), Asset.class);
         asset = responseEntity.getBody();
@@ -303,7 +303,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         tendermintClient.suspendMarket(request);
-        sleepUtils.sleep(2000L);
+        sleepUtils.sleep(3000L);
         ResponseEntity<Market> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/market/%s", port, market.getId().toString()), Market.class);
         market = responseEntity.getBody();
@@ -321,7 +321,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         tendermintClient.unsuspendMarket(request);
-        sleepUtils.sleep(2000L);
+        sleepUtils.sleep(3000L);
         responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/market/%s", port, market.getId().toString()), Market.class);
         market = responseEntity.getBody();

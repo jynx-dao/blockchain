@@ -1,6 +1,7 @@
 package com.jynx.pro.utils;
 
 import com.jynx.pro.service.ConfigService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -9,11 +10,8 @@ import java.util.UUID;
 @Component
 public class UUIDUtils {
 
-    private final ConfigService configService;
-
-    public UUIDUtils(ConfigService configService) {
-        this.configService = configService;
-    }
+    @Autowired
+    private ConfigService configService;
 
     /**
      * Get the next deterministic UUID

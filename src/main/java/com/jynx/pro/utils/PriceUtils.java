@@ -8,6 +8,14 @@ import java.math.BigInteger;
 @Component
 public class PriceUtils {
 
+    /**
+     * Convert large integer to decimal representation
+     *
+     * @param value {@link BigInteger}
+     * @param decimals the number of decimals
+     *
+     * @return {@link BigDecimal}
+     */
     public BigDecimal fromBigInteger(
             final BigInteger value,
             final int decimals
@@ -16,6 +24,14 @@ public class PriceUtils {
         return new BigDecimal(value.divide(BigInteger.valueOf(modifier)));
     }
 
+    /**
+     * Convert long to decimal representation
+     *
+     * @param value {@link Long}
+     * @param decimals the number of decimals
+     *
+     * @return {@link BigDecimal}
+     */
     public BigDecimal fromLong(
             final long value,
             final int decimals
@@ -24,6 +40,14 @@ public class PriceUtils {
         return BigDecimal.valueOf(value / modifier);
     }
 
+    /**
+     * Convert decimal representation to long
+     *
+     * @param value {@link BigDecimal}
+     * @param decimals the number of decimals
+     *
+     * @return {@link Long}
+     */
     public long toLong(
             final BigDecimal value,
             final int decimals
@@ -32,6 +56,14 @@ public class PriceUtils {
         return value.multiply(BigDecimal.valueOf(modifier)).longValue();
     }
 
+    /**
+     * Convert decimal representation to large integer
+     *
+     * @param value {@link BigDecimal}
+     * @param decimals the number of decimals
+     *
+     * @return {@link BigInteger}
+     */
     public BigInteger toBigInteger(
             final BigDecimal value,
             final int decimals
@@ -40,24 +72,26 @@ public class PriceUtils {
         return value.multiply(BigDecimal.valueOf(modifier)).toBigInteger();
     }
 
+    /**
+     * Convert large integer to decimal representation using 18 decimal places
+     *
+     * @param value {@link BigInteger}
+     *
+     * @return {@link BigDecimal}
+     */
     public BigDecimal fromBigInteger(
             final BigInteger value
     ) {
         return fromBigInteger(value, 18);
     }
 
-    public BigDecimal fromLong(
-            final long value
-    ) {
-        return fromLong(value, 18);
-    }
-
-    public long toLong(
-            final BigDecimal value
-    ) {
-        return toLong(value, 18);
-    }
-
+    /**
+     * Convert decimal representation to large integer using 18 decimal places
+     *
+     * @param value {@link BigDecimal}
+     *
+     * @return {@link BigInteger}
+     */
     public BigInteger toBigInteger(
             final BigDecimal value
     ) {

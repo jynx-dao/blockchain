@@ -1,11 +1,13 @@
 package com.jynx.pro.service;
 
 import com.jynx.pro.blockchain.TendermintClient;
+import com.jynx.pro.entity.Config;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.ethereum.ERC20Detailed;
 import com.jynx.pro.ethereum.JynxPro_Bridge;
 import com.jynx.pro.ethereum.type.EthereumType;
 import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.repository.ReadOnlyRepository;
 import com.jynx.pro.request.BatchValidatorRequest;
 import com.jynx.pro.request.DepositAssetRequest;
 import com.jynx.pro.request.SignedRequest;
@@ -61,6 +63,8 @@ public class EthereumService {
     private EventService eventService;
     @Autowired
     private ConfigService configService;
+    @Autowired
+    private ReadOnlyRepository readOnlyRepository;
     @Autowired
     private PriceUtils priceUtils;
     @Autowired
@@ -221,7 +225,12 @@ public class EthereumService {
         return result;
     }
 
-    private void addSignatureToRequest(
+    /**
+     * Aad validator's signature to {@link SignedRequest}
+     *
+     * @param request {@link SignedRequest}
+     */
+    public void addSignatureToRequest(
             final SignedRequest request
     ) {
         request.setNonce(getNonce().toString());
@@ -252,7 +261,7 @@ public class EthereumService {
                         .setTxHash(txHash)
                         .setBlockNumber(blockNumber.longValue());
                 addSignatureToRequest(request);
-                tendermintClient.addStake(request); // TODO - this needs to be signed [by validator]
+                tendermintClient.addStake(request);
             } else if(eventHash.equals(REMOVE_STAKE_HASH)) {
                 BigInteger amount = decodeUint256(ethLog, 1);
                 String jynxKey = decodeBytes32(ethLog, 2);
@@ -262,7 +271,7 @@ public class EthereumService {
                         .setTxHash(txHash)
                         .setBlockNumber(blockNumber.longValue());
                 addSignatureToRequest(request);
-                tendermintClient.removeStake(request); // TODO - this needs to be signed [by validator]
+                tendermintClient.removeStake(request);
             } else if(eventHash.equals(DEPOSIT_ASSET_HASH)) {
                 String assetAddress = decodeAddress(ethLog, 1);
                 BigInteger amount = decodeUint256(ethLog, 2);
@@ -274,7 +283,7 @@ public class EthereumService {
                         .setTxHash(txHash)
                         .setBlockNumber(blockNumber.longValue());
                 addSignatureToRequest(request);
-                tendermintClient.depositAsset(request); // TODO - this needs to be signed [by validator]
+                tendermintClient.depositAsset(request);
             }
         });
     }
@@ -349,34 +358,58 @@ public class EthereumService {
      * @param destinations the destination wallet of each withdrawal
      * @param amounts the withdrawal amounts
      * @param assets the asset for each withdrawal
+     * @param nonce the nonce used for the signature
+     * @param signature the signature as byte-array
      *
      * @return {@link TransactionReceipt} from Ethereum
      */
     public TransactionReceipt withdrawAssets(
             final List<String> destinations,
             final List<BigInteger> amounts,
-            final List<String> assets
+            final List<String> assets,
+            final BigInteger nonce,
+            final byte[] signature
     ) {
         try {
             Credentials credentials = Credentials.create(ethereumPrivateKey);
-            JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.get().getBridgeAddress(), getWeb3j(),
-                    credentials, new DefaultGasProvider());
-            BigInteger nonce = getNonce();
-            List<Address> destinationsForSig = destinations.stream().map(Address::new)
-                    .collect(Collectors.toList());
-            List<Uint256> amountsForSig = amounts.stream().map(Uint256::new)
-                    .collect(Collectors.toList());
-            List<Address> assetsForSig = assets.stream().map(Address::new)
-                    .collect(Collectors.toList());
-            List<Type> args = Arrays.asList(new DynamicArray<>(Address.class, destinationsForSig),
-                    new DynamicArray<>(Uint256.class, amountsForSig), new DynamicArray<>(Address.class, assetsForSig),
-                    new Uint256(nonce), new Utf8String("withdraw_assets"));
-            byte[] signature = getSignature(args, credentials);
-            return jynxProBridge.withdraw_assets(destinations, amounts, assets, nonce, signature).send();
+            List<Config> configList = readOnlyRepository.getAllByEntity(Config.class);
+            if(configList.size() > 0) {
+                JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configList.get(0).getBridgeAddress(), getWeb3j(),
+                        credentials, new DefaultGasProvider());
+                return jynxProBridge.withdraw_assets(destinations, amounts, assets, nonce, signature).send();
+            }
+            throw new JynxProException(ErrorCode.CONFIG_NOT_FOUND);
         } catch(Exception e) {
             log.error(e.getMessage(), e);
             throw new JynxProException(ErrorCode.CANNOT_WITHDRAW_ASSETS);
         }
+    }
+
+    public byte[] getSignatureForWithdrawal(
+            final List<String> destinations,
+            final List<BigInteger> amounts,
+            final List<String> assets
+    ) throws DecoderException {
+        return getSignatureForWithdrawal(destinations, amounts, assets, null);
+    }
+
+    public byte[] getSignatureForWithdrawal(
+            final List<String> destinations,
+            final List<BigInteger> amounts,
+            final List<String> assets,
+            final BigInteger nonce
+    ) throws DecoderException {
+        Credentials credentials = Credentials.create(ethereumPrivateKey);
+        List<Address> destinationsForSig = destinations.stream().map(Address::new)
+                .collect(Collectors.toList());
+        List<Uint256> amountsForSig = amounts.stream().map(Uint256::new)
+                .collect(Collectors.toList());
+        List<Address> assetsForSig = assets.stream().map(Address::new)
+                .collect(Collectors.toList());
+        List<Type> args = Arrays.asList(new DynamicArray<>(Address.class, destinationsForSig),
+                new DynamicArray<>(Uint256.class, amountsForSig), new DynamicArray<>(Address.class, assetsForSig),
+                new Uint256(nonce == null ? getNonce() : nonce), new Utf8String("withdraw_assets"));
+        return getSignature(args, credentials);
     }
 
     /**

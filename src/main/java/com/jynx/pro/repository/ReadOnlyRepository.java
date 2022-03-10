@@ -527,4 +527,79 @@ public class ReadOnlyRepository {
             return Optional.empty();
         }
     }
+
+    /**
+     * Get all {@link T}s
+     *
+     * @return {@link List<T>}
+     */
+    public <T> List<T> getAllByEntity(
+            final Class<T> type
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<T> query = cb.createQuery(type);
+        Root<T> rootType = query.from(type);
+        query = query.select(rootType);
+        return getEntityManager().createQuery(query).getResultList();
+    }
+
+    /**
+     * Get {@link Withdrawal}s by batch ID
+     *
+     * @param batchId the withdrawal batch ID
+     *
+     * @return {@link Optional<Withdrawal>}
+     */
+    public List<Withdrawal> getWithdrawalsByWithdrawalBatchId(
+            final UUID batchId
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Withdrawal> query = cb.createQuery(Withdrawal.class);
+        Root<Withdrawal> rootType = query.from(Withdrawal.class);
+        Path<UUID> batch_id = rootType.join("withdrawalBatch").get("id");
+        query = query.select(rootType).where(cb.equal(batch_id, batchId));
+        return getEntityManager().createQuery(query).getResultList();
+    }
+
+    /**
+     * Get {@link WithdrawalBatchSignature} by batch ID and validator ID
+     *
+     * @param batchId the batch ID
+     *
+     * @return {@link Optional<WithdrawalBatchSignature>}
+     */
+    public Optional<WithdrawalBatchSignature> getSignatureByWithdrawalBatchIdAndValidatorId(
+            final UUID batchId,
+            final UUID validatorId
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<WithdrawalBatchSignature> query = cb.createQuery(WithdrawalBatchSignature.class);
+        Root<WithdrawalBatchSignature> rootType = query.from(WithdrawalBatchSignature.class);
+        Path<UUID> batch_id = rootType.join("withdrawalBatch").get("id");
+        Path<UUID> validator_id = rootType.join("validator").get("id");
+        query = query.select(rootType).where(cb.equal(batch_id, batchId), cb.equal(validator_id, validatorId));
+        try {
+            return Optional.of(getEntityManager().createQuery(query).getSingleResult());
+        } catch(Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Get {@link WithdrawalBatchSignature} by batch ID
+     *
+     * @param batchId the batch ID
+     *
+     * @return {@link Optional<WithdrawalBatchSignature>}
+     */
+    public List<WithdrawalBatchSignature> getSignatureByWithdrawalBatchId(
+            final UUID batchId
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<WithdrawalBatchSignature> query = cb.createQuery(WithdrawalBatchSignature.class);
+        Root<WithdrawalBatchSignature> rootType = query.from(WithdrawalBatchSignature.class);
+        Path<UUID> batch_id = rootType.join("withdrawalBatch").get("id");
+        query = query.select(rootType).where(cb.equal(batch_id, batchId));
+        return getEntityManager().createQuery(query).getResultList();
+    }
 }

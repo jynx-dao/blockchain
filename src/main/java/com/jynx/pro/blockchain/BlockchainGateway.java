@@ -11,7 +11,6 @@ import com.jynx.pro.manager.AppStateManager;
 import com.jynx.pro.manager.DatabaseTransactionManager;
 import com.jynx.pro.model.CheckTxResult;
 import com.jynx.pro.model.TransactionConfig;
-import com.jynx.pro.repository.WithdrawalRepository;
 import com.jynx.pro.request.*;
 import com.jynx.pro.service.*;
 import com.jynx.pro.utils.CryptoUtils;
@@ -61,7 +60,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Autowired
     private ValidatorService validatorService;
     @Autowired
-    private WithdrawalRepository withdrawalRepository;
+    private WithdrawalService withdrawalService;
     @Autowired
     private AppStateManager appStateManager;
     @Autowired
@@ -185,6 +184,21 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                         .setDeliverFn(marketService::settleMarkets)
                         .setProtectedFn(true)
                         .setRequestType(BatchValidatorRequest.class));
+        transactionSettings.put(TendermintTransaction.BATCH_WITHDRAWALS,
+                new TransactionConfig<BatchValidatorRequest>()
+                        .setDeliverFn(withdrawalService::batchWithdrawals)
+                        .setProtectedFn(true)
+                        .setRequestType(BatchValidatorRequest.class));
+        transactionSettings.put(TendermintTransaction.SIGN_WITHDRAWAL_BATCHES,
+                new TransactionConfig<BulkSignWithdrawalRequest>()
+                        .setDeliverFn(withdrawalService::saveWithdrawalBatchSignatures)
+                        .setProtectedFn(true)
+                        .setRequestType(BulkSignWithdrawalRequest.class));
+        transactionSettings.put(TendermintTransaction.DEBIT_WITHDRAWALS,
+                new TransactionConfig<DebitWithdrawalsRequest>()
+                        .setDeliverFn(withdrawalService::debitWithdrawals)
+                        .setProtectedFn(true)
+                        .setRequestType(DebitWithdrawalsRequest.class));
         transactionSettings.put(TendermintTransaction.ADD_STAKE,
                 new TransactionConfig<UpdateStakeRequest>()
                         .setDeliverFn(stakeService::add)
@@ -422,10 +436,26 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                     getBatchRequest(proposerAddress, blockHeight)));
             executorService.submit(() -> tendermintClient.syncProposals(
                     getBatchRequest(proposerAddress, blockHeight)));
-            // TODO - this doesn't work with multiple validators, we need to collect a valid signature
-            //  bundle via consensus
-            List<Withdrawal> withdrawals = withdrawalRepository.findByStatus(WithdrawalStatus.PENDING);
-            accountService.processWithdrawals(withdrawals);
+            executorService.submit(() -> tendermintClient.batchWithdrawals(
+                    getBatchRequest(proposerAddress, blockHeight)));
+            executorService.submit(() -> {
+                try {
+                    BulkSignWithdrawalRequest request = withdrawalService.signBatches(validatorPublicKey);
+                    ethereumService.addSignatureToRequest(request);
+                    if(request.getSignatures().size() > 0) {
+                        tendermintClient.signWithdrawals(request);
+                    }
+                } catch(Exception e) {
+                    log.error(e.getMessage());
+                }
+            });
+            executorService.submit(() -> {
+                DebitWithdrawalsRequest request = withdrawalService.withdrawSignedBatches();
+                ethereumService.addSignatureToRequest(request);
+                if(request.getBatchIds().size() > 0) {
+                    tendermintClient.debitWithdrawals(request);
+                }
+            });
         }
         responseObserver.onNext(resp);
         responseObserver.onCompleted();

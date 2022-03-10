@@ -10,7 +10,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "jynx_withdrawal_signature")
 @Accessors(chain = true)
-public class WithdrawalSignature {
+public class WithdrawalBatchSignature {
     @Id
     private UUID id;
     @Column(name = "signature", nullable = false)
@@ -19,6 +19,6 @@ public class WithdrawalSignature {
     @JoinColumn(name = "validator_id", nullable = false)
     private Validator validator;
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "withdrawal_id", nullable = false)
-    private Withdrawal withdrawal;
+    @JoinColumn(name = "withdrawal_batch_id", nullable = false)
+    private WithdrawalBatch withdrawalBatch;
 }

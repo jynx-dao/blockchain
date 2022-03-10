@@ -7,6 +7,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class SleepUtils {
 
+    /**
+     * Pause the current thread
+     *
+     * @param millis duration to pause for in milliseconds
+     */
     public void sleep(
             final long millis
     ) {

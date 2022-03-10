@@ -34,4 +34,7 @@ public class Withdrawal {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private WithdrawalStatus status;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "withdrawal_batch_id")
+    private WithdrawalBatch withdrawalBatch;
 }
