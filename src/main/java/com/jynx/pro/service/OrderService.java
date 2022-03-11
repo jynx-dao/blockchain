@@ -302,7 +302,7 @@ public class OrderService {
         // TODO - should the mark price come from the settlement price source?
         BigDecimal markPrice = getMidPrice(market);
         marketService.updateLastPrice(lastPrice, markPrice, market);
-        auctionService.checkTriggers(market);
+//        auctionService.checkTriggers(market); // TODO - should happen async at end of block
         positionService.updatePassiveLiquidity(market);
         if(!markPrice.setScale(dps, RoundingMode.HALF_UP)
                 .equals(originalMarkPrice.setScale(dps, RoundingMode.HALF_UP))) {

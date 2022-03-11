@@ -6,6 +6,8 @@ import lombok.EqualsAndHashCode;
 import lombok.experimental.Accessors;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @EqualsAndHashCode(callSuper = true)
@@ -24,4 +26,11 @@ public class AddMarketRequest extends ProposalRequest {
     private String oracleKey;
     private OracleType oracleType;
     private UUID oracleProvider;
+    private List<AuctionTrigger> auctionTriggers = new ArrayList<>();
+    @Data
+    @Accessors(chain = true)
+    public static class AuctionTrigger {
+        private BigDecimal depth;
+        private BigDecimal openVolumeRatio;
+    }
 }
