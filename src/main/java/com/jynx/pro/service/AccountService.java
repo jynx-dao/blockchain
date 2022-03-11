@@ -213,9 +213,6 @@ public class AccountService {
         validate(request);
         Withdrawal withdrawal = withdrawalRepository.findById(request.getId())
                 .orElseThrow(() -> new JynxProException(ErrorCode.WITHDRAWAL_NOT_FOUND));
-        // TODO - we must ensure that we don't allow withdrawals to be cancelled that have already
-        // been processed on Ethereum, because the submission to Ethereum is happening "off-chain"
-        // by the proposer of the current block
         if(!withdrawal.getStatus().equals(WithdrawalStatus.PENDING)) {
             throw new JynxProException(ErrorCode.WITHDRAWAL_NOT_PENDING);
         }

@@ -388,14 +388,6 @@ public class EthereumService {
     public byte[] getSignatureForWithdrawal(
             final List<String> destinations,
             final List<BigInteger> amounts,
-            final List<String> assets
-    ) throws DecoderException {
-        return getSignatureForWithdrawal(destinations, amounts, assets, null);
-    }
-
-    public byte[] getSignatureForWithdrawal(
-            final List<String> destinations,
-            final List<BigInteger> amounts,
             final List<String> assets,
             final BigInteger nonce
     ) throws DecoderException {

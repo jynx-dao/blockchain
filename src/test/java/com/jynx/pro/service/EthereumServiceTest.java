@@ -206,11 +206,6 @@ public class EthereumServiceTest extends IntegrationTest {
         Assertions.assertNotNull(responseEntity.getBody());
         sleepUtils.sleep(30000L);
         Optional<Withdrawal> withdrawalOptional = readOnlyRepository.getWithdrawalById(responseEntity.getBody().getId());
-        try {
-            readOnlyRepository.getAllByEntity(WithdrawalBatch.class);
-        } catch(Exception e) {
-            log.error(e.getMessage(), e);
-        }
         Assertions.assertTrue(withdrawalOptional.isPresent());
         Assertions.assertEquals(withdrawalOptional.get().getStatus(), WithdrawalStatus.DEBITED);
         Optional<Account> account = readOnlyRepository.getAccountByUserIdAndAssetId(
