@@ -6,7 +6,6 @@ import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.model.OrderBook;
 import com.jynx.pro.model.OrderBookItem;
-import com.jynx.pro.repository.AccountRepository;
 import com.jynx.pro.repository.OrderHistoryRepository;
 import com.jynx.pro.repository.OrderRepository;
 import com.jynx.pro.request.*;
@@ -40,12 +39,8 @@ public class OrderService {
     private ConfigService configService;
     @Autowired
     private OrderHistoryRepository orderHistoryRepository;
-    @Autowired
-    private AuctionService auctionService;
-    @Autowired
-    private AccountRepository accountRepository;
 
-    private static final int MAX_BULK = 25;
+    private static final int MAX_BULK = 25; // TODO - should be configured at network level
 
     /**
      * Gets the opposite {@link MarketSide}
@@ -302,7 +297,6 @@ public class OrderService {
         // TODO - should the mark price come from the settlement price source?
         BigDecimal markPrice = getMidPrice(market);
         marketService.updateLastPrice(lastPrice, markPrice, market);
-//        auctionService.checkTriggers(market); // TODO - should happen async at end of block
         positionService.updatePassiveLiquidity(market);
         if(!markPrice.setScale(dps, RoundingMode.HALF_UP)
                 .equals(originalMarkPrice.setScale(dps, RoundingMode.HALF_UP))) {
@@ -377,6 +371,9 @@ public class OrderService {
             final Market market,
             final Order orderOverride
     ) {
+        if(market.getStatus().equals(MarketStatus.AUCTION)) {
+            throw new JynxProException(ErrorCode.MARKET_ORDER_NOT_SUPPORTED);
+        }
         MarketSide side = orderOverride != null ? orderOverride.getSide() : request.getSide();
         User user = orderOverride != null ? orderOverride.getUser() : request.getUser();
         BigDecimal price = orderOverride != null ? orderOverride.getPrice() : request.getPrice();
@@ -444,6 +441,30 @@ public class OrderService {
     }
 
     /**
+     * Ensures that a new stop-market order is not above/below the trader's liquidation price
+     *
+     * @param user {@link User}
+     * @param market {@link Market}
+     * @param side {@link MarketSide}
+     * @param price stop-loss price
+     */
+    private void ensureDoesNotExceedLiquidation(
+            final User user,
+            final Market market,
+            final MarketSide side,
+            final BigDecimal price
+    ) {
+        Position position = positionService.getAndCreate(user, market);
+        if(position.getQuantity().doubleValue() > 0) {
+            if(side.equals(MarketSide.BUY) && price.doubleValue() <= position.getLiquidationPrice().doubleValue()) {
+                throw new JynxProException(ErrorCode.EXCEEDS_LIQUIDATION_PRICE);
+            } else if(side.equals(MarketSide.SELL) && price.doubleValue() >= position.getLiquidationPrice().doubleValue()) {
+                throw new JynxProException(ErrorCode.EXCEEDS_LIQUIDATION_PRICE);
+            }
+        }
+    }
+
+    /**
      * Create a new stop-loss order
      *
      * @param request {@link CreateOrderRequest}
@@ -455,7 +476,9 @@ public class OrderService {
             final CreateOrderRequest request,
             final Market market
     ) {
-        // TODO - user cannot place a stop-loss that would be below their current liquidation price
+        ensureDoesNotExceedLiquidation(request.getUser(), market, request.getSide(), request.getPrice());
+        BigDecimal triggerPrice = request.getStopTrigger().equals(StopTrigger.LAST_PRICE) ?
+                market.getLastPrice() : market.getMarkPrice();
         Order order = new Order()
                 .setUser(request.getUser())
                 .setId(uuidUtils.next())
@@ -469,10 +492,11 @@ public class OrderService {
                 .setPriority(1L)
                 .setTag(OrderTag.USER_GENERATED)
                 .setStopTrigger(request.getStopTrigger());
+        if(market.getStatus().equals(MarketStatus.AUCTION) && isStopTriggered(order, triggerPrice)) {
+            throw new JynxProException(ErrorCode.MARKET_ORDER_NOT_SUPPORTED);
+        }
         order = orderRepository.save(order);
         accountService.allocateMargin(request.getUser(), market);
-        BigDecimal triggerPrice = request.getStopTrigger().equals(StopTrigger.LAST_PRICE) ?
-                market.getLastPrice() : market.getMarkPrice();
         if(isStopTriggered(order, triggerPrice)) {
             executeStopLoss(order, market);
         }
@@ -491,6 +515,9 @@ public class OrderService {
             final CreateOrderRequest request,
             final Market market
     ) {
+        if(market.getStatus().equals(MarketStatus.AUCTION)) {
+            return createLimitOrder(request, market);
+        }
         if(request.getPostOnly()) {
             throw new JynxProException(ErrorCode.POST_ONLY_FAILED);
         }
@@ -567,7 +594,8 @@ public class OrderService {
         if(!skipMarginCheck) {
             performMarginCheck(market, request.getSide(), request.getQuantity(), request.getPrice(), request.getUser());
         }
-        if(!market.getStatus().equals(MarketStatus.ACTIVE)) {
+        List<MarketStatus> validStatusList = Arrays.asList(MarketStatus.ACTIVE, MarketStatus.AUCTION);
+        if(!validStatusList.contains(market.getStatus())) {
             throw new JynxProException(ErrorCode.MARKET_NOT_ACTIVE);
         }
         Order order;

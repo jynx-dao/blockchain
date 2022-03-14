@@ -85,4 +85,6 @@ public class ErrorCode {
     public static final String SIGN_WITHDRAWALS_FAILED = "Failed to sign withdrawals.";
     public static final String BATCH_WITHDRAWALS_FAILED = "Failed to batch withdrawals.";
     public static final String DEBIT_WITHDRAWALS_FAILED = "Failed to debit withdrawals.";
+    public static final String MARKET_ORDER_NOT_SUPPORTED = "Market orders are not supported during an auction.";
+    public static final String EXCEEDS_LIQUIDATION_PRICE = "The stop-market order is above or below liquidation price.";
 }
