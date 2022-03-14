@@ -214,7 +214,7 @@ public class AuctionService {
     }
 
     /**
-     * Exit an auction when all conditions are met to do so
+     * Exit an auction when the conditions are met to do so
      *
      * @param market {@link Market}
      */
@@ -222,11 +222,14 @@ public class AuctionService {
             final Market market
     ) {
         BigDecimal uncrossingPrice = getUncrossingPrice(market);
-        BigDecimal expectedOpenVolume = market.getOpenVolume().add(
-                getOpenVolumeDeltaAtUncrossing(market, uncrossingPrice));
+        BigDecimal expectedOpenVolume = (market.getOpenVolume().add(
+                getOpenVolumeDeltaAtUncrossing(market, uncrossingPrice)))
+                .multiply(BigDecimal.valueOf(0.8));
         OrderBook expectedOrderBook = getOrderBookAfterUncrossing(market);
-        // TODO - to determine if the auction can exit, we need to simulate uncrossing
-        // and also check that the liquidity leftover would satisfy every trigger
-        // with some reasonable buffer [is 20% enough?]
+        List<AuctionTrigger> triggers = auctionTriggerRepository.findByMarketId(market.getId());
+        boolean auctionTriggered = checkTriggers(expectedOpenVolume, expectedOrderBook, triggers);
+        if(!auctionTriggered) {
+            // TODO - exit auction
+        }
     }
 }
