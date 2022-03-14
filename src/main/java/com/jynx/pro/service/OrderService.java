@@ -445,20 +445,20 @@ public class OrderService {
      *
      * @param user {@link User}
      * @param market {@link Market}
-     * @param side {@link MarketSide}
      * @param price stop-loss price
      */
     private void ensureDoesNotExceedLiquidation(
             final User user,
             final Market market,
-            final MarketSide side,
             final BigDecimal price
     ) {
         Position position = positionService.getAndCreate(user, market);
         if(position.getQuantity().doubleValue() > 0) {
-            if(side.equals(MarketSide.BUY) && price.doubleValue() <= position.getLiquidationPrice().doubleValue()) {
+            if(position.getSide().equals(MarketSide.BUY) &&
+                    price.doubleValue() <= position.getLiquidationPrice().doubleValue()) {
                 throw new JynxProException(ErrorCode.EXCEEDS_LIQUIDATION_PRICE);
-            } else if(side.equals(MarketSide.SELL) && price.doubleValue() >= position.getLiquidationPrice().doubleValue()) {
+            } else if(position.getSide().equals(MarketSide.SELL) &&
+                    price.doubleValue() >= position.getLiquidationPrice().doubleValue()) {
                 throw new JynxProException(ErrorCode.EXCEEDS_LIQUIDATION_PRICE);
             }
         }
@@ -476,7 +476,7 @@ public class OrderService {
             final CreateOrderRequest request,
             final Market market
     ) {
-        ensureDoesNotExceedLiquidation(request.getUser(), market, request.getSide(), request.getPrice());
+        ensureDoesNotExceedLiquidation(request.getUser(), market, request.getPrice());
         BigDecimal triggerPrice = request.getStopTrigger().equals(StopTrigger.LAST_PRICE) ?
                 market.getLastPrice() : market.getMarkPrice();
         Order order = new Order()

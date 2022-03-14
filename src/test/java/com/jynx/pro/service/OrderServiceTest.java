@@ -950,7 +950,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testTriggerStopLoss() throws InterruptedException {
+    public void testTriggerStopLoss() {
         Market market = createOrderBook(5, 5, 100);
         orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45550), BigDecimal.valueOf(1),
                 MarketSide.SELL, OrderType.STOP_MARKET, degenUser));
@@ -1013,15 +1013,17 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testTriggerStopLossForBankruptTraderUsingInsuranceFund() throws InterruptedException {
+    public void testTriggerStopLossForBankruptTraderUsingInsuranceFund() {
         Market market = createOrderBook(20, 20, 100);
         market = market.setInsuranceFund(BigDecimal.valueOf(1000000));
         market = marketRepository.save(market);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1),
                 MarketSide.BUY, OrderType.MARKET, degenUser));
-        orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45550), BigDecimal.valueOf(1),
-                MarketSide.SELL, OrderType.STOP_MARKET, degenUser));
+        Optional<Position> degenPositionOptional = positionRepository.findByUserAndMarket(degenUser, market);
+        Assertions.assertTrue(degenPositionOptional.isPresent());
+        orderService.create(getCreateOrderRequest(market.getId(), degenPositionOptional.get().getLiquidationPrice().add(BigDecimal.ONE),
+                BigDecimal.valueOf(1), MarketSide.SELL, OrderType.STOP_MARKET, degenUser));
         orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(44590), BigDecimal.valueOf(20),
                 MarketSide.SELL, OrderType.LIMIT, takerUser));
         BigDecimal takerMargin = BigDecimal.valueOf(45090).multiply(BigDecimal.valueOf(11))
@@ -1087,12 +1089,14 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testTriggerStopLossForBankruptTraderWithoutInsuranceFund() throws InterruptedException {
+    public void testTriggerStopLossForBankruptTraderWithoutInsuranceFund() {
         Market market = createOrderBook(20, 20, 100);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1),
                 MarketSide.BUY, OrderType.MARKET, degenUser));
-        orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45550), BigDecimal.valueOf(1),
+        Optional<Position> degenPositionOptional = positionRepository.findByUserAndMarket(degenUser, market);
+        Assertions.assertTrue(degenPositionOptional.isPresent());
+        orderService.create(getCreateOrderRequest(market.getId(), degenPositionOptional.get().getLiquidationPrice().add(BigDecimal.ONE), BigDecimal.valueOf(1),
                 MarketSide.SELL, OrderType.STOP_MARKET, degenUser).setStopTrigger(StopTrigger.LAST_PRICE));
         orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(44590), BigDecimal.valueOf(20),
                 MarketSide.SELL, OrderType.LIMIT, takerUser));
@@ -1535,7 +1539,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testAmendOrderFailsWithInsufficientMargin() throws InterruptedException {
+    public void testAmendOrderFailsWithInsufficientMargin() {
         Market market = createOrderBook(1, 1);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         Order order = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45600), BigDecimal.ONE,
@@ -1565,7 +1569,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testAmendOrderFailsWithImmediateExecutionBuy() throws InterruptedException {
+    public void testAmendOrderFailsWithImmediateExecutionBuy() {
         Market market = createOrderBook(1, 1);
         Order order = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45600), BigDecimal.ONE,
                 MarketSide.BUY, OrderType.LIMIT, takerUser));
@@ -1583,7 +1587,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testAmendOrderFreelyWhenAskEmpty() throws InterruptedException {
+    public void testAmendOrderFreelyWhenAskEmpty() {
         Market market = createOrderBook(1, 0);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         Order order = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45600), BigDecimal.ONE,
@@ -1600,7 +1604,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testAmendOrderFreelyWhenBidEmpty() throws InterruptedException {
+    public void testAmendOrderFreelyWhenBidEmpty() {
         Market market = createOrderBook(0, 1);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         Order order = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45600), BigDecimal.ONE,
@@ -1617,7 +1621,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testAmendOrderFailsWithImmediateExecutionSell() throws InterruptedException {
+    public void testAmendOrderFailsWithImmediateExecutionSell() {
         Market market = createOrderBook(1, 1);
         Order order = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45600), BigDecimal.ONE,
                 MarketSide.SELL, OrderType.LIMIT, takerUser));
@@ -1635,7 +1639,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testAmendOrderFailsWhenPermissionDenied() throws InterruptedException {
+    public void testAmendOrderFailsWhenPermissionDenied() {
         Market market = createOrderBook(1, 1);
         Order order = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45600), BigDecimal.ONE,
                 MarketSide.SELL, OrderType.LIMIT, takerUser));
@@ -1668,7 +1672,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testAmendOrderFailsWithInvalidType() throws InterruptedException {
+    public void testAmendOrderFailsWithInvalidType() {
         Market market = createOrderBook(1, 1);
         Order order = orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(0.1),
                 MarketSide.SELL, OrderType.MARKET, takerUser));
@@ -1686,7 +1690,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testAmendOrderFailsWithInvalidStatus() throws InterruptedException {
+    public void testAmendOrderFailsWithInvalidStatus() {
         Market market = createOrderBook(1, 1);
         List<Order> openOrders = orderService.getOpenLimitOrders(market).stream()
                 .filter(o -> o.getSide().equals(MarketSide.BUY)).collect(Collectors.toList());
@@ -1719,9 +1723,6 @@ public class OrderServiceTest extends IntegrationTest {
         }
         orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1.5),
                 side, OrderType.MARKET, degenUser));
-        orderService.create(getCreateOrderRequest(market.getId(), side.equals(MarketSide.BUY) ? BigDecimal.valueOf(1) :
-                        BigDecimal.valueOf(1000000), BigDecimal.valueOf(0.0001),
-                side.equals(MarketSide.BUY) ? MarketSide.SELL : MarketSide.BUY, OrderType.STOP_MARKET, degenUser));
         orderService.create(getCreateOrderRequest(market.getId(), side.equals(MarketSide.SELL) ? BigDecimal.valueOf(1) :
                         BigDecimal.valueOf(1000000), BigDecimal.valueOf(0.0001),
                 side.equals(MarketSide.BUY) ? MarketSide.SELL : MarketSide.BUY, OrderType.LIMIT, degenUser));
@@ -1737,7 +1738,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testLiquidationShortPosition() throws InterruptedException {
+    public void testLiquidationShortPosition() {
         Market market = createOrderBook(100, 100, 100);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         BigDecimal liqPrice = testLiquidation(MarketSide.SELL, 10, false, market);
@@ -2117,7 +2118,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testLiquidationLongPositionWithLossSocialization() throws InterruptedException {
+    public void testLiquidationLongPositionWithLossSocialization() {
         Market market = createOrderBook(100, 100, 100);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         BigDecimal liqPrice = testLiquidation(MarketSide.BUY, 300, false, market);
