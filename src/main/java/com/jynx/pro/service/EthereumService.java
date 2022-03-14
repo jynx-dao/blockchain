@@ -385,6 +385,18 @@ public class EthereumService {
         }
     }
 
+    /**
+     * Get a signature to use with a batch withdrawal
+     *
+     * @param destinations the destination addresses
+     * @param amounts the withdrawal amounts
+     * @param assets the withdrawal assets
+     * @param nonce the nonce used for the signature
+     *
+     * @return signature as byte-array
+     *
+     * @throws DecoderException thrown if signature cannot be decoded
+     */
     public byte[] getSignatureForWithdrawal(
             final List<String> destinations,
             final List<BigInteger> amounts,
@@ -420,7 +432,7 @@ public class EthereumService {
                     credentials, new DefaultGasProvider());
             BigInteger nonce = getNonce();
             List<Type> args = Arrays.asList(new Address(asset), new Uint256(nonce), new Utf8String("remove_asset"));
-            byte[] signature = getSignature(args, credentials);
+            byte[] signature = getSignature(args, credentials);  // TODO - this won't work with multiple validators...
             return jynxProBridge.remove_asset(asset, nonce, signature).send();
         } catch(Exception e) {
             log.error(e.getMessage(), e);
@@ -444,7 +456,7 @@ public class EthereumService {
                     credentials, new DefaultGasProvider());
             BigInteger nonce = getNonce();
             List<Type> args = Arrays.asList(new Address(asset), new Uint256(nonce), new Utf8String("add_asset"));
-            byte[] signature = getSignature(args, credentials);
+            byte[] signature = getSignature(args, credentials); // TODO - this won't work with multiple validators...
             return jynxProBridge.add_asset(asset, nonce, signature).send();
         } catch(Exception e) {
             log.error(e.getMessage(), e);

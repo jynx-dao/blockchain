@@ -31,6 +31,18 @@ public class TradeService {
     @Autowired
     private ConfigService configService;
 
+    /**
+     * Save a new {@link Trade}
+     *
+     * @param market the {@link Market}
+     * @param passiveOrder the passive {@link Order}
+     * @param takerOrder the taker {@link Order}
+     * @param price the trade price
+     * @param quantity the trade size
+     * @param side the {@link MarketSide}
+     *
+     * @return {@link Trade}
+     */
     public Trade save(
             final Market market,
             final Order passiveOrder,
@@ -50,6 +62,14 @@ public class TradeService {
                 .setSide(side));
     }
 
+    /**
+     * Build candlestick data from trades and interval
+     *
+     * @param interval {@link KlineInterval}
+     * @param trades {@link List<Trade>}
+     *
+     * @return {@link List<Kline>}
+     */
     public List<Kline> getKline(
             final KlineInterval interval,
             final List<Trade> trades
@@ -92,6 +112,13 @@ public class TradeService {
         return kline;
     }
 
+    /**
+     * Convert a {@link KlineInterval} into seconds
+     *
+     * @param interval {@link KlineInterval}
+     *
+     * @return interval in seconds
+     */
     private long getIntervalInSeconds(
             final KlineInterval interval
     ) {

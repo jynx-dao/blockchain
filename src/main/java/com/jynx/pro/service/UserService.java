@@ -16,6 +16,13 @@ public class UserService {
     @Autowired
     private UUIDUtils uuidUtils;
 
+    /**
+     * Get a {@link User} by public key and create it if it doesn't exist
+     *
+     * @param publicKey the public key
+     *
+     * @return {@link User}
+     */
     public User getAndCreate(
             final String publicKey
     ) {

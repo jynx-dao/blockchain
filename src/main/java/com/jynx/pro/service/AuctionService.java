@@ -224,7 +224,7 @@ public class AuctionService {
         BigDecimal uncrossingPrice = getUncrossingPrice(market);
         BigDecimal expectedOpenVolume = (market.getOpenVolume().add(
                 getOpenVolumeDeltaAtUncrossing(market, uncrossingPrice)))
-                .multiply(BigDecimal.valueOf(0.8));
+                .multiply(BigDecimal.valueOf(0.8)); // TODO - use config variable for this ratio
         OrderBook expectedOrderBook = getOrderBookAfterUncrossing(market);
         List<AuctionTrigger> triggers = auctionTriggerRepository.findByMarketId(market.getId());
         boolean auctionTriggered = checkTriggers(expectedOpenVolume, expectedOrderBook, triggers);

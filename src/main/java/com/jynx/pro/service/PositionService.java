@@ -412,6 +412,11 @@ public class PositionService {
         liquidatedPositions.forEach(this::reconcileLiquidatedPosition);
     }
 
+    /**
+     * Ensure that the state of a {@link Position} is correct after liquidation
+     *
+     * @param position {@link Position}
+     */
     public void reconcileLiquidatedPosition(
             final Position position
     ) {

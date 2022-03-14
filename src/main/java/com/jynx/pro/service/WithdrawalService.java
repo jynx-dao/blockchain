@@ -129,7 +129,8 @@ public class WithdrawalService {
                             .getSignatureByWithdrawalBatchIdAndValidatorId(batch.getId(), validator.getId());
                     List<String> destinations = withdrawals.stream().map(Withdrawal::getDestination)
                             .collect(Collectors.toList());
-                    List<BigInteger> amounts = withdrawals.stream().map(Withdrawal::getAmount).map(priceUtils::toBigInteger)
+                    List<BigInteger> amounts = withdrawals.stream()
+                            .map(Withdrawal::getAmount).map(priceUtils::toBigInteger)
                             .collect(Collectors.toList());
                     List<String> assets = withdrawals.stream().map(Withdrawal::getAsset).map(Asset::getAddress)
                             .collect(Collectors.toList());
@@ -178,7 +179,8 @@ public class WithdrawalService {
                 List<Withdrawal> withdrawals = readOnlyRepository.getWithdrawalsByWithdrawalBatchId(batch.getId());
                 List<String> destinations = withdrawals.stream().map(Withdrawal::getDestination)
                         .collect(Collectors.toList());
-                List<BigInteger> amounts = withdrawals.stream().map(Withdrawal::getAmount).map(priceUtils::toBigInteger)
+                List<BigInteger> amounts = withdrawals.stream()
+                        .map(Withdrawal::getAmount).map(priceUtils::toBigInteger)
                         .collect(Collectors.toList());
                 List<String> assets = withdrawals.stream().map(Withdrawal::getAsset).map(Asset::getAddress)
                         .collect(Collectors.toList());

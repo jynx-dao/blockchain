@@ -393,6 +393,7 @@ public abstract class IntegrationTest {
                     .setMinProposerStake(1L)
                     .setNetworkFee(BigDecimal.valueOf(0.001))
                     .setParticipationThreshold(BigDecimal.valueOf(0.66))
+                    .setApprovalThreshold(BigDecimal.valueOf(0.66))
                     .setUuidSeed(1L)
                     .setEthConfirmations(0)
                     .setBridgeAddress(ethereumHelper.getJynxProBridge().getContractAddress());
