@@ -11,25 +11,17 @@ import com.jynx.pro.repository.*;
 import com.jynx.pro.request.CreateWithdrawalRequest;
 import com.jynx.pro.request.DepositAssetRequest;
 import com.jynx.pro.request.SingleItemRequest;
-import com.jynx.pro.utils.PriceUtils;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.collections4.ListUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
-import org.web3j.protocol.core.methods.response.TransactionReceipt;
 
 import java.math.BigDecimal;
-import java.math.BigInteger;
-import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class AccountService {
-
-    private static final int WITHDRAWAL_BATCH_SIZE = 100;
 
     @Autowired
     private AccountRepository accountRepository;
@@ -52,14 +44,18 @@ public class AccountService {
     @Autowired
     private UUIDUtils uuidUtils;
     @Autowired
-    private PriceUtils priceUtils;
-    @Autowired
-    private EthereumService ethereumService;
-    @Autowired
     private WithdrawalRepository withdrawalRepository;
     @Autowired
     private OrderService orderService;
 
+    /**
+     * Get an account by user and asset
+     *
+     * @param user {@link User}
+     * @param asset {@link Asset}
+     *
+     * @return {@link Optional<Account>}
+     */
     public Optional<Account> get(
             final User user,
             final Asset asset
@@ -67,6 +63,14 @@ public class AccountService {
         return accountRepository.findByUserAndAsset(user, asset);
     }
 
+    /**
+     * Get an account by user and asset, and create if doesn't exist
+     *
+     * @param user the {@link User}
+     * @param asset the {@link Asset}
+     *
+     * @return {@link Account}
+     */
     public Account getAndCreate(
             final User user,
             final Asset asset
@@ -82,6 +86,13 @@ public class AccountService {
         return accountRepository.save(account);
     }
 
+    /**
+     * Allocate margin to a user's {@link Account}
+     *
+     * @param user the {@link User}
+     * @param market the relevant {@link Market}
+     * @param margin the margin to allocate
+     */
     public void allocateMargin(
             final User user,
             final Market market,
@@ -94,6 +105,12 @@ public class AccountService {
         accountRepository.save(account);
     }
 
+    /**
+     * Allocate margin to a user's {@link Account}
+     *
+     * @param user the {@link User}
+     * @param market the relevant {@link Market}
+     */
     public void allocateMargin(
             final User user,
             final Market market
@@ -231,6 +248,13 @@ public class AccountService {
         return withdrawalRepository.save(withdrawal);
     }
 
+    /**
+     * Create a new deposit {@link Event}
+     *
+     * @param request {@link DepositAssetRequest}
+     *
+     * @return {@link Event}
+     */
     public Event deposit(
             final DepositAssetRequest request
     ) {
@@ -238,6 +262,11 @@ public class AccountService {
                 request.getTxHash(), request.getAmount(), EventType.DEPOSIT_ASSET, request.getAssetAddress());
     }
 
+    /**
+     * Credit a {@link Deposit} to a user's account
+     *
+     * @param deposit {@link Deposit}
+     */
     public void credit(
             final Deposit deposit
     ) {
@@ -256,6 +285,15 @@ public class AccountService {
         depositRepository.save(deposit);
     }
 
+    /**
+     * Credit / debit maker and taker fees when a trade happens
+     *
+     * @param quantity the trade size
+     * @param price the price of the rade
+     * @param maker the maker {@link User}
+     * @param taker the taker {@link User}
+     * @param market the relevant {@link Market}
+     */
     public void processFees(
             final BigDecimal quantity,
             final BigDecimal price,
@@ -299,6 +337,13 @@ public class AccountService {
         transactionRepository.save(makerTx);
     }
 
+    /**
+     * Book realised profit or loss against a user's account
+     *
+     * @param user the {@link User}
+     * @param market the relevant {@link Market}
+     * @param realisedProfit the user's PNL
+     */
     public void bookProfit(
             final User user,
             final Market market,
