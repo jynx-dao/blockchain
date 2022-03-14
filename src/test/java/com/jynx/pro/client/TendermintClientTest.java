@@ -582,7 +582,6 @@ public class TendermintClientTest extends IntegrationTest {
     }
 
     @Test
-    @Disabled // TODO - this is broken because the withdrawal gets immediately processed via beginBlock code
     public void testCancelWithdrawal() {
         Withdrawal withdrawal = createWithdrawal();
         SingleItemRequest request = new SingleItemRequest()
