@@ -30,7 +30,6 @@ import java.util.Optional;
 
 @Slf4j
 @Testcontainers
-//@Disabled
 @ActiveProfiles("tendermint")
 @SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class EthereumServiceTest extends IntegrationTest {

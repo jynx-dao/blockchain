@@ -26,7 +26,6 @@ public class PolygonServiceTest {
     }
 
     @Test
-    @Disabled
     public void testGetPrice() {
         long time = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
         BigDecimal price = polygonService.getPriceAt("C:EURUSD", time);
