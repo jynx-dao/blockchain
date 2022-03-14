@@ -36,12 +36,12 @@ public class AuctionService {
     private PositionRepository positionRepository;
 
     /**
-     * Check auction triggers for a market
+     * Checks if an auction is triggered for a market
      *
      * @param orderBook {@link OrderBook}
      * @param openVolume the open volume
      */
-    public boolean checkTriggers(
+    public boolean isAuctionTriggered(
             final BigDecimal openVolume,
             final OrderBook orderBook,
             final List<AuctionTrigger> triggers
@@ -85,7 +85,7 @@ public class AuctionService {
         BigDecimal openVolume = market.getOpenVolume();
         OrderBook orderBook = orderService.getOrderBook(market);
         List<AuctionTrigger> triggers = auctionTriggerRepository.findByMarketId(market.getId());
-        boolean triggered = checkTriggers(openVolume, orderBook, triggers);
+        boolean triggered = isAuctionTriggered(openVolume, orderBook, triggers);
         if(triggered) {
             market.setStatus(MarketStatus.AUCTION);
             marketRepository.save(market);
@@ -227,7 +227,7 @@ public class AuctionService {
                 .multiply(BigDecimal.valueOf(0.8)); // TODO - use config variable for this ratio
         OrderBook expectedOrderBook = getOrderBookAfterUncrossing(market);
         List<AuctionTrigger> triggers = auctionTriggerRepository.findByMarketId(market.getId());
-        boolean auctionTriggered = checkTriggers(expectedOpenVolume, expectedOrderBook, triggers);
+        boolean auctionTriggered = isAuctionTriggered(expectedOpenVolume, expectedOrderBook, triggers);
         if(!auctionTriggered) {
             // TODO - exit auction
         }
