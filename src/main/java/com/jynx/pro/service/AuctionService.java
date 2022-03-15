@@ -75,21 +75,20 @@ public class AuctionService {
     }
 
     /**
-     * Enter market auction if triggered
-     *
-     * @param market {@link Market}
+     * Enter market auctions if triggered
      */
-    public void enterAuction(
-            final Market market
-    ) {
-        BigDecimal openVolume = market.getOpenVolume();
-        OrderBook orderBook = orderService.getOrderBook(market);
-        List<AuctionTrigger> triggers = auctionTriggerRepository.findByMarketId(market.getId());
-        boolean triggered = isAuctionTriggered(openVolume, orderBook, triggers);
-        if(triggered) {
-            market.setStatus(MarketStatus.AUCTION);
-            marketRepository.save(market);
+    public void enterAuctions() {
+        List<Market> markets = marketRepository.findByStatusIn(List.of(MarketStatus.ACTIVE));
+        for(Market market : markets) {
+            BigDecimal openVolume = market.getOpenVolume();
+            OrderBook orderBook = orderService.getOrderBook(market);
+            List<AuctionTrigger> triggers = auctionTriggerRepository.findByMarketId(market.getId());
+            boolean triggered = isAuctionTriggered(openVolume, orderBook, triggers);
+            if (triggered) {
+                market.setStatus(MarketStatus.AUCTION);
+            }
         }
+        marketRepository.saveAll(markets);
     }
 
     /**
@@ -112,10 +111,10 @@ public class AuctionService {
         List<OrderBookItem> crossingAsks = orderBook.getAsks().stream()
                 .filter(ob -> ob.getPrice().doubleValue() <= bestBid.doubleValue())
                 .collect(Collectors.toList());
-        List<OrderBookItem> crossingBids = orderBook.getAsks().stream()
+        List<OrderBookItem> crossingBids = orderBook.getBids().stream()
                 .filter(ob -> ob.getPrice().doubleValue() >= bestAsk.doubleValue())
                 .collect(Collectors.toList());
-        if(crossingAsks.size() == 0 || crossingBids.size() == 0) {
+        if(crossingAsks.size() == 0) {
             return (bestBid.add(bestAsk)).divide(BigDecimal.valueOf(2), dps, RoundingMode.HALF_UP);
         }
         double sumCrossingAsks = crossingAsks.stream().mapToDouble(ob -> ob.getQuantity().doubleValue()).sum();
@@ -126,7 +125,8 @@ public class AuctionService {
                 ob.getQuantity().multiply(ob.getPrice()).doubleValue()).sum();
         double vwapCrossingBids = sumProductCrossingBids / sumCrossingBids;
         double vwapCrossingAsks = sumProductCrossingAsks / sumCrossingAsks;
-        return BigDecimal.valueOf((vwapCrossingBids + vwapCrossingAsks) / 2);
+        BigDecimal price = BigDecimal.valueOf((vwapCrossingBids + vwapCrossingAsks) / 2);
+        return price;
     }
 
     /**
@@ -203,33 +203,94 @@ public class AuctionService {
             final Market market
     ) {
         OrderBook orderBook = orderService.getOrderBook(market);
-        BigDecimal uncrossingPrice = getUncrossingPrice(market);
+        if(orderBook.getBids().size() == 0 || orderBook.getAsks().size() == 0) {
+            return orderBook;
+        }
+        BigDecimal bestBid = orderBook.getBids().get(0).getPrice();
+        BigDecimal bestAsk = orderBook.getAsks().get(0).getPrice();
+        List<OrderBookItem> crossingAsks = orderBook.getAsks().stream()
+                .filter(ob -> ob.getPrice().doubleValue() <= bestBid.doubleValue())
+                .collect(Collectors.toList());
+        List<OrderBookItem> crossingBids = orderBook.getBids().stream()
+                .filter(ob -> ob.getPrice().doubleValue() >= bestAsk.doubleValue())
+                .collect(Collectors.toList());
         List<OrderBookItem> asks = orderBook.getAsks().stream()
-                .filter(ob -> ob.getPrice().doubleValue() >= uncrossingPrice.doubleValue())
+                .filter(ob -> ob.getPrice().doubleValue() > bestBid.doubleValue())
                 .collect(Collectors.toList());
         List<OrderBookItem> bids = orderBook.getBids().stream()
-                .filter(ob -> ob.getPrice().doubleValue() <= uncrossingPrice.doubleValue())
+                .filter(ob -> ob.getPrice().doubleValue() < bestAsk.doubleValue())
                 .collect(Collectors.toList());
-        return new OrderBook().setBids(bids).setAsks(asks);
+        double volumeCrossingBids = crossingBids.stream()
+                .mapToDouble(ob -> ob.getQuantity().doubleValue()).sum();
+        double volumeCrossingAsks = crossingAsks.stream()
+                .mapToDouble(ob -> ob.getQuantity().doubleValue()).sum();
+        OrderBook orderBookResult = new OrderBook().setBids(bids).setAsks(asks);
+        double matchedVolume = 0d;
+        List<OrderBookItem> ordersWithLeftover = new ArrayList<>();
+        if(volumeCrossingAsks > volumeCrossingBids) {
+            matchedVolume = volumeCrossingBids;
+            ordersWithLeftover = new ArrayList<>(crossingAsks);
+        } else if(volumeCrossingBids > volumeCrossingAsks) {
+            matchedVolume = volumeCrossingAsks;
+            ordersWithLeftover = new ArrayList<>(crossingBids);
+        }
+        List<OrderBookItem> missingOrders = new ArrayList<>();
+        for(OrderBookItem item : ordersWithLeftover) {
+            matchedVolume -= item.getQuantity().doubleValue();
+            if(matchedVolume < 0) {
+                missingOrders.add(new OrderBookItem()
+                        .setQuantity(BigDecimal.valueOf(matchedVolume * -1))
+                        .setPrice(item.getPrice()));
+                matchedVolume = 0d;
+            }
+        }
+        if(volumeCrossingAsks > volumeCrossingBids) {
+            orderBookResult.getAsks().addAll(missingOrders);
+            orderBookResult.getAsks().sort(Comparator.comparing(OrderBookItem::getPrice));
+        } else if(volumeCrossingBids > volumeCrossingAsks) {
+            orderBookResult.getBids().addAll(missingOrders);
+            orderBookResult.getBids().sort(Comparator.comparing(OrderBookItem::getPrice).reversed());
+        }
+        return orderBookResult;
     }
 
     /**
-     * Exit an auction when the conditions are met to do so
-     *
-     * @param market {@link Market}
+     * Exit auctions when the conditions to do so are met
      */
-    public void exitAuction(
-            final Market market
-    ) {
-        BigDecimal uncrossingPrice = getUncrossingPrice(market);
-        BigDecimal expectedOpenVolume = (market.getOpenVolume().add(
-                getOpenVolumeDeltaAtUncrossing(market, uncrossingPrice)))
-                .multiply(BigDecimal.valueOf(0.8)); // TODO - use config variable for this ratio
-        OrderBook expectedOrderBook = getOrderBookAfterUncrossing(market);
-        List<AuctionTrigger> triggers = auctionTriggerRepository.findByMarketId(market.getId());
-        boolean auctionTriggered = isAuctionTriggered(expectedOpenVolume, expectedOrderBook, triggers);
-        if(!auctionTriggered) {
-            // TODO - exit auction
+    public void exitAuctions() {
+        List<Market> markets = marketRepository.findByStatusIn(List.of(MarketStatus.AUCTION));
+        for(Market market : markets) {
+            BigDecimal uncrossingPrice = getUncrossingPrice(market);
+            BigDecimal expectedOpenVolume = (market.getOpenVolume().add(
+                    getOpenVolumeDeltaAtUncrossing(market, uncrossingPrice)))
+                    .multiply(BigDecimal.valueOf(0.8)); // TODO - use config variable for this ratio
+            OrderBook expectedOrderBook = getOrderBookAfterUncrossing(market);
+            List<AuctionTrigger> triggers = auctionTriggerRepository.findByMarketId(market.getId());
+            boolean auctionTriggered = isAuctionTriggered(expectedOpenVolume, expectedOrderBook, triggers);
+            if (!auctionTriggered) {
+                List<Order> openOrders = orderService.getOpenLimitOrders(market);
+                market.setStatus(MarketStatus.ACTIVE);
+                marketRepository.save(market);
+                List<Order> crossingAsks = openOrders.stream()
+                        .filter(ob -> ob.getSide().equals(MarketSide.SELL))
+                        .filter(ob -> ob.getPrice().doubleValue() <= uncrossingPrice.doubleValue())
+                        .collect(Collectors.toList());
+                List<Order> crossingBids = openOrders.stream()
+                        .filter(ob -> ob.getSide().equals(MarketSide.BUY))
+                        .filter(ob -> ob.getPrice().doubleValue() >= uncrossingPrice.doubleValue())
+                        .collect(Collectors.toList());
+                double volumeCrossingBids = crossingBids.stream()
+                        .mapToDouble(ob -> ob.getRemainingQuantity().doubleValue()).sum();
+                double volumeCrossingAsks = crossingAsks.stream()
+                        .mapToDouble(ob -> ob.getRemainingQuantity().doubleValue()).sum();
+                // TODO - matching depends on which side has more volume
+                // TODO - exit auction
+                // 1) update market state
+                // 2) fill crossing orders
+                // 3) trigger stop losses
+                // 4) execute liquidations
+                // 5) update positions
+            }
         }
     }
 }
