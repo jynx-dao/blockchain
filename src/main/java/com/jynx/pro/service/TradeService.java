@@ -63,6 +63,27 @@ public class TradeService {
     }
 
     /**
+     * Save a new {@link Trade}
+     *
+     * @param market the {@link Market}
+     * @param takerOrder the taker {@link Order}
+     * @param price the trade price
+     * @param quantity the trade size
+     * @param side the {@link MarketSide}
+     *
+     * @return {@link Trade}
+     */
+    public Trade save(
+            final Market market,
+            final Order takerOrder,
+            final BigDecimal price,
+            final BigDecimal quantity,
+            final MarketSide side
+    ) {
+        return save(market, null, takerOrder, price, quantity, side);
+    }
+
+    /**
      * Build candlestick data from trades and interval
      *
      * @param interval {@link KlineInterval}

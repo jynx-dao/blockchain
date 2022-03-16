@@ -290,6 +290,23 @@ public class AccountService {
      *
      * @param quantity the trade size
      * @param price the price of the rade
+     * @param taker the taker {@link User}
+     * @param market the relevant {@link Market}
+     */
+    public void processFees(
+            final BigDecimal quantity,
+            final BigDecimal price,
+            final User taker,
+            final Market market
+    ) {
+        processFees(quantity, price, null, taker, market);
+    }
+
+    /**
+     * Credit / debit maker and taker fees when a trade happens
+     *
+     * @param quantity the trade size
+     * @param price the price of the rade
      * @param maker the maker {@link User}
      * @param taker the taker {@link User}
      * @param market the relevant {@link Market}
@@ -301,40 +318,43 @@ public class AccountService {
             final User taker,
             final Market market
     ) {
+        BigDecimal makerAmount = BigDecimal.ZERO;
         BigDecimal takerAmount = quantity.multiply(price).multiply(market.getTakerFee());
-        BigDecimal makerAmount = quantity.multiply(price).multiply(market.getMakerFee());
         Account takerAccount = getAndCreate(taker, market.getSettlementAsset());
-        Account makerAccount = getAndCreate(maker, market.getSettlementAsset());
         takerAccount.setBalance(takerAccount.getBalance().subtract(takerAmount));
-        makerAccount.setBalance(makerAccount.getBalance().add(makerAmount));
         takerAccount.setAvailableBalance(takerAccount.getAvailableBalance().subtract(takerAmount));
-        makerAccount.setAvailableBalance(makerAccount.getAvailableBalance().add(makerAmount));
-        BigDecimal treasuryAmount = takerAmount.subtract(makerAmount);
-        market.getSettlementAsset().setTreasuryBalance(
-                market.getSettlementAsset().getTreasuryBalance().add(treasuryAmount));
         accountRepository.save(takerAccount);
-        accountRepository.save(makerAccount);
-        assetRepository.save(market.getSettlementAsset());
         Transaction takerTx = new Transaction()
                 .setType(TransactionType.FEE)
                 .setAmount(takerAmount.multiply(BigDecimal.valueOf(-1)))
                 .setUser(taker)
                 .setAsset(market.getSettlementAsset())
                 .setTimestamp(configService.getTimestamp());
-        Transaction makerTx = new Transaction()
-                .setType(TransactionType.FEE)
-                .setAmount(makerAmount)
-                .setUser(maker)
-                .setAsset(market.getSettlementAsset())
-                .setTimestamp(configService.getTimestamp());
-        Position makerPosition = positionService.getAndCreate(maker, market);
         Position takerPosition = positionService.getAndCreate(taker, market);
-        makerPosition.setRealisedPnl(makerPosition.getRealisedPnl().add(makerAmount));
         takerPosition.setRealisedPnl(takerPosition.getRealisedPnl().subtract(takerAmount));
-        positionService.save(makerPosition);
         positionService.save(takerPosition);
         transactionRepository.save(takerTx);
-        transactionRepository.save(makerTx);
+        if(maker != null) {
+            makerAmount = quantity.multiply(price).multiply(market.getMakerFee());
+            Account makerAccount = getAndCreate(maker, market.getSettlementAsset());
+            makerAccount.setBalance(makerAccount.getBalance().add(makerAmount));
+            makerAccount.setAvailableBalance(makerAccount.getAvailableBalance().add(makerAmount));
+            accountRepository.save(makerAccount);
+            Transaction makerTx = new Transaction()
+                    .setType(TransactionType.FEE)
+                    .setAmount(makerAmount)
+                    .setUser(maker)
+                    .setAsset(market.getSettlementAsset())
+                    .setTimestamp(configService.getTimestamp());
+            Position makerPosition = positionService.getAndCreate(maker, market);
+            makerPosition.setRealisedPnl(makerPosition.getRealisedPnl().add(makerAmount));
+            positionService.save(makerPosition);
+            transactionRepository.save(makerTx);
+        }
+        BigDecimal treasuryAmount = takerAmount.subtract(makerAmount);
+        market.getSettlementAsset().setTreasuryBalance(
+                market.getSettlementAsset().getTreasuryBalance().add(treasuryAmount));
+        assetRepository.save(market.getSettlementAsset());
     }
 
     /**

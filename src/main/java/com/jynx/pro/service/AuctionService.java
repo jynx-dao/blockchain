@@ -2,14 +2,16 @@ package com.jynx.pro.service;
 
 import com.jynx.pro.constant.MarketSide;
 import com.jynx.pro.constant.MarketStatus;
-import com.jynx.pro.entity.AuctionTrigger;
-import com.jynx.pro.entity.Market;
-import com.jynx.pro.entity.Order;
+import com.jynx.pro.constant.OrderAction;
+import com.jynx.pro.constant.OrderStatus;
+import com.jynx.pro.entity.*;
 import com.jynx.pro.model.OrderBook;
 import com.jynx.pro.model.OrderBookItem;
 import com.jynx.pro.repository.AuctionTriggerRepository;
 import com.jynx.pro.repository.MarketRepository;
+import com.jynx.pro.repository.OrderHistoryRepository;
 import com.jynx.pro.request.BatchValidatorRequest;
+import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -28,7 +30,19 @@ public class AuctionService {
     @Autowired
     private OrderService orderService;
     @Autowired
+    private ConfigService configService;
+    @Autowired
+    private AccountService accountService;
+    @Autowired
+    private TradeService tradeService;
+    @Autowired
+    private PositionService positionService;
+    @Autowired
+    private OrderHistoryRepository orderHistoryRepository;
+    @Autowired
     private MarketRepository marketRepository;
+    @Autowired
+    private UUIDUtils uuidUtils;
 
     /**
      * Checks if an auction is triggered for a market
@@ -272,6 +286,42 @@ public class AuctionService {
     }
 
     /**
+     * Fill a crossing order and update the position and account balances
+     *
+     * @param orders {@link List<Order>}
+     * @param uncrossingPrice the uncrossing price
+     * @param maximumVolume the maximum volume permitted for all orders
+     */
+    private void fillCrossingOrders(
+            final List<Order> orders,
+            final BigDecimal uncrossingPrice,
+            final BigDecimal maximumVolume
+    ) {
+        BigDecimal matched = BigDecimal.ZERO;
+        for(Order order : orders) {
+            Market market = order.getMarket();
+            matched = matched.add(order.getRemainingQuantity());
+            BigDecimal quantity = order.getRemainingQuantity();
+            order.setStatus(OrderStatus.FILLED);
+            if(matched.doubleValue() > maximumVolume.doubleValue()) {
+                quantity = quantity.subtract(matched.subtract(maximumVolume));
+                order.setStatus(OrderStatus.PARTIALLY_FILLED);
+            }
+            order.setRemainingQuantity(order.getRemainingQuantity().subtract(quantity));
+            accountService.processFees(quantity, uncrossingPrice, order.getUser(), market);
+            Trade trade = tradeService.save(market, order, uncrossingPrice, quantity, order.getSide());
+            positionService.update(market, uncrossingPrice, quantity, order.getUser(), order.getSide());
+            OrderHistory orderHistory = new OrderHistory()
+                    .setOrder(order)
+                    .setId(uuidUtils.next())
+                    .setTrade(trade)
+                    .setAction(OrderAction.MATCH_IN_AUCTION)
+                    .setUpdated(configService.getTimestamp());
+            orderHistoryRepository.save(orderHistory);
+        }
+    }
+
+    /**
      * Exit auctions when the conditions to do so are met
      */
     public List<Market> exitAuctions() {
@@ -287,11 +337,26 @@ public class AuctionService {
                 boolean auctionTriggered = isAuctionTriggered(expectedOpenVolume, expectedOrderBook, triggers);
                 if (!auctionTriggered) {
                     triggeredMarkets.add(market);
-                    List<Order> openOrders = orderService.getOpenLimitOrders(market);
                     market.setStatus(MarketStatus.ACTIVE);
                     marketRepository.save(market);
                     List<Order> uncrossingOrders = getUncrossingOrders(market);
-                    // TODO - fill the uncrossing orders [handle partial fill of dangling order]
+                    double volumeBids = uncrossingOrders.stream().filter(o -> o.getSide().equals(MarketSide.BUY))
+                            .mapToDouble(o -> o.getRemainingQuantity().doubleValue()).sum();
+                    double volumeAsks = uncrossingOrders.stream().filter(o -> o.getSide().equals(MarketSide.SELL))
+                            .mapToDouble(o -> o.getRemainingQuantity().doubleValue()).sum();
+                    List<Order> uncrossingBids = uncrossingOrders.stream()
+                            .filter(o -> o.getSide().equals(MarketSide.BUY))
+                            .collect(Collectors.toList());
+                    List<Order> uncrossingAsks = uncrossingOrders.stream()
+                            .filter(o -> o.getSide().equals(MarketSide.SELL))
+                            .collect(Collectors.toList());
+                    if(volumeBids > volumeAsks) {
+                        fillCrossingOrders(uncrossingAsks, uncrossingPrice, BigDecimal.valueOf(volumeAsks));
+                        fillCrossingOrders(uncrossingBids, uncrossingPrice, BigDecimal.valueOf(volumeAsks));
+                    } else if(volumeAsks > volumeBids) {
+                        fillCrossingOrders(uncrossingAsks, uncrossingPrice, BigDecimal.valueOf(volumeBids));
+                        fillCrossingOrders(uncrossingBids, uncrossingPrice, BigDecimal.valueOf(volumeBids));
+                    }
                 }
             }
         }
