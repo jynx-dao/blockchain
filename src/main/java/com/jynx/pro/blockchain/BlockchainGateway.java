@@ -393,29 +393,77 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     }
 
     /**
-     * Handles off-chain asynchronous actions
+     * Confrirm Ethereum events
      *
-     * @param proposerAddress the proposer's address
+     * @param proposerAddress the proposer address
      * @param blockHeight the current block height
      */
-    private void handleProposerActions(
+    private void confirmEthereumEvents(
             final String proposerAddress,
             final long blockHeight
     ) {
         executorService.submit(() -> tendermintClient.confirmEthereumEvents(
                 getBatchRequest(proposerAddress, blockHeight)));
+    }
+
+    /**
+     * Settle markets
+     *
+     * @param proposerAddress the proposer address
+     * @param blockHeight the current block height
+     */
+    private void settleMarkets(
+            final String proposerAddress,
+            final long blockHeight
+    ) {
         executorService.submit(() -> tendermintClient.settleMarkets(
                 getBatchRequest(proposerAddress, blockHeight)));
+    }
+
+    /**
+     * Sync proposals
+     *
+     * @param proposerAddress the proposer address
+     * @param blockHeight the current block height
+     */
+    private void syncProposals(
+            final String proposerAddress,
+            final long blockHeight
+    ) {
         executorService.submit(() -> tendermintClient.syncProposals(
                 getBatchRequest(proposerAddress, blockHeight)));
+    }
+
+    /**
+     * Batch withdrawals
+     */
+    private void batchWithdrawals() {
         executorService.submit(() -> {
             BatchWithdrawalRequest request = new BatchWithdrawalRequest()
                     .setNonce(ethereumService.getNonce().toString());
             ethereumService.addSignatureToRequest(request);
             tendermintClient.batchWithdrawals(request);
         });
+    }
+
+    /**
+     * Monitor auctions
+     *
+     * @param proposerAddress the proposer address
+     * @param blockHeight the current block height
+     */
+    private void monitorAuctions(
+            final String proposerAddress,
+            final long blockHeight
+    ) {
         executorService.submit(() -> tendermintClient.monitorAuctions(
                 getBatchRequest(proposerAddress, blockHeight)));
+    }
+
+    /**
+     * Sign withdrawals
+     */
+    private void signWithdrawals() {
         executorService.submit(() -> {
             try {
                 BulkSignWithdrawalRequest request = withdrawalService.signBatches(validatorPublicKey);
@@ -427,6 +475,12 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                 log.error(e.getMessage(), e);
             }
         });
+    }
+
+    /**
+     * Withdraw signed batches
+     */
+    private void withdrawSignedBatches() {
         executorService.submit(() -> {
             try {
                 List<WithdrawalBatch> batches = withdrawalService.getUnprocessedWithdrawalBatches();
@@ -443,6 +497,12 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                 log.error(e.getMessage(), e);
             }
         });
+    }
+
+    /**
+     * Sign bridge updates
+     */
+    private void signBridgeUpdates() {
         executorService.submit(() -> {
             try {
                 BulkSignBridgeUpdateRequest request = bridgeUpdateService.signUpdates(validatorPublicKey);
@@ -454,6 +514,26 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                 log.error(e.getMessage(), e);
             }
         });
+    }
+
+    /**
+     * Handles off-chain asynchronous actions
+     *
+     * @param proposerAddress the proposer's address
+     * @param blockHeight the current block height
+     */
+    private void handleProposerActions(
+            final String proposerAddress,
+            final long blockHeight
+    ) {
+        confirmEthereumEvents(proposerAddress, blockHeight);
+        settleMarkets(proposerAddress, blockHeight);
+        syncProposals(proposerAddress, blockHeight);
+        batchWithdrawals();
+        monitorAuctions(proposerAddress, blockHeight);
+        signWithdrawals();
+        withdrawSignedBatches();
+        signBridgeUpdates();
         executorService.submit(() -> {
             // TODO - add / remove asset when sufficient signatures have been provided
             // (e.g. this is the equivalent of withdrawalService.withdrawSignedBatches(batches)
