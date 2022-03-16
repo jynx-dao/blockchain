@@ -18,7 +18,7 @@ public enum TendermintTransaction {
     CANCEL_WITHDRAWAL,
     CAST_VOTE,
     UPDATE_DELEGATION, // TODO
-    MONITOR_AUCTIONS, // TODO
+    MONITOR_AUCTIONS,
     ADD_STAKE,
     REMOVE_STAKE,
     DEPOSIT_ASSET,
