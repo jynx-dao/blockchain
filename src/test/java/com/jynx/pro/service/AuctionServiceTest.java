@@ -4,10 +4,13 @@ import com.jynx.pro.Application;
 import com.jynx.pro.constant.MarketSide;
 import com.jynx.pro.constant.MarketStatus;
 import com.jynx.pro.constant.OrderType;
+import com.jynx.pro.constant.StopTrigger;
 import com.jynx.pro.entity.Account;
 import com.jynx.pro.entity.AuctionTrigger;
 import com.jynx.pro.entity.Market;
 import com.jynx.pro.entity.Position;
+import com.jynx.pro.error.ErrorCode;
+import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.model.OrderBook;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -118,8 +121,7 @@ public class AuctionServiceTest extends IntegrationTest {
         Assertions.assertTrue(isTriggered);
     }
 
-    @Test
-    public void testEnterAuctions() {
+    public Market enterAuction() {
         Market market = createOrderBook(1, 1);
         AuctionTrigger trigger = new AuctionTrigger()
                 .setDepth(BigDecimal.valueOf(0.0001))
@@ -134,6 +136,12 @@ public class AuctionServiceTest extends IntegrationTest {
         Assertions.assertTrue(marketOptional.isPresent());
         market = marketOptional.get();
         Assertions.assertEquals(market.getStatus(), MarketStatus.AUCTION);
+        return market;
+    }
+
+    @Test
+    public void testEnterAuctions() {
+        enterAuction();
     }
 
     private void createAuctionOrders(
@@ -420,11 +428,10 @@ public class AuctionServiceTest extends IntegrationTest {
         Assertions.assertTrue(marketOptional.isPresent());
         market = marketOptional.get();
         Assertions.assertEquals(market.getStatus(), MarketStatus.ACTIVE);
-        // TODO - need to check positions, accounts, transactions, fees, etc [validateState from OrderServiceTest]...
         Optional<Position> takerPositionOptional = positionRepository.findByUserAndMarket(takerUser, market);
-        Optional<Position> makerPositionOptional = positionRepository.findByUserAndMarket(takerUser, market);
+        Optional<Position> makerPositionOptional = positionRepository.findByUserAndMarket(makerUser, market);
         Optional<Account> takerAccountOptional = accountRepository.findByUserAndAsset(takerUser, market.getSettlementAsset());
-        Optional<Account> makerAccountOptional = accountRepository.findByUserAndAsset(takerUser, market.getSettlementAsset());
+        Optional<Account> makerAccountOptional = accountRepository.findByUserAndAsset(makerUser, market.getSettlementAsset());
         Assertions.assertTrue(takerPositionOptional.isPresent());
         Assertions.assertTrue(makerPositionOptional.isPresent());
         Assertions.assertTrue(takerAccountOptional.isPresent());
@@ -433,11 +440,19 @@ public class AuctionServiceTest extends IntegrationTest {
         Position makerPosition = makerPositionOptional.get();
         Account takerAccount = takerAccountOptional.get();
         Account makerAccount = makerAccountOptional.get();
+        BigDecimal makerFee = BigDecimal.valueOf(45610).multiply(market.getMakerFee()).subtract(uncrossingPrice.multiply(market.getTakerFee()));
+        BigDecimal takerFee = (BigDecimal.valueOf(45610).multiply(market.getTakerFee()).add(uncrossingPrice.multiply(market.getTakerFee()))).multiply(BigDecimal.valueOf(-1));
+        Assertions.assertEquals(takerAccount.getBalance().doubleValue(), BigDecimal.valueOf(INITIAL_BALANCE).add(takerFee).doubleValue());
+        Assertions.assertEquals(makerAccount.getBalance().doubleValue(), BigDecimal.valueOf(INITIAL_BALANCE).add(makerFee).doubleValue());
         BigDecimal entryPrice = (uncrossingPrice.add(BigDecimal.valueOf(45610))).multiply(BigDecimal.valueOf(0.5));
         Assertions.assertEquals(takerPosition.getAverageEntryPrice().doubleValue(), entryPrice.doubleValue());
         Assertions.assertEquals(makerPosition.getAverageEntryPrice().doubleValue(), entryPrice.doubleValue());
         Assertions.assertEquals(makerPosition.getQuantity().doubleValue(), 2d);
         Assertions.assertEquals(takerPosition.getQuantity().doubleValue(), 2d);
+        Assertions.assertEquals(takerPosition.getSide(), MarketSide.BUY);
+        Assertions.assertEquals(makerPosition.getSide(), MarketSide.SELL);
+        Assertions.assertEquals(makerPosition.getRealisedPnl().doubleValue(), makerFee.doubleValue());
+        Assertions.assertEquals(takerPosition.getRealisedPnl().doubleValue(), takerFee.doubleValue());
     }
 
     @Test
@@ -453,5 +468,28 @@ public class AuctionServiceTest extends IntegrationTest {
     @Test
     public void testExitAuctionWithAskSkew() {
         exitAuction(BigDecimal.ZERO, BigDecimal.valueOf(0.5),2, 2, 46980d, 46990d, 10d, 0.5d);
+    }
+
+    @Test
+    public void testCannotSubmitMarketOrderDuringAuction() {
+        Market market = enterAuction();
+        try {
+            orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.ONE, MarketSide.SELL, OrderType.MARKET, takerUser));
+            Assertions.fail();
+        } catch (JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.MARKET_ORDER_NOT_SUPPORTED);
+        }
+    }
+
+    @Test
+    public void testCannotSubmitCrossingStopOrderDuringAuction() {
+        Market market = enterAuction();
+        try {
+            orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(10), BigDecimal.ONE,
+                    MarketSide.BUY, OrderType.STOP_MARKET, takerUser).setStopTrigger(StopTrigger.LAST_PRICE));
+            Assertions.fail();
+        } catch (JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.MARKET_ORDER_NOT_SUPPORTED);
+        }
     }
 }

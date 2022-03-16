@@ -53,6 +53,8 @@ public class MarketService {
     private AccountRepository accountRepository;
     @Autowired
     private AuctionTriggerRepository auctionTriggerRepository;
+    @Autowired
+    private PendingAuctionTriggerRepository pendingAuctionTriggerRepository;
 
     /**
      * Get a market by ID if it exists
@@ -235,6 +237,19 @@ public class MarketService {
         if(!Objects.isNull(request.getSettlementFrequency())) {
             market.setPendingSettlementFrequency(request.getSettlementFrequency());
         }
+        if(request.getAuctionTriggers().size() > 0) {
+            final Market auctionMarket = market;
+            pendingAuctionTriggerRepository.findByMarketId(auctionMarket.getId())
+                    .forEach(t -> pendingAuctionTriggerRepository.delete(t.getId()));
+            List<PendingAuctionTrigger> auctionTriggers = request.getAuctionTriggers().stream()
+                    .map(t -> new PendingAuctionTrigger()
+                            .setMarket(auctionMarket)
+                            .setId(uuidUtils.next())
+                            .setDepth(t.getDepth())
+                            .setOpenVolumeRatio(t.getOpenVolumeRatio()))
+                    .collect(Collectors.toList());
+            pendingAuctionTriggerRepository.saveAll(auctionTriggers);
+        }
         market = marketRepository.save(market);
         return proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
                 request.getEnactmentTime(), market.getId(), ProposalType.AMEND_MARKET);
@@ -327,6 +342,21 @@ public class MarketService {
     ) {
         proposalService.checkEnacted(proposal);
         Market market = get(proposal.getLinkedId());
+        List<PendingAuctionTrigger> pendingTriggers = pendingAuctionTriggerRepository.findByMarketId(market.getId());
+        if(pendingTriggers.size() > 0) {
+            List<AuctionTrigger> triggers = pendingTriggers.stream()
+                    .map(t -> new AuctionTrigger()
+                            .setDepth(t.getDepth())
+                            .setMarket(t.getMarket())
+                            .setId(uuidUtils.next())
+                            .setOpenVolumeRatio(t.getOpenVolumeRatio()))
+                    .collect(Collectors.toList());
+            auctionTriggerRepository.findByMarketId(market.getId())
+                    .forEach(t -> auctionTriggerRepository.delete(t.getId()));
+            pendingAuctionTriggerRepository.findByMarketId(market.getId())
+                    .forEach(t -> pendingAuctionTriggerRepository.delete(t.getId()));
+            auctionTriggerRepository.saveAll(triggers);
+        }
         if(!Objects.isNull(market.getPendingMarginRequirement())) {
             market.setMarginRequirement(market.getPendingMarginRequirement());
             market.setPendingMarginRequirement(null);

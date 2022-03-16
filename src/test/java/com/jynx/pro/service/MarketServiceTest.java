@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -53,6 +54,18 @@ public class MarketServiceTest extends IntegrationTest {
         Asset asset = createAndEnactAsset(true);
         Proposal proposal = marketService.proposeToAdd(getAddMarketRequest(asset));
         Assertions.assertEquals(proposal.getStatus(), ProposalStatus.CREATED);
+    }
+
+    @Test
+    public void testAddMarketWithAuctionTriggers() {
+        Asset asset = createAndEnactAsset(true);
+        List<AddMarketRequest.AuctionTrigger> triggers = new ArrayList<>();
+        triggers.add(new AddMarketRequest.AuctionTrigger()
+                .setDepth(BigDecimal.valueOf(0.001)).setOpenVolumeRatio(BigDecimal.ONE));
+        Proposal proposal = marketService.proposeToAdd(getAddMarketRequest(asset).setAuctionTriggers(triggers));
+        Assertions.assertEquals(proposal.getStatus(), ProposalStatus.CREATED);
+        List<AuctionTrigger> auctionTriggers = auctionTriggerRepository.findByMarketId(proposal.getLinkedId());
+        Assertions.assertEquals(1, auctionTriggers.size());
     }
 
     @Test
