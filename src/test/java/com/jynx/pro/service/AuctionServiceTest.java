@@ -4,8 +4,10 @@ import com.jynx.pro.Application;
 import com.jynx.pro.constant.MarketSide;
 import com.jynx.pro.constant.MarketStatus;
 import com.jynx.pro.constant.OrderType;
+import com.jynx.pro.entity.Account;
 import com.jynx.pro.entity.AuctionTrigger;
 import com.jynx.pro.entity.Market;
+import com.jynx.pro.entity.Position;
 import com.jynx.pro.model.OrderBook;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
@@ -364,5 +366,92 @@ public class AuctionServiceTest extends IntegrationTest {
         createAuctionOrders(market);
         BigDecimal volume = auctionService.getUncrossingVolume(market);
         Assertions.assertEquals(volume.doubleValue(), 18d);
+    }
+
+    private void exitAuction(
+            final BigDecimal bidSkew,
+            final BigDecimal askSkew,
+            final int bidCount,
+            final int askCount,
+            final double bidPrice,
+            final double askPrice,
+            final double bidSize,
+            final double askSize
+    ) {
+        Market market = createOrderBook(1, 1);
+        AuctionTrigger trigger = new AuctionTrigger()
+                .setDepth(BigDecimal.valueOf(0.0005))
+                .setMarket(market)
+                .setId(uuidUtils.next())
+                .setOpenVolumeRatio(BigDecimal.ONE);
+        auctionTriggerRepository.save(trigger);
+        orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1),
+                MarketSide.BUY, OrderType.MARKET, takerUser));
+        auctionService.enterAuctions();
+        Optional<Market> marketOptional = marketRepository.findById(market.getId());
+        Assertions.assertTrue(marketOptional.isPresent());
+        market = marketOptional.get();
+        Assertions.assertEquals(market.getStatus(), MarketStatus.AUCTION);
+        orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(47000), BigDecimal.valueOf(1).add(bidSkew),
+                MarketSide.BUY, OrderType.LIMIT, takerUser));
+        orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(46990), BigDecimal.valueOf(1).add(askSkew),
+                MarketSide.SELL, OrderType.LIMIT, makerUser));
+        orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(46980), BigDecimal.valueOf(10),
+                MarketSide.BUY, OrderType.LIMIT, takerUser));
+        orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(47010), BigDecimal.valueOf(10),
+                MarketSide.SELL, OrderType.LIMIT, makerUser));
+        OrderBook orderBook = auctionService.getOrderBookAfterUncrossing(market);
+        Assertions.assertEquals(orderBook.getBids().size(), bidCount);
+        Assertions.assertEquals(orderBook.getAsks().size(), askCount);
+        Assertions.assertEquals(orderBook.getBids().get(0).getPrice().doubleValue(), bidPrice);
+        Assertions.assertEquals(orderBook.getAsks().get(0).getPrice().doubleValue(), askPrice);
+        Assertions.assertEquals(orderBook.getBids().get(0).getQuantity().doubleValue(), bidSize);
+        Assertions.assertEquals(orderBook.getAsks().get(0).getQuantity().doubleValue(), askSize);
+        BigDecimal uncrossingPrice = auctionService.getUncrossingPrice(market);
+        auctionService.exitAuctions();
+        orderBook = orderService.getOrderBook(market);
+        Assertions.assertEquals(orderBook.getBids().size(), bidCount);
+        Assertions.assertEquals(orderBook.getAsks().size(), askCount);
+        Assertions.assertEquals(orderBook.getBids().get(0).getPrice().doubleValue(), bidPrice);
+        Assertions.assertEquals(orderBook.getAsks().get(0).getPrice().doubleValue(), askPrice);
+        Assertions.assertEquals(orderBook.getBids().get(0).getQuantity().doubleValue(), bidSize);
+        Assertions.assertEquals(orderBook.getAsks().get(0).getQuantity().doubleValue(), askSize);
+        marketOptional = marketRepository.findById(market.getId());
+        Assertions.assertTrue(marketOptional.isPresent());
+        market = marketOptional.get();
+        Assertions.assertEquals(market.getStatus(), MarketStatus.ACTIVE);
+        // TODO - need to check positions, accounts, transactions, fees, etc [validateState from OrderServiceTest]...
+        Optional<Position> takerPositionOptional = positionRepository.findByUserAndMarket(takerUser, market);
+        Optional<Position> makerPositionOptional = positionRepository.findByUserAndMarket(takerUser, market);
+        Optional<Account> takerAccountOptional = accountRepository.findByUserAndAsset(takerUser, market.getSettlementAsset());
+        Optional<Account> makerAccountOptional = accountRepository.findByUserAndAsset(takerUser, market.getSettlementAsset());
+        Assertions.assertTrue(takerPositionOptional.isPresent());
+        Assertions.assertTrue(makerPositionOptional.isPresent());
+        Assertions.assertTrue(takerAccountOptional.isPresent());
+        Assertions.assertTrue(makerAccountOptional.isPresent());
+        Position takerPosition = takerPositionOptional.get();
+        Position makerPosition = makerPositionOptional.get();
+        Account takerAccount = takerAccountOptional.get();
+        Account makerAccount = makerAccountOptional.get();
+        BigDecimal entryPrice = (uncrossingPrice.add(BigDecimal.valueOf(45610))).multiply(BigDecimal.valueOf(0.5));
+        Assertions.assertEquals(takerPosition.getAverageEntryPrice().doubleValue(), entryPrice.doubleValue());
+        Assertions.assertEquals(makerPosition.getAverageEntryPrice().doubleValue(), entryPrice.doubleValue());
+        Assertions.assertEquals(makerPosition.getQuantity().doubleValue(), 2d);
+        Assertions.assertEquals(takerPosition.getQuantity().doubleValue(), 2d);
+    }
+
+    @Test
+    public void testExitAuction() {
+        exitAuction(BigDecimal.ZERO, BigDecimal.ZERO,2, 1, 46980d, 47010d, 10d, 10d);
+    }
+
+    @Test
+    public void testExitAuctionWithBidSkew() {
+        exitAuction(BigDecimal.valueOf(0.5), BigDecimal.ZERO,3, 1, 47000d, 47010d, 0.5d, 10d);
+    }
+
+    @Test
+    public void testExitAuctionWithAskSkew() {
+        exitAuction(BigDecimal.ZERO, BigDecimal.valueOf(0.5),2, 2, 46980d, 46990d, 10d, 0.5d);
     }
 }

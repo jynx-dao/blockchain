@@ -353,7 +353,7 @@ public class AuctionService {
                     if(volumeBids > volumeAsks) {
                         fillCrossingOrders(uncrossingAsks, uncrossingPrice, BigDecimal.valueOf(volumeAsks));
                         fillCrossingOrders(uncrossingBids, uncrossingPrice, BigDecimal.valueOf(volumeAsks));
-                    } else if(volumeAsks > volumeBids) {
+                    } else if(volumeAsks >= volumeBids) {
                         fillCrossingOrders(uncrossingAsks, uncrossingPrice, BigDecimal.valueOf(volumeBids));
                         fillCrossingOrders(uncrossingBids, uncrossingPrice, BigDecimal.valueOf(volumeBids));
                     }
