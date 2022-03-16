@@ -95,6 +95,13 @@ public class ProposalService {
         return proposalRepository.saveAll(proposals);
     }
 
+    /**
+     * Count the total votes cast on a {@link Proposal}
+     *
+     * @param proposal {@link Proposal}
+     *
+     * @return the total number of votes
+     */
     private BigDecimal getTotalVotes(
             final Proposal proposal
     ) {
@@ -106,6 +113,31 @@ public class ProposalService {
         return totalVotes;
     }
 
+    /**
+     * Count the total votes in-favour of a {@link Proposal}
+     *
+     * @param proposal {@link Proposal}
+     *
+     * @return the total number of votes
+     */
+    private BigDecimal getTotalVotesInFavour(
+            final Proposal proposal
+    ) {
+        List<Vote> votes = voteRepository.findByProposal(proposal).stream()
+                .filter(Vote::getInFavour)
+                .collect(Collectors.toList());
+        BigDecimal totalVotes = BigDecimal.ZERO;
+        for(Vote vote : votes) {
+            totalVotes = totalVotes.add(stakeService.getStakeForUser(vote.getUser()));
+        }
+        return totalVotes;
+    }
+
+    /**
+     * Check if a {@link Proposal} has been enacted
+     *
+     * @param proposal {@link Proposal}
+     */
     public void checkEnacted(
             final Proposal proposal
     ) {
@@ -114,7 +146,14 @@ public class ProposalService {
         }
     }
 
-    private boolean isAboveThreshold(
+    /**
+     * Check if a {@link Proposal} meets the participation threshold
+     *
+     * @param proposal {@link Proposal}
+     *
+     * @return true / false
+     */
+    private boolean meetsParticipationThreshold(
             final Proposal proposal
     ) {
         BigDecimal totalVotes = getTotalVotes(proposal);
@@ -124,12 +163,28 @@ public class ProposalService {
     }
 
     /**
+     * Check if a {@link Proposal} has sufficient votes in-favour to pass
+     *
+     * @param proposal {@link Proposal}
+     *
+     * @return true / false
+     */
+    private boolean hasEnoughVotesInFavour(
+            final Proposal proposal
+    ) {
+        BigDecimal totalVotes = getTotalVotes(proposal);
+        BigDecimal totalVotesInFavour = getTotalVotesInFavour(proposal);
+        double threshold = totalVotesInFavour.doubleValue() / totalVotes.doubleValue();
+        return threshold >= configService.get().getApprovalThreshold().doubleValue();
+    }
+
+    /**
      * Approve {@link Proposal}s
      */
     public List<Proposal> approve() {
         List<Proposal> proposals = proposalRepository.findByStatus(ProposalStatus.OPEN);
         for(Proposal proposal : proposals) {
-            if(isAboveThreshold(proposal)) {
+            if(meetsParticipationThreshold(proposal) && hasEnoughVotesInFavour(proposal)) {
                 proposal.setStatus(ProposalStatus.APPROVED);
             }
         }
@@ -145,7 +200,7 @@ public class ProposalService {
         List<ProposalType> assetProposalTypes = List.of(ProposalType.ADD_ASSET, ProposalType.SUSPEND_ASSET,
                 ProposalType.UNSUSPEND_ASSET);
         for(Proposal proposal : proposals) {
-            if(!isAboveThreshold(proposal)) {
+            if(!meetsParticipationThreshold(proposal) || !hasEnoughVotesInFavour(proposal)) {
                 proposal.setStatus(ProposalStatus.REJECTED);
                 if(assetProposalTypes.contains(proposal.getType())) {
                     assetService.reject(proposal);

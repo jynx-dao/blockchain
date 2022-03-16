@@ -46,6 +46,17 @@ public class EventService {
     @Autowired
     private PriceUtils priceUtils;
 
+    /**
+     * Lookup matching event
+     *
+     * @param amount the amount
+     * @param publicKey the public key
+     * @param blockNumber the block number
+     * @param txHash the transaction hash
+     * @param eventType the {@link EventType}
+     *
+     * @return {@link Optional<Event>}
+     */
     private Optional<Event> findMatchingEvent(
             final BigInteger amount,
             final String publicKey,
@@ -60,6 +71,18 @@ public class EventService {
                         e.getType().equals(eventType)).findFirst();
     }
 
+    /**
+     * Save a new {@link Event}
+     *
+     * @param user the {@link User}
+     * @param blockNumber the block number
+     * @param txHash the transaction hash
+     * @param amount the amount
+     * @param type the {@link EventType}
+     * @param assetAddress the asset address [optional]
+     *
+     * @return {@link Event}
+     */
     public Event save(
             final User user,
             final Long blockNumber,
@@ -103,6 +126,17 @@ public class EventService {
         return event;
     }
 
+    /**
+     * Save a new {@link Event}
+     *
+     * @param user the {@link User}
+     * @param blockNumber the block number
+     * @param txHash the transaction hash
+     * @param amount the amount
+     * @param type the {@link EventType}
+     *
+     * @return {@link Event}
+     */
     public Event save(
             final User user,
             final Long blockNumber,
@@ -113,6 +147,13 @@ public class EventService {
         return save(user, blockNumber, txHash, amount, type, null);
     }
 
+    /**
+     * Confirm an event after sufficient Ethereum blocks have been mined
+     *
+     * @param event {@link Event}
+     *
+     * @return {@link Event}
+     */
     public Event confirm(
             final Event event
     ) {
@@ -134,6 +175,11 @@ public class EventService {
         return eventRepository.save(event);
     }
 
+    /**
+     * Get unconfirmed {@link Event}s
+     *
+     * @return {@link List<Event>}
+     */
     public List<Event> getUnconfirmed() {
         return eventRepository.findByConfirmed(false);
     }

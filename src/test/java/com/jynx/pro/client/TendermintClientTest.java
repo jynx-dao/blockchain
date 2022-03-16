@@ -224,7 +224,7 @@ public class TendermintClientTest extends IntegrationTest {
     private Market addMarket() {
         Asset asset = getDai();
         Assertions.assertNotNull(asset);
-        sleepUtils.sleep(2000L);
+        sleepUtils.sleep(3000L);
         AddMarketRequest request = new AddMarketRequest()
                 .setName("Tesla Motors")
                 .setSettlementAssetId(asset.getId())
@@ -247,7 +247,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         TransactionResponse<Proposal> txResponse = tendermintClient.addMarket(request);
-        sleepUtils.sleep(2000L);
+        sleepUtils.sleep(3000L);
         Assertions.assertEquals(txResponse.getItem().getStatus(), ProposalStatus.CREATED);
         ResponseEntity<Market> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/market/%s", port,
@@ -280,7 +280,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         tendermintClient.amendMarket(request);
-        sleepUtils.sleep(2000L);
+        sleepUtils.sleep(3000L);
         ResponseEntity<Market> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/market/%s", port, market.getId().toString()), Market.class);
         market = responseEntity.getBody();

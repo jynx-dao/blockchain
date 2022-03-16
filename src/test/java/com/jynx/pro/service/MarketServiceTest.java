@@ -23,6 +23,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,14 +50,26 @@ public class MarketServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testAddMarket() throws InterruptedException {
+    public void testAddMarket() {
         Asset asset = createAndEnactAsset(true);
         Proposal proposal = marketService.proposeToAdd(getAddMarketRequest(asset));
         Assertions.assertEquals(proposal.getStatus(), ProposalStatus.CREATED);
     }
 
     @Test
-    public void testAddMarketFailsWhenAssetNotActive() throws InterruptedException {
+    public void testAddMarketWithAuctionTriggers() {
+        Asset asset = createAndEnactAsset(true);
+        List<AddMarketRequest.AuctionTrigger> triggers = new ArrayList<>();
+        triggers.add(new AddMarketRequest.AuctionTrigger()
+                .setDepth(BigDecimal.valueOf(0.001)).setOpenVolumeRatio(BigDecimal.ONE));
+        Proposal proposal = marketService.proposeToAdd(getAddMarketRequest(asset).setAuctionTriggers(triggers));
+        Assertions.assertEquals(proposal.getStatus(), ProposalStatus.CREATED);
+        List<AuctionTrigger> auctionTriggers = auctionTriggerRepository.findByMarketId(proposal.getLinkedId());
+        Assertions.assertEquals(1, auctionTriggers.size());
+    }
+
+    @Test
+    public void testAddMarketFailsWhenAssetNotActive() {
         Asset asset = createAndEnactAsset(false);
         try {
             marketService.proposeToAdd(getAddMarketRequest(asset));
@@ -67,7 +80,7 @@ public class MarketServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testAddMarketFailsWithInvalidTakerFee() throws InterruptedException {
+    public void testAddMarketFailsWithInvalidTakerFee() {
         Asset asset = createAndEnactAsset(true);
         try {
             AddMarketRequest request = getAddMarketRequest(asset);
@@ -80,7 +93,7 @@ public class MarketServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testAddMarketFailsWithInvalidLiquidationFee() throws InterruptedException {
+    public void testAddMarketFailsWithInvalidLiquidationFee() {
         Asset asset = createAndEnactAsset(true);
         try {
             AddMarketRequest request = getAddMarketRequest(asset);
@@ -93,7 +106,7 @@ public class MarketServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testAddMarketFailsWithSignedDataOracle() throws InterruptedException {
+    public void testAddMarketFailsWithSignedDataOracle() {
         Asset asset = createAndEnactAsset(true);
         try {
             AddMarketRequest request = getAddMarketRequest(asset);
@@ -106,7 +119,7 @@ public class MarketServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testAddMarketAndEnact() throws InterruptedException {
+    public void testAddMarketAndEnact() {
         createAndEnactMarket(true);
     }
 
@@ -131,7 +144,7 @@ public class MarketServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testSuspendMarketFailsWhenNotActive() throws InterruptedException {
+    public void testSuspendMarketFailsWhenNotActive() {
         Market market = createAndEnactMarket(false);
         long[] times = proposalTimes();
         SingleItemRequest request = new SingleItemRequest().setId(market.getId());
@@ -148,7 +161,7 @@ public class MarketServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testUnsuspendMarketFailsWhenNotActive() throws InterruptedException {
+    public void testUnsuspendMarketFailsWhenNotActive() {
         Market market = createAndEnactMarket(true);
         long[] times = proposalTimes();
         SingleItemRequest request = new SingleItemRequest().setId(market.getId());
@@ -194,7 +207,7 @@ public class MarketServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testAmendFailsWithInvalidTakerFee() throws InterruptedException {
+    public void testAmendFailsWithInvalidTakerFee() {
         Market market = createAndEnactMarket(true);
         Assertions.assertEquals(market.getMarginRequirement().setScale(2, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(0.01).setScale(2, RoundingMode.HALF_UP));
@@ -215,7 +228,7 @@ public class MarketServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testAmendFailsWithInvalidLiquidationFee() throws InterruptedException {
+    public void testAmendFailsWithInvalidLiquidationFee() {
         Market market = createAndEnactMarket(true);
         Assertions.assertEquals(market.getMarginRequirement().setScale(2, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(0.01).setScale(2, RoundingMode.HALF_UP));
@@ -236,7 +249,7 @@ public class MarketServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testAmendFailsWhenMarketNotActive() throws InterruptedException {
+    public void testAmendFailsWhenMarketNotActive() {
         Market market = createAndEnactMarket(false);
         Assertions.assertEquals(market.getMarginRequirement().setScale(2, RoundingMode.HALF_UP),
                 BigDecimal.valueOf(0.01).setScale(2, RoundingMode.HALF_UP));
@@ -302,6 +315,59 @@ public class MarketServiceTest extends IntegrationTest {
         proposalService.reject();
         market = marketRepository.findById(market.getId()).orElse(new Market());
         Assertions.assertEquals(market.getTickSize(), 2);
+    }
+
+    @Test
+    public void testAmendAuctionTriggersWithEmptyArray() throws InterruptedException {
+        Market market = createAndEnactMarket(true, true);
+        Assertions.assertEquals(market.getTickSize(), 1);
+        long[] times = proposalTimes();
+        List<AddMarketRequest.AuctionTrigger> triggers = new ArrayList<>();
+        AmendMarketRequest request = new AmendMarketRequest()
+                .setId(market.getId())
+                .setAuctionTriggers(triggers);
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setUser(takerUser);
+        marketService.proposeToAmend(request);
+        Thread.sleep(100L);
+        configService.setTimestamp(nowAsMillis());
+        proposalService.open();
+        proposalService.approve();
+        proposalService.enact();
+        proposalService.reject();
+        market = marketRepository.findById(market.getId()).orElse(new Market());
+        List<AuctionTrigger> auctionTriggers = auctionTriggerRepository.findByMarketId(market.getId());
+        Assertions.assertEquals(0, auctionTriggers.size());
+    }
+
+    @Test
+    public void testAmendAuctionTriggersWithNewTrigger() throws InterruptedException {
+        Market market = createAndEnactMarket(true, true);
+        Assertions.assertEquals(market.getTickSize(), 1);
+        long[] times = proposalTimes();
+        List<AddMarketRequest.AuctionTrigger> triggers = new ArrayList<>();
+        triggers.add(new AddMarketRequest.AuctionTrigger().setOpenVolumeRatio(BigDecimal.ONE).setDepth(BigDecimal.TEN));
+        AmendMarketRequest request = new AmendMarketRequest()
+                .setId(market.getId())
+                .setAuctionTriggers(triggers);
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setUser(takerUser);
+        marketService.proposeToAmend(request);
+        Thread.sleep(100L);
+        configService.setTimestamp(nowAsMillis());
+        proposalService.open();
+        proposalService.approve();
+        proposalService.enact();
+        proposalService.reject();
+        market = marketRepository.findById(market.getId()).orElse(new Market());
+        List<AuctionTrigger> auctionTriggers = auctionTriggerRepository.findByMarketId(market.getId());
+        Assertions.assertEquals(1, auctionTriggers.size());
+        Assertions.assertEquals(10d, auctionTriggers.get(0).getDepth().doubleValue());
+        Assertions.assertEquals(1d, auctionTriggers.get(0).getOpenVolumeRatio().doubleValue());
     }
 
     @Test
@@ -457,7 +523,7 @@ public class MarketServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testMarketSettlement() throws InterruptedException {
+    public void testMarketSettlement() {
         Market market = createOrderBook(10, 10, 1);
         market.setLastSettlement(LocalDateTime.now().toEpochSecond(ZoneOffset.UTC) - 86400);
         market = marketRepository.save(market);
@@ -497,7 +563,7 @@ public class MarketServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testMarketSettlementSkip() throws InterruptedException {
+    public void testMarketSettlementSkip() {
         Market market = createOrderBook(10, 10, 1);
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.ONE, MarketSide.BUY, OrderType.MARKET, takerUser));

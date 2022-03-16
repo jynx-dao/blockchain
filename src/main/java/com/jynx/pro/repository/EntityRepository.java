@@ -103,4 +103,19 @@ public abstract class EntityRepository<T> {
         query.from(getType());
         getEntityManager().createQuery(query).executeUpdate();
     }
+
+    /**
+     * Generic method to delete by ID
+     *
+     * @param id the entity ID
+     */
+    public void delete(
+            final UUID id
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaDelete<T> query = cb.createCriteriaDelete(getType());
+        Root<T> rootType = query.from(getType());
+        query = query.where(new Predicate[]{ cb.equal(rootType.get("id"), id) });
+        getEntityManager().createQuery(query).executeUpdate();
+    }
 }

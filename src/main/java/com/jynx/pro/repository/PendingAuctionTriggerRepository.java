@@ -1,6 +1,6 @@
 package com.jynx.pro.repository;
 
-import com.jynx.pro.entity.AuctionTrigger;
+import com.jynx.pro.entity.PendingAuctionTrigger;
 import org.springframework.stereotype.Repository;
 
 import javax.persistence.criteria.CriteriaBuilder;
@@ -11,28 +11,28 @@ import java.util.List;
 import java.util.UUID;
 
 @Repository
-public class AuctionTriggerRepository extends EntityRepository<AuctionTrigger> {
+public class PendingAuctionTriggerRepository extends EntityRepository<PendingAuctionTrigger> {
 
     /**
-     * Get {@link AuctionTrigger}s by market ID
+     * Get {@link PendingAuctionTrigger}s by market ID
      *
      * @param marketId the market ID
      *
-     * @return {@link List} of {@link AuctionTrigger}s
+     * @return {@link List} of {@link PendingAuctionTrigger}s
      */
-    public List<AuctionTrigger> findByMarketId(
+    public List<PendingAuctionTrigger> findByMarketId(
             final UUID marketId
     ) {
         CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
-        CriteriaQuery<AuctionTrigger> query = cb.createQuery(getType());
-        Root<AuctionTrigger> rootType = query.from(getType());
+        CriteriaQuery<PendingAuctionTrigger> query = cb.createQuery(getType());
+        Root<PendingAuctionTrigger> rootType = query.from(getType());
         Path<UUID> market_id = rootType.join("market").get("id");
         query = query.select(rootType).where(cb.equal(market_id, marketId));
         return getEntityManager().createQuery(query).getResultList();
     }
 
     @Override
-    public Class<AuctionTrigger> getType() {
-        return AuctionTrigger.class;
+    public Class<PendingAuctionTrigger> getType() {
+        return PendingAuctionTrigger.class;
     }
 }

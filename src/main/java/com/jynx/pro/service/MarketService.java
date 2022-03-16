@@ -19,6 +19,7 @@ import java.math.RoundingMode;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -50,13 +51,31 @@ public class MarketService {
     private TransactionRepository transactionRepository;
     @Autowired
     private AccountRepository accountRepository;
+    @Autowired
+    private AuctionTriggerRepository auctionTriggerRepository;
+    @Autowired
+    private PendingAuctionTriggerRepository pendingAuctionTriggerRepository;
 
+    /**
+     * Get a market by ID if it exists
+     *
+     * @param id the market ID
+     *
+     * @return {@link Market}
+     */
     public Market get(
             final UUID id
     ) {
         return marketRepository.findById(id).orElseThrow(() -> new JynxProException(ErrorCode.MARKET_NOT_FOUND));
     }
 
+    /**
+     * Settle an open position
+     *
+     * @param position {@link Position}
+     * @param market {@link Market}
+     * @param value settlement price
+     */
     private void settlePosition(
             final Position position,
             final Market market,
@@ -82,6 +101,13 @@ public class MarketService {
         accountService.reconcileNegativeBalance(account.getUser(), market);
     }
 
+    /**
+     * Settle markets using Oracle price data
+     *
+     * @param request {@link BatchValidatorRequest}
+     *
+     * @return {@link List<Market>}
+     */
     public List<Market> settleMarkets(
             final BatchValidatorRequest request
     ) {
@@ -102,6 +128,13 @@ public class MarketService {
         return markets;
     }
 
+    /**
+     * Create a {@link Proposal} to add a market
+     *
+     * @param request {@link AddMarketRequest}
+     *
+     * @return {@link Proposal}
+     */
     public Proposal proposeToAdd(
             final AddMarketRequest request
     ) {
@@ -140,11 +173,28 @@ public class MarketService {
                 .setStatus(MarketStatus.PENDING)
                 .setId(uuidUtils.next())
                 .setLastSettlement(0L);
-        market = marketRepository.save(market);
+        marketRepository.save(market);
+        if(request.getAuctionTriggers().size() > 0) {
+            List<AuctionTrigger> auctionTriggers = request.getAuctionTriggers().stream()
+                    .map(t -> new AuctionTrigger()
+                            .setMarket(market)
+                            .setId(uuidUtils.next())
+                            .setDepth(t.getDepth())
+                            .setOpenVolumeRatio(t.getOpenVolumeRatio()))
+                    .collect(Collectors.toList());
+            auctionTriggerRepository.saveAll(auctionTriggers);
+        }
         return proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
                 request.getEnactmentTime(), market.getId(), ProposalType.ADD_MARKET);
     }
 
+    /**
+     * Create a {@link Proposal} to amend a market
+     *
+     * @param request {@link AmendMarketRequest}
+     *
+     * @return {@link Proposal}
+     */
     public Proposal proposeToAmend(
             final AmendMarketRequest request
     ) {
@@ -187,11 +237,31 @@ public class MarketService {
         if(!Objects.isNull(request.getSettlementFrequency())) {
             market.setPendingSettlementFrequency(request.getSettlementFrequency());
         }
+        if(request.getAuctionTriggers().size() > 0) {
+            final Market auctionMarket = market;
+            pendingAuctionTriggerRepository.findByMarketId(auctionMarket.getId())
+                    .forEach(t -> pendingAuctionTriggerRepository.delete(t.getId()));
+            List<PendingAuctionTrigger> auctionTriggers = request.getAuctionTriggers().stream()
+                    .map(t -> new PendingAuctionTrigger()
+                            .setMarket(auctionMarket)
+                            .setId(uuidUtils.next())
+                            .setDepth(t.getDepth())
+                            .setOpenVolumeRatio(t.getOpenVolumeRatio()))
+                    .collect(Collectors.toList());
+            pendingAuctionTriggerRepository.saveAll(auctionTriggers);
+        }
         market = marketRepository.save(market);
         return proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
                 request.getEnactmentTime(), market.getId(), ProposalType.AMEND_MARKET);
     }
 
+    /**
+     * Create a {@link Proposal} to suspend a market
+     *
+     * @param request {@link SingleItemRequest}
+     *
+     * @return {@link Proposal}
+     */
     public Proposal proposeToSuspend(
             final SingleItemRequest request
     ) {
@@ -205,6 +275,13 @@ public class MarketService {
                 request.getEnactmentTime(), market.getId(), ProposalType.SUSPEND_MARKET);
     }
 
+    /**
+     * Create a {@link Proposal} to unsuspend a market
+     *
+     * @param request {@link SingleItemRequest}
+     *
+     * @return {@link Proposal}
+     */
     public Proposal proposeToUnsuspend(
             final SingleItemRequest request
     ) {
@@ -235,7 +312,12 @@ public class MarketService {
         }
         marketRepository.save(market);
     }
-    
+
+    /**
+     * Activate a {@link Market} and enact its proposal
+     *
+     * @param proposal {@link Proposal}
+     */
     public void add(
             final Proposal proposal
     ) {
@@ -243,17 +325,38 @@ public class MarketService {
         updateStatus(proposal, MarketStatus.ACTIVE);
     }
 
+    /**
+     * Reject a {@link Market} by {@link Proposal}
+     */
     public void reject(
             final Proposal proposal
     ) {
         updateStatus(proposal, MarketStatus.REJECTED);
     }
 
+    /**
+     * Amend a {@link Market} by {@link Proposal}
+     */
     public void amend(
             final Proposal proposal
     ) {
         proposalService.checkEnacted(proposal);
         Market market = get(proposal.getLinkedId());
+        List<PendingAuctionTrigger> pendingTriggers = pendingAuctionTriggerRepository.findByMarketId(market.getId());
+        if(!Objects.isNull(pendingTriggers)) {
+            List<AuctionTrigger> triggers = pendingTriggers.stream()
+                    .map(t -> new AuctionTrigger()
+                            .setDepth(t.getDepth())
+                            .setMarket(t.getMarket())
+                            .setId(uuidUtils.next())
+                            .setOpenVolumeRatio(t.getOpenVolumeRatio()))
+                    .collect(Collectors.toList());
+            auctionTriggerRepository.findByMarketId(market.getId())
+                    .forEach(t -> auctionTriggerRepository.delete(t.getId()));
+            pendingAuctionTriggerRepository.findByMarketId(market.getId())
+                    .forEach(t -> pendingAuctionTriggerRepository.delete(t.getId()));
+            auctionTriggerRepository.saveAll(triggers);
+        }
         if(!Objects.isNull(market.getPendingMarginRequirement())) {
             market.setMarginRequirement(market.getPendingMarginRequirement());
             market.setPendingMarginRequirement(null);
@@ -289,19 +392,27 @@ public class MarketService {
         marketRepository.save(market);
     }
 
+    /**
+     * Suspend a {@link Market} by {@link Proposal}
+     */
     public void suspend(
             final Proposal proposal
     ) {
         proposalService.checkEnacted(proposal);
-        // TODO - the market can only be settled (it cannot be unsuspended until it has been) and all orders will be canceled
+        // TODO - the market can only be settled (it cannot be unsuspended
+        // until it has been) and all orders will be canceled
         updateStatus(proposal, MarketStatus.SUSPENDED);
     }
 
+    /**
+     * Unsuspend a {@link Market} by {@link Proposal}
+     */
     public void unsuspend(
             final Proposal proposal
     ) {
         proposalService.checkEnacted(proposal);
-        // TODO - the market can only be unsuspended if it was settled, so when it opens again nobody will have any positions and all orders will be canceled
+        // TODO - the market can only be unsuspended if it was settled, so when it
+        // opens again nobody will have any positions and all orders will be canceled
         updateStatus(proposal, MarketStatus.ACTIVE);
     }
 

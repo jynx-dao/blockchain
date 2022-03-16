@@ -37,6 +37,8 @@ public class Config {
     private Long minProposerStake;
     @Column(name = "participation_threshold", nullable = false)
     private BigDecimal participationThreshold;
+    @Column(name = "approval_threshold", nullable = false)
+    private BigDecimal approvalThreshold;
     @Column(name = "bridge_address", nullable = false)
     private String bridgeAddress;
     @Column(name = "eth_confirmations", nullable = false)

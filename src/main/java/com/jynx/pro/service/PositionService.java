@@ -412,6 +412,11 @@ public class PositionService {
         liquidatedPositions.forEach(this::reconcileLiquidatedPosition);
     }
 
+    /**
+     * Ensure that the state of a {@link Position} is correct after liquidation
+     *
+     * @param position {@link Position}
+     */
     public void reconcileLiquidatedPosition(
             final Position position
     ) {
@@ -439,16 +444,8 @@ public class PositionService {
             final Market market,
             final Position position
     ) {
-        List<Order> stopOrders = orderRepository.findByStatusInAndTypeAndMarketAndUser(
-                List.of(OrderStatus.OPEN), OrderType.STOP_MARKET, market, position.getUser());
         List<Order> limitOrders = orderRepository.findByStatusInAndTypeAndMarketAndUser(List.of(OrderStatus.OPEN,
                 OrderStatus.PARTIALLY_FILLED), OrderType.LIMIT, market, position.getUser());
-        stopOrders.forEach(order -> {
-            CancelOrderRequest request = new CancelOrderRequest();
-            request.setUser(order.getUser());
-            request.setId(order.getId());
-            orderService.cancel(request);
-        });
         limitOrders.forEach(order -> {
             CancelOrderRequest request = new CancelOrderRequest();
             request.setUser(order.getUser());

@@ -25,7 +25,7 @@ public class Trade {
     @JoinColumn(name = "market_id", nullable = false)
     private Market market;
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "maker_order_id", nullable = false)
+    @JoinColumn(name = "maker_order_id")
     private Order makerOrder;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "taker_order_id", nullable = false)

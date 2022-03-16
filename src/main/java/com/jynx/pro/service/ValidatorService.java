@@ -3,8 +3,6 @@ package com.jynx.pro.service;
 import com.jynx.pro.entity.Validator;
 import com.jynx.pro.repository.ReadOnlyRepository;
 import com.jynx.pro.repository.ValidatorRepository;
-import com.jynx.pro.repository.WithdrawalRepository;
-import com.jynx.pro.repository.WithdrawalBatchSignatureRepository;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,15 +17,9 @@ public class ValidatorService {
     @Autowired
     private ValidatorRepository validatorRepository;
     @Autowired
-    private WithdrawalRepository withdrawalRepository;
-    @Autowired
-    private WithdrawalBatchSignatureRepository withdrawalBatchSignatureRepository;
-    @Autowired
     private ReadOnlyRepository readOnlyRepository;
     @Autowired
     private UUIDUtils uuidUtils;
-    @Autowired
-    private EthereumService ethereumService;
 
     /**
      * Add a {@link Validator} to the database if it doesn't exist

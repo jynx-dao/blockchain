@@ -28,6 +28,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -109,6 +111,8 @@ public abstract class IntegrationTest {
     protected WithdrawalBatchSignatureRepository withdrawalBatchSignatureRepository;
     @Autowired
     protected ValidatorRepository validatorRepository;
+    @Autowired
+    protected AuctionTriggerRepository auctionTriggerRepository;
     @Autowired
     protected AccountService accountService;
     @Autowired
@@ -195,8 +199,20 @@ public abstract class IntegrationTest {
     protected Market createAndEnactMarket(
             final boolean activate
     ) {
+        return createAndEnactMarket(activate, false);
+    }
+
+    protected Market createAndEnactMarket(
+            final boolean activate,
+            final boolean includeTriggers
+    ) {
         Asset asset = createAndEnactAsset(true);
-        Proposal proposal = marketService.proposeToAdd(getAddMarketRequest(asset));
+        List<AddMarketRequest.AuctionTrigger> triggers = new ArrayList<>();
+        if(includeTriggers) {
+            triggers.add(new AddMarketRequest.AuctionTrigger()
+                    .setDepth(BigDecimal.valueOf(0.001)).setOpenVolumeRatio(BigDecimal.ONE));
+        }
+        Proposal proposal = marketService.proposeToAdd(getAddMarketRequest(asset).setAuctionTriggers(triggers));
         Assertions.assertEquals(proposal.getStatus(), ProposalStatus.CREATED);
         sleepUtils.sleep(100L);
         if(activate) {
@@ -356,6 +372,7 @@ public abstract class IntegrationTest {
         tradeRepository.deleteAll();
         orderRepository.deleteAll();
         positionRepository.deleteAll();
+        auctionTriggerRepository.deleteAll();
         marketRepository.deleteAll();
         oracleRepository.deleteAll();
         accountRepository.deleteAll();
@@ -393,6 +410,7 @@ public abstract class IntegrationTest {
                     .setMinProposerStake(1L)
                     .setNetworkFee(BigDecimal.valueOf(0.001))
                     .setParticipationThreshold(BigDecimal.valueOf(0.66))
+                    .setApprovalThreshold(BigDecimal.valueOf(0.66))
                     .setUuidSeed(1L)
                     .setEthConfirmations(0)
                     .setBridgeAddress(ethereumHelper.getJynxProBridge().getContractAddress());

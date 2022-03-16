@@ -1,6 +1,5 @@
 package com.jynx.pro.repository;
 
-import com.jynx.pro.entity.Vote;
 import com.jynx.pro.entity.WithdrawalBatchSignature;
 import org.springframework.stereotype.Repository;
 
@@ -8,7 +7,6 @@ import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Path;
 import javax.persistence.criteria.Root;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -44,16 +42,5 @@ public class WithdrawalBatchSignatureRepository extends EntityRepository<Withdra
         } catch(Exception e) {
             return Optional.empty();
         }
-    }
-
-    public List<WithdrawalBatchSignature> findByWithdrawalBatchId(
-            final UUID batchId
-    ) {
-        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
-        CriteriaQuery<WithdrawalBatchSignature> query = cb.createQuery(getType());
-        Root<WithdrawalBatchSignature> rootType = query.from(getType());
-        Path<UUID> batch_id = rootType.join("withdrawalBatch").get("id");
-        query = query.select(rootType).where(cb.equal(batch_id, batchId));
-        return getEntityManager().createQuery(query).getResultList();
     }
 }

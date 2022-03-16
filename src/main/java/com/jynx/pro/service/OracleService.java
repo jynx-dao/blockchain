@@ -2,9 +2,6 @@ package com.jynx.pro.service;
 
 import com.jynx.pro.constant.OracleType;
 import com.jynx.pro.entity.Market;
-import com.jynx.pro.repository.AccountRepository;
-import com.jynx.pro.repository.OracleRepository;
-import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -15,14 +12,6 @@ import java.math.BigDecimal;
 @Service
 public class OracleService {
 
-    @Autowired
-    private OracleRepository oracleRepository;
-    @Autowired
-    private AccountService accountService;
-    @Autowired
-    private AccountRepository accountRepository;
-    @Autowired
-    private UUIDUtils uuidUtils;
     @Autowired
     private BinanceService binanceService;
     @Autowired
@@ -51,6 +40,13 @@ public class OracleService {
         return getSettlementValueFromSignedData(market);
     }
 
+    /**
+     * Get the settlement price from a signed data-source
+     *
+     * @param market {@link Market}
+     *
+     * @return the settlement price
+     */
     private BigDecimal getSettlementValueFromSignedData(
             final Market market
     ) {
@@ -58,6 +54,13 @@ public class OracleService {
         return BigDecimal.ZERO;
     }
 
+    /**
+     * Get the cut-off time to use for settlement price sourcing
+     *
+     * @param market {@link Market}
+     *
+     * @return time as Unix timestamp
+     */
     private long getSettlementTime(
             final Market market
     ) {
