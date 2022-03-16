@@ -205,10 +205,10 @@ public class TendermintClient {
     /**
      * Batch withdrawals
      *
-     * @param request {@link BatchValidatorRequest}
+     * @param request {@link BatchWithdrawalRequest}
      */
     public void batchWithdrawals(
-            final BatchValidatorRequest request
+            final BatchWithdrawalRequest request
     ) {
         processTransaction(request, Object.class,
                 TendermintTransaction.BATCH_WITHDRAWALS, ErrorCode.BATCH_WITHDRAWALS_FAILED);
@@ -224,6 +224,18 @@ public class TendermintClient {
     ) {
         processTransaction(request, Object.class,
                 TendermintTransaction.SIGN_WITHDRAWAL_BATCHES, ErrorCode.SIGN_WITHDRAWALS_FAILED);
+    }
+
+    /**
+     * Sign bridge updates
+     *
+     * @param request {@link BulkSignBridgeUpdateRequest}
+     */
+    public void signBridgeUpdates(
+            final BulkSignBridgeUpdateRequest request
+    ) {
+        processTransaction(request, Object.class,
+                TendermintTransaction.SIGN_BRIDGE_UPDATES, ErrorCode.SIGN_BRIDGE_UPDATED_FAILED);
     }
 
     /**

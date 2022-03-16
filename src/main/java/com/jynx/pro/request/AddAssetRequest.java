@@ -13,4 +13,5 @@ public class AddAssetRequest extends ProposalRequest {
     private AssetType type;
     private String address;
     private Integer decimalPlaces;
+    private String bridgeNonce;
 }

@@ -62,6 +62,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Autowired
     private WithdrawalService withdrawalService;
     @Autowired
+    private BridgeUpdateService bridgeUpdateService;
+    @Autowired
     private AuctionService auctionService;
     @Autowired
     private AppStateManager appStateManager;
@@ -187,10 +189,10 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                         .setProtectedFn(true)
                         .setRequestType(BatchValidatorRequest.class));
         transactionSettings.put(TendermintTransaction.BATCH_WITHDRAWALS,
-                new TransactionConfig<BatchValidatorRequest>()
+                new TransactionConfig<BatchWithdrawalRequest>()
                         .setDeliverFn(withdrawalService::batchWithdrawals)
                         .setProtectedFn(true)
-                        .setRequestType(BatchValidatorRequest.class));
+                        .setRequestType(BatchWithdrawalRequest.class));
         transactionSettings.put(TendermintTransaction.SIGN_WITHDRAWAL_BATCHES,
                 new TransactionConfig<BulkSignWithdrawalRequest>()
                         .setDeliverFn(withdrawalService::saveWithdrawalBatchSignatures)
@@ -401,8 +403,12 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                 getBatchRequest(proposerAddress, blockHeight)));
         executorService.submit(() -> tendermintClient.syncProposals(
                 getBatchRequest(proposerAddress, blockHeight)));
-        executorService.submit(() -> tendermintClient.batchWithdrawals(
-                getBatchRequest(proposerAddress, blockHeight)));
+        executorService.submit(() -> {
+            BatchWithdrawalRequest request = new BatchWithdrawalRequest()
+                    .setNonce(ethereumService.getNonce().toString());
+            ethereumService.addSignatureToRequest(request);
+            tendermintClient.batchWithdrawals(request);
+        });
         executorService.submit(() -> tendermintClient.monitorAuctions(
                 getBatchRequest(proposerAddress, blockHeight)));
         executorService.submit(() -> {
@@ -423,8 +429,21 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                     List<UUID> ids = batches.stream().map(WithdrawalBatch::getId).collect(Collectors.toList());
                     DebitWithdrawalsRequest request = new DebitWithdrawalsRequest().setBatchIds(ids);
                     ethereumService.addSignatureToRequest(request);
+                    // TODO - we should check that the node has sufficient gas before broadcasting the Tendermint tx
                     tendermintClient.debitWithdrawals(request);
+                    // TODO - how do we undo the previous Tendermint transactions if the node has insufficient gas??
                     withdrawalService.withdrawSignedBatches(batches);
+                }
+            } catch(Exception e) {
+                log.error(e.getMessage(), e);
+            }
+        });
+        executorService.submit(() -> {
+            try {
+                BulkSignBridgeUpdateRequest request = bridgeUpdateService.signUpdates(validatorPublicKey);
+                ethereumService.addSignatureToRequest(request);
+                if(request.getSignatures().size() > 0) {
+                    tendermintClient.signBridgeUpdates(request);
                 }
             } catch(Exception e) {
                 log.error(e.getMessage(), e);

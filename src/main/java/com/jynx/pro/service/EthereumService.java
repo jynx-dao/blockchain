@@ -441,6 +441,48 @@ public class EthereumService {
     }
 
     /**
+     * Check if an asset is active on the Jynx bridge
+     *
+     * @param asset the ERC20 contract address
+     *
+     * @return {@link Boolean} from Ethereum
+     */
+    public Boolean isAssetActive(
+            final String asset
+    ) {
+        try {
+            Credentials credentials = Credentials.create(ethereumPrivateKey);
+            JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.get().getBridgeAddress(), getWeb3j(),
+                    credentials, new DefaultGasProvider());
+            return jynxProBridge.assets(asset).send();
+        } catch(Exception e) {
+            log.error(e.getMessage(), e);
+            throw new JynxProException(ErrorCode.CANNOT_GET_ASSET);
+        }
+    }
+
+    /**
+     * Check if an asset is active on the Jynx bridge
+     *
+     * @param nonce proposed nonce
+     *
+     * @return {@link Boolean} from Ethereum
+     */
+    public Boolean isNonceUsed(
+            final String nonce
+    ) {
+        try {
+            Credentials credentials = Credentials.create(ethereumPrivateKey);
+            JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.get().getBridgeAddress(), getWeb3j(),
+                    credentials, new DefaultGasProvider());
+            return jynxProBridge.used_nonces(new BigInteger(nonce)).send();
+        } catch(Exception e) {
+            log.error(e.getMessage(), e);
+            throw new JynxProException(ErrorCode.CANNOT_GET_NONCE);
+        }
+    }
+
+    /**
      * Add an asset to the Jynx bridge
      *
      * @param asset the ERC20 contract address
@@ -508,5 +550,43 @@ public class EthereumService {
      */
     public BigInteger getNonce() {
         return new BigInteger(256, new SecureRandom());
+    }
+
+    /**
+     * Get a signature to use when adding an asset
+     *
+     * @param asset the asset address
+     * @param nonce the nonce used for the signature
+     *
+     * @return signature as byte-array
+     *
+     * @throws DecoderException thrown if signature cannot be decoded
+     */
+    public byte[] getSignatureForAddAsset(
+            final String asset,
+            final BigInteger nonce
+    ) throws DecoderException {
+        Credentials credentials = Credentials.create(ethereumPrivateKey);
+        List<Type> args = Arrays.asList(new Address(asset), new Uint256(nonce), new Utf8String("add_asset"));
+        return getSignature(args, credentials);
+    }
+
+    /**
+     * Get a signature to use when removing an asset
+     *
+     * @param asset the asset address
+     * @param nonce the nonce used for the signature
+     *
+     * @return signature as byte-array
+     *
+     * @throws DecoderException thrown if signature cannot be decoded
+     */
+    public byte[] getSignatureForRemoveAsset(
+            final String asset,
+            final BigInteger nonce
+    ) throws DecoderException {
+        Credentials credentials = Credentials.create(ethereumPrivateKey);
+        List<Type> args = Arrays.asList(new Address(asset), new Uint256(nonce), new Utf8String("remove_asset"));
+        return getSignature(args, credentials);
     }
 }

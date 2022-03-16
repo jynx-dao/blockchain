@@ -339,6 +339,29 @@ public class ProposalService {
             final UUID linkedId,
             final ProposalType type
     ) {
+        return create(user, openTime, closingTime, enactmentTime, linkedId, type, null);
+    }
+
+    /**
+     * Create a new {@link Proposal}
+     *
+     * @param user the creator {@link User}
+     * @param openTime the opening time
+     * @param closingTime the closing time
+     * @param enactmentTime the enactment time
+     * @param linkedId the linked object
+     * @param type the {@link ProposalType}
+     * @param nonce the nonce for the bridge
+     */
+    public Proposal create(
+            final User user,
+            final Long openTime,
+            final Long closingTime,
+            final Long enactmentTime,
+            final UUID linkedId,
+            final ProposalType type,
+            final String nonce
+    ) {
         Proposal proposal = new Proposal()
                 .setUser(user)
                 .setOpenTime(getOpenTime(openTime))
@@ -347,7 +370,8 @@ public class ProposalService {
                 .setId(uuidUtils.next())
                 .setLinkedId(linkedId)
                 .setType(type)
-                .setStatus(ProposalStatus.CREATED);
+                .setStatus(ProposalStatus.CREATED)
+                .setNonce(nonce);
         proposal = proposalRepository.save(proposal);
         CastVoteRequest castVoteRequest = new CastVoteRequest()
                 .setId(proposal.getId())
@@ -355,5 +379,18 @@ public class ProposalService {
         castVoteRequest.setUser(user);
         vote(castVoteRequest);
         return proposal;
+    }
+
+    /**
+     * Check if a {@link Proposal} already exists with a specified nonce
+     *
+     * @param nonce the nonce
+     *
+     * @return true / false
+     */
+    public boolean existsWithNonce(
+            final String nonce
+    ) {
+        return proposalRepository.findByNonce(nonce).size() > 0;
     }
 }

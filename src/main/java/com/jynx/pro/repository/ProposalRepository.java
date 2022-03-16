@@ -31,6 +31,23 @@ public class ProposalRepository extends EntityRepository<Proposal> {
         return getEntityManager().createQuery(query).getResultList();
     }
 
+    /**
+     * Get {@link Proposal}s by nonce
+     *
+     * @param nonce the nonce
+     *
+     * @return {@link List<Proposal>}
+     */
+    public List<Proposal> findByNonce(
+            final String nonce
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Proposal> query = cb.createQuery(getType());
+        Root<Proposal> rootType = query.from(getType());
+        query = query.select(rootType).where(cb.equal(rootType.get("nonce"), nonce));
+        return getEntityManager().createQuery(query).getResultList();
+    }
+
     @Override
     public Class<Proposal> getType() {
         return Proposal.class;

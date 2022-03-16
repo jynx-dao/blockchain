@@ -125,6 +125,10 @@ public abstract class IntegrationTest {
     protected TendermintClient tendermintClient;
     @Autowired
     protected BlockchainGateway blockchainGateway;
+    @Autowired
+    protected BridgeUpdateSignatureRepository bridgeUpdateSignatureRepository;
+    @Autowired
+    protected BridgeUpdateRepository bridgeUpdateRepository;
 
     protected static final String ETH_ADDRESS = "0xd7E1236C08731C3632519DCd1A581bFe6876a3B2";
     protected static final String ETH_PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
@@ -380,6 +384,8 @@ public abstract class IntegrationTest {
         transactionRepository.deleteAll();
         withdrawalRepository.deleteAll();
         withdrawalBatchRepository.deleteAll();
+        bridgeUpdateSignatureRepository.deleteAll();
+        bridgeUpdateRepository.deleteAll();
         assetRepository.deleteAll();
         voteRepository.deleteAll();
         proposalRepository.deleteAll();
