@@ -116,7 +116,6 @@ public abstract class EntityRepository<T> {
         CriteriaDelete<T> query = cb.createCriteriaDelete(getType());
         Root<T> rootType = query.from(getType());
         query = query.where(new Predicate[]{ cb.equal(rootType.get("id"), id) });
-        query.from(getType());
         getEntityManager().createQuery(query).executeUpdate();
     }
 }

@@ -318,6 +318,59 @@ public class MarketServiceTest extends IntegrationTest {
     }
 
     @Test
+    public void testAmendAuctionTriggersWithEmptyArray() throws InterruptedException {
+        Market market = createAndEnactMarket(true, true);
+        Assertions.assertEquals(market.getTickSize(), 1);
+        long[] times = proposalTimes();
+        List<AddMarketRequest.AuctionTrigger> triggers = new ArrayList<>();
+        AmendMarketRequest request = new AmendMarketRequest()
+                .setId(market.getId())
+                .setAuctionTriggers(triggers);
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setUser(takerUser);
+        marketService.proposeToAmend(request);
+        Thread.sleep(100L);
+        configService.setTimestamp(nowAsMillis());
+        proposalService.open();
+        proposalService.approve();
+        proposalService.enact();
+        proposalService.reject();
+        market = marketRepository.findById(market.getId()).orElse(new Market());
+        List<AuctionTrigger> auctionTriggers = auctionTriggerRepository.findByMarketId(market.getId());
+        Assertions.assertEquals(0, auctionTriggers.size());
+    }
+
+    @Test
+    public void testAmendAuctionTriggersWithNewTrigger() throws InterruptedException {
+        Market market = createAndEnactMarket(true, true);
+        Assertions.assertEquals(market.getTickSize(), 1);
+        long[] times = proposalTimes();
+        List<AddMarketRequest.AuctionTrigger> triggers = new ArrayList<>();
+        triggers.add(new AddMarketRequest.AuctionTrigger().setOpenVolumeRatio(BigDecimal.ONE).setDepth(BigDecimal.TEN));
+        AmendMarketRequest request = new AmendMarketRequest()
+                .setId(market.getId())
+                .setAuctionTriggers(triggers);
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setUser(takerUser);
+        marketService.proposeToAmend(request);
+        Thread.sleep(100L);
+        configService.setTimestamp(nowAsMillis());
+        proposalService.open();
+        proposalService.approve();
+        proposalService.enact();
+        proposalService.reject();
+        market = marketRepository.findById(market.getId()).orElse(new Market());
+        List<AuctionTrigger> auctionTriggers = auctionTriggerRepository.findByMarketId(market.getId());
+        Assertions.assertEquals(1, auctionTriggers.size());
+        Assertions.assertEquals(10d, auctionTriggers.get(0).getDepth().doubleValue());
+        Assertions.assertEquals(1d, auctionTriggers.get(0).getOpenVolumeRatio().doubleValue());
+    }
+
+    @Test
     public void testAmendStepSize() throws InterruptedException {
         Market market = createAndEnactMarket(true);
         Assertions.assertEquals(market.getStepSize(), 1);

@@ -343,7 +343,7 @@ public class MarketService {
         proposalService.checkEnacted(proposal);
         Market market = get(proposal.getLinkedId());
         List<PendingAuctionTrigger> pendingTriggers = pendingAuctionTriggerRepository.findByMarketId(market.getId());
-        if(pendingTriggers.size() > 0) {
+        if(!Objects.isNull(pendingTriggers)) {
             List<AuctionTrigger> triggers = pendingTriggers.stream()
                     .map(t -> new AuctionTrigger()
                             .setDepth(t.getDepth())
