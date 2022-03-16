@@ -291,7 +291,6 @@ public class OrderService {
             final Market market,
             final BigDecimal lastPrice
     ) {
-        // TODO - we can significantly improve performance by doing this on a time loop instead of after every trade
         BigDecimal originalMarkPrice = market.getMarkPrice();
         int dps = market.getSettlementAsset().getDecimalPlaces();
         // TODO - should the mark price come from the settlement price source?
