@@ -119,6 +119,12 @@ public class AuctionServiceTest extends IntegrationTest {
     @Test
     public void testEnterAuctions() {
         Market market = createOrderBook(1, 1);
+        AuctionTrigger trigger = new AuctionTrigger()
+                .setDepth(BigDecimal.valueOf(0.0001))
+                .setMarket(market)
+                .setId(uuidUtils.next())
+                .setOpenVolumeRatio(BigDecimal.ONE);
+        auctionTriggerRepository.save(trigger);
         orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1),
                 MarketSide.BUY, OrderType.MARKET, takerUser));
         auctionService.enterAuctions();
@@ -175,6 +181,12 @@ public class AuctionServiceTest extends IntegrationTest {
     @Test
     public void testGetUncrossingPriceDuringAuction() {
         Market market = createOrderBook(1, 1);
+        AuctionTrigger trigger = new AuctionTrigger()
+                .setDepth(BigDecimal.valueOf(0.0001))
+                .setMarket(market)
+                .setId(uuidUtils.next())
+                .setOpenVolumeRatio(BigDecimal.ONE);
+        auctionTriggerRepository.save(trigger);
         auctionService.enterAuctions();
         orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1),
                 MarketSide.BUY, OrderType.MARKET, takerUser));

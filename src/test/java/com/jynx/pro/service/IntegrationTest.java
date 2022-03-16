@@ -110,6 +110,8 @@ public abstract class IntegrationTest {
     @Autowired
     protected ValidatorRepository validatorRepository;
     @Autowired
+    protected AuctionTriggerRepository auctionTriggerRepository;
+    @Autowired
     protected AccountService accountService;
     @Autowired
     protected DatabaseTransactionManager databaseTransactionManager;
@@ -356,6 +358,7 @@ public abstract class IntegrationTest {
         tradeRepository.deleteAll();
         orderRepository.deleteAll();
         positionRepository.deleteAll();
+        auctionTriggerRepository.deleteAll();
         marketRepository.deleteAll();
         oracleRepository.deleteAll();
         accountRepository.deleteAll();

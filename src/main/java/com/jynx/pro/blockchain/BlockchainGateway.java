@@ -62,6 +62,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Autowired
     private WithdrawalService withdrawalService;
     @Autowired
+    private AuctionService auctionService;
+    @Autowired
     private AppStateManager appStateManager;
     @Autowired
     private DatabaseTransactionManager databaseTransactionManager;
@@ -214,6 +216,11 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                         .setDeliverFn(accountService::deposit)
                         .setProtectedFn(true)
                         .setRequestType(DepositAssetRequest.class));
+        transactionSettings.put(TendermintTransaction.MONITOR_AUCTIONS,
+                new TransactionConfig<BatchValidatorRequest>()
+                        .setDeliverFn(auctionService::monitorAuctions)
+                        .setProtectedFn(true)
+                        .setRequestType(BatchValidatorRequest.class));
     }
 
     /**
@@ -395,6 +402,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         executorService.submit(() -> tendermintClient.syncProposals(
                 getBatchRequest(proposerAddress, blockHeight)));
         executorService.submit(() -> tendermintClient.batchWithdrawals(
+                getBatchRequest(proposerAddress, blockHeight)));
+        executorService.submit(() -> tendermintClient.monitorAuctions(
                 getBatchRequest(proposerAddress, blockHeight)));
         executorService.submit(() -> {
             try {

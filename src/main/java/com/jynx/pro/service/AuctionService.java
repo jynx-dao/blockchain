@@ -9,6 +9,7 @@ import com.jynx.pro.model.OrderBook;
 import com.jynx.pro.model.OrderBookItem;
 import com.jynx.pro.repository.AuctionTriggerRepository;
 import com.jynx.pro.repository.MarketRepository;
+import com.jynx.pro.request.BatchValidatorRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -71,18 +72,23 @@ public class AuctionService {
     /**
      * Enter market auctions if triggered
      */
-    public void enterAuctions() {
+    public List<Market> enterAuctions() {
         List<Market> markets = marketRepository.findByStatusIn(List.of(MarketStatus.ACTIVE));
+        List<Market> triggeredMarkets = new ArrayList<>();
         for(Market market : markets) {
             BigDecimal openVolume = market.getOpenVolume();
             OrderBook orderBook = orderService.getOrderBook(market);
             List<AuctionTrigger> triggers = auctionTriggerRepository.findByMarketId(market.getId());
-            boolean triggered = isAuctionTriggered(openVolume, orderBook, triggers);
-            if (triggered) {
-                market.setStatus(MarketStatus.AUCTION);
+            if(triggers.size() > 0) {
+                boolean triggered = isAuctionTriggered(openVolume, orderBook, triggers);
+                if (triggered) {
+                    market.setStatus(MarketStatus.AUCTION);
+                    triggeredMarkets.add(market);
+                }
             }
         }
         marketRepository.saveAll(markets);
+        return triggeredMarkets;
     }
 
     /**
@@ -268,22 +274,40 @@ public class AuctionService {
     /**
      * Exit auctions when the conditions to do so are met
      */
-    public void exitAuctions() {
+    public List<Market> exitAuctions() {
         List<Market> markets = marketRepository.findByStatusIn(List.of(MarketStatus.AUCTION));
+        List<Market> triggeredMarkets = new ArrayList<>();
         for(Market market : markets) {
             BigDecimal uncrossingPrice = getUncrossingPrice(market);
             BigDecimal expectedOpenVolume = (market.getOpenVolume().add(getUncrossingVolume(market)))
                     .multiply(BigDecimal.valueOf(0.8)); // TODO - use config variable for this ratio
             OrderBook expectedOrderBook = getOrderBookAfterUncrossing(market);
             List<AuctionTrigger> triggers = auctionTriggerRepository.findByMarketId(market.getId());
-            boolean auctionTriggered = isAuctionTriggered(expectedOpenVolume, expectedOrderBook, triggers);
-            if (!auctionTriggered) {
-                List<Order> openOrders = orderService.getOpenLimitOrders(market);
-                market.setStatus(MarketStatus.ACTIVE);
-                marketRepository.save(market);
-                List<Order> uncrossingOrders = getUncrossingOrders(market);
-                // TODO - fill the uncrossing orders [handle partial fill of dangling order]
+            if(triggers.size() > 0) {
+                boolean auctionTriggered = isAuctionTriggered(expectedOpenVolume, expectedOrderBook, triggers);
+                if (!auctionTriggered) {
+                    triggeredMarkets.add(market);
+                    List<Order> openOrders = orderService.getOpenLimitOrders(market);
+                    market.setStatus(MarketStatus.ACTIVE);
+                    marketRepository.save(market);
+                    List<Order> uncrossingOrders = getUncrossingOrders(market);
+                    // TODO - fill the uncrossing orders [handle partial fill of dangling order]
+                }
             }
         }
+        return triggeredMarkets;
+    }
+
+    /**
+     * Monitor market auctions
+     */
+    public List<Market> monitorAuctions(
+            final BatchValidatorRequest request
+    ) {
+        log.debug(request.toString());
+        List<Market> markets = new ArrayList<>();
+        markets.addAll(enterAuctions());
+        markets.addAll(exitAuctions());
+        return markets;
     }
 }

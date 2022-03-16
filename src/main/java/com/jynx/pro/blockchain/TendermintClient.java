@@ -155,6 +155,18 @@ public class TendermintClient {
     }
 
     /**
+     * Monitor market auctions
+     *
+     * @param request {@link BatchValidatorRequest}
+     */
+    public void monitorAuctions(
+            final BatchValidatorRequest request
+    ) {
+        processTransaction(request, Object.class,
+                TendermintTransaction.MONITOR_AUCTIONS, ErrorCode.MONITOR_AUCTIONS_FAILED);
+    }
+
+    /**
      * Confirm Ethereum events
      *
      * @param request {@link BatchValidatorRequest}
