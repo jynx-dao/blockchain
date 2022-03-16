@@ -76,7 +76,7 @@ public class WithdrawalService {
     }
 
     /**
-     * Save a signature for a {@link WithdrawalBatch}
+     * Save signatures for a {@link WithdrawalBatch}
      *
      * @param request {@link BulkSignWithdrawalRequest}
      *

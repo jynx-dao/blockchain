@@ -223,6 +223,11 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                         .setDeliverFn(auctionService::monitorAuctions)
                         .setProtectedFn(true)
                         .setRequestType(BatchValidatorRequest.class));
+        transactionSettings.put(TendermintTransaction.SIGN_BRIDGE_UPDATES,
+                new TransactionConfig<BulkSignBridgeUpdateRequest>()
+                        .setDeliverFn(bridgeUpdateService::saveBridgeUpdateSignatures)
+                        .setProtectedFn(true)
+                        .setRequestType(BulkSignBridgeUpdateRequest.class));
     }
 
     /**
@@ -448,6 +453,10 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             } catch(Exception e) {
                 log.error(e.getMessage(), e);
             }
+        });
+        executorService.submit(() -> {
+            // TODO - add / remove asset when sufficient signatures have been provided
+            // (e.g. this is the equivalent of withdrawalService.withdrawSignedBatches(batches)
         });
     }
 
