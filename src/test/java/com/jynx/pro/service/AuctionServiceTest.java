@@ -271,4 +271,86 @@ public class AuctionServiceTest extends IntegrationTest {
         Assertions.assertEquals(orderBook.getAsks().get(0).getPrice().doubleValue(), 47500d);
         Assertions.assertEquals(orderBook.getAsks().get(0).getQuantity().doubleValue(), 1d);
     }
+
+    @Test
+    public void testGetOrderBookAfterUncrossingWithoutCrossingOrders() {
+        Market market = createOrderBook(1, 1);
+        Optional<Market> marketOptional = marketRepository.findById(market.getId());
+        Assertions.assertTrue(marketOptional.isPresent());
+        market = marketOptional.get();
+        OrderBook orderBook = auctionService.getOrderBookAfterUncrossing(market);
+        Assertions.assertEquals(orderBook.getBids().size(), 1);
+        Assertions.assertEquals(orderBook.getAsks().size(), 1);
+        Assertions.assertEquals(orderBook.getBids().get(0).getPrice().doubleValue(), 45590d);
+        Assertions.assertEquals(orderBook.getBids().get(0).getQuantity().doubleValue(), 1d);
+        Assertions.assertEquals(orderBook.getAsks().get(0).getPrice().doubleValue(), 45610d);
+        Assertions.assertEquals(orderBook.getAsks().get(0).getQuantity().doubleValue(), 1d);
+    }
+
+    @Test
+    public void testGetOrderBookAfterUncrossingWithMissingBid() {
+        Market market = createOrderBook(1, 1);
+        orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1),
+                MarketSide.SELL, OrderType.MARKET, takerUser));
+        Optional<Market> marketOptional = marketRepository.findById(market.getId());
+        Assertions.assertTrue(marketOptional.isPresent());
+        market = marketOptional.get();
+        OrderBook orderBook = auctionService.getOrderBookAfterUncrossing(market);
+        Assertions.assertEquals(orderBook.getBids().size(), 0);
+        Assertions.assertEquals(orderBook.getAsks().size(), 1);
+        Assertions.assertEquals(orderBook.getAsks().get(0).getPrice().doubleValue(), 45610d);
+        Assertions.assertEquals(orderBook.getAsks().get(0).getQuantity().doubleValue(), 1d);
+    }
+
+    @Test
+    public void testGetOrderBookAfterUncrossingWithMissingAsk() {
+        Market market = createOrderBook(1, 1);
+        orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1),
+                MarketSide.BUY, OrderType.MARKET, takerUser));
+        Optional<Market> marketOptional = marketRepository.findById(market.getId());
+        Assertions.assertTrue(marketOptional.isPresent());
+        market = marketOptional.get();
+        OrderBook orderBook = auctionService.getOrderBookAfterUncrossing(market);
+        Assertions.assertEquals(orderBook.getBids().size(), 1);
+        Assertions.assertEquals(orderBook.getAsks().size(), 0);
+        Assertions.assertEquals(orderBook.getBids().get(0).getPrice().doubleValue(), 45590d);
+        Assertions.assertEquals(orderBook.getBids().get(0).getQuantity().doubleValue(), 1d);
+    }
+
+    @Test
+    public void testGetUncrossingVolumeWithMissingBid() {
+        Market market = createOrderBook(1, 1);
+        orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1),
+                MarketSide.BUY, OrderType.MARKET, takerUser));
+        Optional<Market> marketOptional = marketRepository.findById(market.getId());
+        Assertions.assertTrue(marketOptional.isPresent());
+        market = marketOptional.get();
+        BigDecimal volume = auctionService.getUncrossingVolume(market);
+        Assertions.assertEquals(volume.doubleValue(), 0d);
+    }
+
+    @Test
+    public void testGetUncrossingVolumeWithMissingAsk() {
+        Market market = createOrderBook(1, 1);
+        orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1),
+                MarketSide.BUY, OrderType.MARKET, takerUser));
+        Optional<Market> marketOptional = marketRepository.findById(market.getId());
+        Assertions.assertTrue(marketOptional.isPresent());
+        market = marketOptional.get();
+        BigDecimal volume = auctionService.getUncrossingVolume(market);
+        Assertions.assertEquals(volume.doubleValue(), 0d);
+    }
+
+    @Test
+    public void testGetUncrossingVolume() {
+        Market market = createOrderBook(1, 1);
+        orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1),
+                MarketSide.BUY, OrderType.MARKET, takerUser));
+        Optional<Market> marketOptional = marketRepository.findById(market.getId());
+        Assertions.assertTrue(marketOptional.isPresent());
+        market = marketOptional.get();
+        createAuctionOrders(market);
+        BigDecimal volume = auctionService.getUncrossingVolume(market);
+        Assertions.assertEquals(volume.doubleValue(), 18d);
+    }
 }
