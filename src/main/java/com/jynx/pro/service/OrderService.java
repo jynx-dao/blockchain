@@ -647,6 +647,7 @@ public class OrderService {
             request.setReduceOnly(false);
         }
         if(request.getReduceOnly()) {
+            // TODO - this should rather be handled silently on execution
             Market market = marketService.get(request.getMarketId());
             Position position = positionService.getAndCreate(request.getUser(), market);
             if(request.getQuantity().doubleValue() > position.getQuantity().doubleValue()) {
