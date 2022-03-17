@@ -220,6 +220,26 @@ public class OrderService {
     }
 
     /**
+     * Adjust the order quantity if reduce only is true
+     *
+     * @param order {@link Order}
+     */
+    private void checkReduceOnly(
+            final Order order
+    ) {
+        if(order.getReduceOnly()) {
+            Position position = positionService.getAndCreate(order.getUser(), order.getMarket());
+            if(position.getSide().equals(order.getSide())) {
+                order.setRemainingQuantity(BigDecimal.ZERO);
+            } else {
+                if (order.getRemainingQuantity().doubleValue() > position.getQuantity().doubleValue()) {
+                    order.setRemainingQuantity(position.getQuantity());
+                }
+            }
+        }
+    }
+
+    /**
      * Execute trades when orders match with each other
      *
      * @param passiveOrders a list of passive {@link Order}s
@@ -234,7 +254,9 @@ public class OrderService {
             final Market market
     ) {
         BigDecimal price = BigDecimal.ZERO;
+        checkReduceOnly(order);
         for(Order passiveOrder : passiveOrders) {
+            checkReduceOnly(passiveOrder);
             price = passiveOrder.getPrice();
             User taker = order.getUser();
             User maker = passiveOrder.getUser();
@@ -394,6 +416,7 @@ public class OrderService {
                     .setQuantity(quantity)
                     .setRemainingQuantity(quantity)
                     .setId(uuidUtils.next())
+                    .setReduceOnly(request.getReduceOnly())
                     .setUser(user)
                     .setPriority(0L);
         }
@@ -645,14 +668,6 @@ public class OrderService {
         }
         if(request.getReduceOnly() == null) {
             request.setReduceOnly(false);
-        }
-        if(request.getReduceOnly()) {
-            // TODO - this should rather be handled silently on execution
-            Market market = marketService.get(request.getMarketId());
-            Position position = positionService.getAndCreate(request.getUser(), market);
-            if(request.getQuantity().doubleValue() > position.getQuantity().doubleValue()) {
-                request.setQuantity(position.getQuantity());
-            }
         }
         if(OrderType.MARKET.equals(request.getType())) {
             request.setPrice(null);
