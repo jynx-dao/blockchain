@@ -8,5 +8,5 @@ import lombok.experimental.Accessors;
 @Data
 @Accessors(chain = true)
 public class BatchWithdrawalRequest extends SignedRequest {
-    private String nonce;
+    private String bridgeNonce;
 }

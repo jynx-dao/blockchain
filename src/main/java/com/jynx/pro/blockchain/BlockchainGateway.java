@@ -3,6 +3,7 @@ package com.jynx.pro.blockchain;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Timestamp;
 import com.jynx.pro.constant.TendermintTransaction;
+import com.jynx.pro.entity.BridgeUpdate;
 import com.jynx.pro.entity.WithdrawalBatch;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
@@ -228,6 +229,11 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                         .setDeliverFn(bridgeUpdateService::saveBridgeUpdateSignatures)
                         .setProtectedFn(true)
                         .setRequestType(BulkSignBridgeUpdateRequest.class));
+        transactionSettings.put(TendermintTransaction.EXECUTE_BRIDGE_UPDATES,
+                new TransactionConfig<ExecuteBridgeUpdatesRequest>()
+                        .setDeliverFn(bridgeUpdateService::executeBridgeUpdates)
+                        .setProtectedFn(true)
+                        .setRequestType(ExecuteBridgeUpdatesRequest.class));
     }
 
     /**
@@ -281,9 +287,11 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                 String publicKeyAsBase64 = Base64.getEncoder().encodeToString(Hex.decodeHex(request.getPublicKey()));
                 boolean result = validatorService.isValidator(publicKeyAsBase64);
                 if(!result) {
+                    log.info(request.toString());
                     throw new JynxProException(ErrorCode.SIGNATURE_INVALID);
                 }
             } catch(Exception e) {
+                log.info(request.toString());
                 log.error(e.getMessage(), e);
                 throw new JynxProException(ErrorCode.SIGNATURE_INVALID);
             }
@@ -293,6 +301,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         String message = jsonUtils.toJson(request);
         boolean result = cryptoUtils.verify(signature, message, publicKey);
         if(!result) {
+            log.info(request.toString());
             throw new JynxProException(ErrorCode.SIGNATURE_INVALID);
         }
     }
@@ -393,7 +402,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     }
 
     /**
-     * Confrirm Ethereum events
+     * Confirm Ethereum events
      *
      * @param proposerAddress the proposer address
      * @param blockHeight the current block height
@@ -440,7 +449,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private void batchWithdrawals() {
         executorService.submit(() -> {
             BatchWithdrawalRequest request = new BatchWithdrawalRequest()
-                    .setNonce(ethereumService.getNonce().toString());
+                    .setBridgeNonce(ethereumService.getNonce().toString());
+            request.setNonce(ethereumService.getNonce().toString());
             ethereumService.addSignatureToRequest(request);
             tendermintClient.batchWithdrawals(request);
         });
@@ -517,6 +527,28 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     }
 
     /**
+     * Execute bridge updates
+     */
+    private void executeBridgeUpdates() {
+        executorService.submit(() -> {
+            try {
+                List<BridgeUpdate> updates = bridgeUpdateService.getUnprocessedBridgeUpdates();
+                if (updates.size() > 0) {
+                    List<UUID> ids = updates.stream().map(BridgeUpdate::getId).collect(Collectors.toList());
+                    ExecuteBridgeUpdatesRequest request = new ExecuteBridgeUpdatesRequest().setUpdateIds(ids);
+                    ethereumService.addSignatureToRequest(request);
+                    // TODO - we should check that the node has sufficient gas before broadcasting the Tendermint tx
+                    tendermintClient.executeBridgeUpdates(request);
+                    // TODO - how do we undo the previous Tendermint transactions if the node has insufficient gas??
+                    bridgeUpdateService.processSignedUpdates(updates);
+                }
+            } catch(Exception e) {
+                log.error(e.getMessage(), e);
+            }
+        });
+    }
+
+    /**
      * Handles off-chain asynchronous actions
      *
      * @param proposerAddress the proposer's address
@@ -534,10 +566,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         signWithdrawals();
         withdrawSignedBatches();
         signBridgeUpdates();
-        executorService.submit(() -> {
-            // TODO - add / remove asset when sufficient signatures have been provided
-            // (e.g. this is the equivalent of withdrawalService.withdrawSignedBatches(batches)
-        });
+        executeBridgeUpdates();
     }
 
     /**

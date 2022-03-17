@@ -417,30 +417,6 @@ public class EthereumService {
     }
 
     /**
-     * Remove an asset to the Jynx bridge
-     *
-     * @param asset the ERC20 contract address
-     *
-     * @return {@link TransactionReceipt} from Ethereum
-     */
-    public TransactionReceipt removeAsset(
-            final String asset
-    ) {
-        try {
-            Credentials credentials = Credentials.create(ethereumPrivateKey);
-            JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.get().getBridgeAddress(), getWeb3j(),
-                    credentials, new DefaultGasProvider());
-            BigInteger nonce = getNonce();
-            List<Type> args = Arrays.asList(new Address(asset), new Uint256(nonce), new Utf8String("remove_asset"));
-            byte[] signature = getSignature(args, credentials);  // TODO - this won't work with multiple validators...
-            return jynxProBridge.remove_asset(asset, nonce, signature).send();
-        } catch(Exception e) {
-            log.error(e.getMessage(), e);
-            throw new JynxProException(ErrorCode.CANNOT_REMOVE_ASSET);
-        }
-    }
-
-    /**
      * Check if an asset is active on the Jynx bridge
      *
      * @param asset the ERC20 contract address
@@ -486,23 +462,57 @@ public class EthereumService {
      * Add an asset to the Jynx bridge
      *
      * @param asset the ERC20 contract address
+     * @param nonce the nonce used for the signature
+     * @param signature the signature as byte-array
      *
      * @return {@link TransactionReceipt} from Ethereum
      */
     public TransactionReceipt addAsset(
-            final String asset
+            final String asset,
+            final BigInteger nonce,
+            final byte[] signature
     ) {
         try {
             Credentials credentials = Credentials.create(ethereumPrivateKey);
-            JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.get().getBridgeAddress(), getWeb3j(),
-                    credentials, new DefaultGasProvider());
-            BigInteger nonce = getNonce();
-            List<Type> args = Arrays.asList(new Address(asset), new Uint256(nonce), new Utf8String("add_asset"));
-            byte[] signature = getSignature(args, credentials); // TODO - this won't work with multiple validators...
-            return jynxProBridge.add_asset(asset, nonce, signature).send();
+            List<Config> configList = readOnlyRepository.getAllByEntity(Config.class);
+            if(configList.size() > 0) {
+                JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configList.get(0).getBridgeAddress(), getWeb3j(),
+                        credentials, new DefaultGasProvider());
+                return jynxProBridge.add_asset(asset, nonce, signature).send();
+            }
+            throw new JynxProException(ErrorCode.CONFIG_NOT_FOUND);
         } catch(Exception e) {
             log.error(e.getMessage(), e);
             throw new JynxProException(ErrorCode.CANNOT_ADD_ASSET);
+        }
+    }
+
+    /**
+     * Remove an asset to the Jynx bridge
+     *
+     * @param asset the ERC20 contract address
+     * @param nonce the nonce used for the signature
+     * @param signature the signature as byte-array
+     *
+     * @return {@link TransactionReceipt} from Ethereum
+     */
+    public TransactionReceipt removeAsset(
+            final String asset,
+            final BigInteger nonce,
+            final byte[] signature
+    ) {
+        try {
+            Credentials credentials = Credentials.create(ethereumPrivateKey);
+            List<Config> configList = readOnlyRepository.getAllByEntity(Config.class);
+            if(configList.size() > 0) {
+                JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configList.get(0).getBridgeAddress(), getWeb3j(),
+                        credentials, new DefaultGasProvider());
+                return jynxProBridge.remove_asset(asset, nonce, signature).send();
+            }
+            throw new JynxProException(ErrorCode.CONFIG_NOT_FOUND);
+        } catch(Exception e) {
+            log.error(e.getMessage(), e);
+            throw new JynxProException(ErrorCode.CANNOT_REMOVE_ASSET);
         }
     }
 

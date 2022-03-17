@@ -287,7 +287,7 @@ public class OrderService {
      * @param market {@link Market}
      * @param lastPrice the last traded price
      */
-    private void handleMarkPriceChange(
+    public void handleMarkPriceChange(
             final Market market,
             final BigDecimal lastPrice
     ) {

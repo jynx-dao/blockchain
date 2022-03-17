@@ -64,7 +64,7 @@ public class WithdrawalService {
                         .setCreated(configService.getTimestamp())
                         .setProcessed(false)
                         .setId(uuidUtils.next())
-                        .setNonce(request.getNonce());
+                        .setNonce(request.getBridgeNonce());
                 withdrawalBatch = withdrawalBatchRepository.save(withdrawalBatch);
                 for (Withdrawal withdrawal : withdrawals) {
                     withdrawal.setWithdrawalBatch(withdrawalBatch);

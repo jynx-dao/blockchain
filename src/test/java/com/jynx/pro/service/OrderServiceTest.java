@@ -12,6 +12,7 @@ import com.jynx.pro.request.*;
 import lombok.Data;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.DecoderException;
 import org.junit.jupiter.api.*;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -56,7 +57,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void createOrderFailedWithInsufficientMargin() {
+    public void createOrderFailedWithInsufficientMargin() throws DecoderException {
         Market market = createAndEnactMarket(true);
         try {
             orderService.create(getCreateOrderRequest(market.getId(),
@@ -68,7 +69,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void createOrderFailedWhenMarketInactive() {
+    public void createOrderFailedWhenMarketInactive() throws DecoderException {
         Market market = createAndEnactMarket(false);
         try {
             orderService.create(getCreateOrderRequest(market.getId(),

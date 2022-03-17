@@ -91,4 +91,5 @@ public class ErrorCode {
     public static final String CANNOT_GET_ASSET = "Cannot get asset.";
     public static final String CANNOT_GET_NONCE = "Cannot get nonce.";
     public static final String SIGN_BRIDGE_UPDATED_FAILED = "Failed to sign bridge updates.";
+    public static final String EXECUTE_BRIDGE_UPDATES_FAILED = "Failed to execute bridge updates.";
 }

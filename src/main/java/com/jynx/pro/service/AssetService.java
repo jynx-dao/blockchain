@@ -1,9 +1,6 @@
 package com.jynx.pro.service;
 
-import com.jynx.pro.constant.AssetStatus;
-import com.jynx.pro.constant.AssetType;
-import com.jynx.pro.constant.BridgeUpdateType;
-import com.jynx.pro.constant.ProposalType;
+import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.Asset;
 import com.jynx.pro.entity.BridgeUpdate;
 import com.jynx.pro.entity.Proposal;
@@ -117,12 +114,11 @@ public class AssetService {
     public void add(
             final Proposal proposal
     ) {
-        proposalService.checkEnacted(proposal);
         Asset asset = get(proposal.getLinkedId());
         createBridgeUpdate(asset, BridgeUpdateType.ADD_ASSET, proposal.getNonce());
-//        ethereumService.addAsset(asset.getAddress()); // TODO - how TF we gonna do this with multiple validators?
         boolean isActive = ethereumService.isAssetActive(asset.getAddress());
         if(isActive) {
+            proposal.setStatus(ProposalStatus.ENACTED);
             updateStatus(proposal, AssetStatus.ACTIVE);
         }
     }
@@ -147,12 +143,11 @@ public class AssetService {
             final Proposal proposal
     ) {
         // TODO - need to suspend all markets that are using this asset
-        proposalService.checkEnacted(proposal);
         Asset asset = get(proposal.getLinkedId());
         createBridgeUpdate(asset, BridgeUpdateType.REMOVE_ASSET, proposal.getNonce());
-//        ethereumService.removeAsset(asset.getAddress()); // TODO - how TF we gonna do this with multiple validators?
         boolean isActive = ethereumService.isAssetActive(asset.getAddress());
         if(!isActive) {
+            proposal.setStatus(ProposalStatus.ENACTED);
             updateStatus(proposal, AssetStatus.SUSPENDED);
         }
     }
@@ -166,12 +161,11 @@ public class AssetService {
             final Proposal proposal
     ) {
         // TODO - need to suspend all markets that are using this asset
-        proposalService.checkEnacted(proposal);
         Asset asset = get(proposal.getLinkedId());
         createBridgeUpdate(asset, BridgeUpdateType.ADD_ASSET, proposal.getNonce());
-//        ethereumService.addAsset(asset.getAddress()); // TODO - how TF we gonna do this with multiple validators?
         boolean isActive = ethereumService.isAssetActive(asset.getAddress());
         if(isActive) {
+            proposal.setStatus(ProposalStatus.ENACTED);
             updateStatus(proposal, AssetStatus.ACTIVE);
         }
     }

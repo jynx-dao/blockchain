@@ -612,7 +612,7 @@ public class ReadOnlyRepository {
      *
      * @return {@link Optional<BridgeUpdateSignature>}
      */
-    public Optional<BridgeUpdateSignature> findSignatureByBridgeUpdateIdAndValidatorId(
+    public Optional<BridgeUpdateSignature> getSignatureByBridgeUpdateIdAndValidatorId(
             final UUID updateId,
             final UUID validatorId
     ) {
@@ -627,5 +627,23 @@ public class ReadOnlyRepository {
         } catch(Exception e) {
             return Optional.empty();
         }
+    }
+
+    /**
+     * Get {@link BridgeUpdateSignature} by batch ID
+     *
+     * @param updateId the update ID
+     *
+     * @return {@link Optional<BridgeUpdateSignature>}
+     */
+    public List<BridgeUpdateSignature> getSignatureByBridgeUpdateId(
+            final UUID updateId
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<BridgeUpdateSignature> query = cb.createQuery(BridgeUpdateSignature.class);
+        Root<BridgeUpdateSignature> rootType = query.from(BridgeUpdateSignature.class);
+        Path<UUID> batch_id = rootType.join("bridgeUpdate").get("id");
+        query = query.select(rootType).where(cb.equal(batch_id, updateId));
+        return getEntityManager().createQuery(query).getResultList();
     }
 }

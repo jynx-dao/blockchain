@@ -12,6 +12,7 @@ import com.jynx.pro.request.AddAssetRequest;
 import com.jynx.pro.request.CastVoteRequest;
 import com.jynx.pro.request.SingleItemRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.DecoderException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +22,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
+import java.math.BigInteger;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
@@ -156,10 +158,12 @@ public class AssetServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testProposeToAddAndEnact() throws InterruptedException {
-        Proposal proposal = assetService.proposeToAdd(getAddAssetRequest(takerUser));
+    public void testProposeToAddAndEnact() throws InterruptedException, DecoderException {
+        AddAssetRequest request = getAddAssetRequest(takerUser);
+        Proposal proposal = assetService.proposeToAdd(request);
         Assertions.assertEquals(proposal.getStatus(), ProposalStatus.CREATED);
         Thread.sleep(100L);
+        addToBridge(request.getAddress(), proposal.getNonce());
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -276,10 +280,12 @@ public class AssetServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testProposeToSuspend() throws InterruptedException {
-        Proposal proposal = assetService.proposeToAdd(getAddAssetRequest(takerUser));
+    public void testProposeToSuspend() throws InterruptedException, DecoderException {
+        AddAssetRequest addAssetRequest = getAddAssetRequest(takerUser);
+        Proposal proposal = assetService.proposeToAdd(addAssetRequest);
         Assertions.assertEquals(proposal.getStatus(), ProposalStatus.CREATED);
         Thread.sleep(100L);
+        addToBridge(addAssetRequest.getAddress(), proposal.getNonce());
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -288,7 +294,7 @@ public class AssetServiceTest extends IntegrationTest {
         Asset asset = assetRepository.findById(proposal.getLinkedId()).orElse(new Asset());
         Assertions.assertEquals(asset.getStatus(), AssetStatus.ACTIVE);
         long[] times = proposalTimes();
-        SingleItemRequest request = new SingleItemRequest().setId(asset.getId());
+        SingleItemRequest request = new SingleItemRequest().setId(asset.getId()).setBridgeNonce("2");
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
@@ -298,6 +304,7 @@ public class AssetServiceTest extends IntegrationTest {
         Assertions.assertEquals(proposals.size(), 1);
         Assertions.assertEquals(proposals.get(0).getLinkedId(), asset.getId());
         Thread.sleep(100L);
+        removeFromBridge(asset.getAddress(), "2");
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -319,7 +326,7 @@ public class AssetServiceTest extends IntegrationTest {
         Asset asset = assetRepository.findById(proposal.getLinkedId()).orElse(new Asset());
         Assertions.assertEquals(asset.getStatus(), AssetStatus.PENDING);
         long[] times = proposalTimes();
-        SingleItemRequest request = new SingleItemRequest().setId(asset.getId());
+        SingleItemRequest request = new SingleItemRequest().setId(asset.getId()).setBridgeNonce("1");
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
@@ -333,10 +340,12 @@ public class AssetServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testProposeToUnsuspend() throws InterruptedException {
-        Proposal proposal = assetService.proposeToAdd(getAddAssetRequest(takerUser));
+    public void testProposeToUnsuspend() throws InterruptedException, DecoderException {
+        AddAssetRequest addAssetRequest = getAddAssetRequest(takerUser);
+        Proposal proposal = assetService.proposeToAdd(addAssetRequest);
         Assertions.assertEquals(proposal.getStatus(), ProposalStatus.CREATED);
         Thread.sleep(100L);
+        addToBridge(addAssetRequest.getAddress(), proposal.getNonce());
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -345,7 +354,7 @@ public class AssetServiceTest extends IntegrationTest {
         Asset asset = assetRepository.findById(proposal.getLinkedId()).orElse(new Asset());
         Assertions.assertEquals(asset.getStatus(), AssetStatus.ACTIVE);
         long[] times = proposalTimes();
-        SingleItemRequest request = new SingleItemRequest().setId(asset.getId());
+        SingleItemRequest request = new SingleItemRequest().setId(asset.getId()).setBridgeNonce("2");
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
@@ -355,6 +364,7 @@ public class AssetServiceTest extends IntegrationTest {
         Assertions.assertEquals(proposals.size(), 1);
         Assertions.assertEquals(proposals.get(0).getLinkedId(), asset.getId());
         Thread.sleep(100L);
+        removeFromBridge(asset.getAddress(), "2");
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -362,7 +372,7 @@ public class AssetServiceTest extends IntegrationTest {
         proposalService.reject();
         asset = assetRepository.findById(asset.getId()).orElse(new Asset());
         Assertions.assertEquals(asset.getStatus(), AssetStatus.SUSPENDED);
-        SingleItemRequest request2 = new SingleItemRequest().setId(asset.getId());
+        SingleItemRequest request2 = new SingleItemRequest().setId(asset.getId()).setBridgeNonce("3");
         request2.setOpenTime(times[0]);
         request2.setClosingTime(times[1]);
         request2.setEnactmentTime(times[2]);
@@ -372,6 +382,7 @@ public class AssetServiceTest extends IntegrationTest {
         Assertions.assertEquals(proposals.size(), 1);
         Assertions.assertEquals(proposals.get(0).getLinkedId(), asset.getId());
         Thread.sleep(100L);
+        addToBridge(asset.getAddress(), "3");
         configService.setTimestamp(nowAsMillis());
         proposalService.open();
         proposalService.approve();
@@ -393,7 +404,7 @@ public class AssetServiceTest extends IntegrationTest {
         Asset asset = assetRepository.findById(proposal.getLinkedId()).orElse(new Asset());
         Assertions.assertEquals(asset.getStatus(), AssetStatus.PENDING);
         long[] times = proposalTimes();
-        SingleItemRequest request = new SingleItemRequest().setId(asset.getId());
+        SingleItemRequest request = new SingleItemRequest().setId(asset.getId()).setBridgeNonce("2");
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);

@@ -241,13 +241,25 @@ public class TendermintClient {
     /**
      * Debit withdrawals
      *
-     * @param request
+     * @param request {@link DebitWithdrawalsRequest}
      */
     public void debitWithdrawals(
             final DebitWithdrawalsRequest request
     ) {
         processTransaction(request, Object.class,
                 TendermintTransaction.DEBIT_WITHDRAWALS, ErrorCode.DEBIT_WITHDRAWALS_FAILED);
+    }
+
+    /**
+     * Execute bridge updates
+     *
+     * @param request {@link ExecuteBridgeUpdatesRequest}
+     */
+    public void executeBridgeUpdates(
+            final ExecuteBridgeUpdatesRequest request
+    ) {
+        processTransaction(request, Object.class,
+                TendermintTransaction.EXECUTE_BRIDGE_UPDATES, ErrorCode.EXECUTE_BRIDGE_UPDATES_FAILED);
     }
 
     /**

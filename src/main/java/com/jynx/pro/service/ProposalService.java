@@ -67,7 +67,6 @@ public class ProposalService {
         List<Proposal> proposals = proposalRepository.findByStatus(ProposalStatus.APPROVED)
                 .stream().filter(p -> p.getEnactmentTime() < configService.getTimestamp()).collect(Collectors.toList());
         for(Proposal proposal : proposals) {
-            proposal.setStatus(ProposalStatus.ENACTED);
             switch (proposal.getType()) {
                 case ADD_ASSET:
                     assetService.add(proposal);
@@ -79,15 +78,19 @@ public class ProposalService {
                     assetService.unsuspend(proposal);
                     break;
                 case ADD_MARKET:
+                    proposal.setStatus(ProposalStatus.ENACTED);
                     marketService.add(proposal);
                     break;
                 case AMEND_MARKET:
+                    proposal.setStatus(ProposalStatus.ENACTED);
                     marketService.amend(proposal);
                     break;
                 case SUSPEND_MARKET:
+                    proposal.setStatus(ProposalStatus.ENACTED);
                     marketService.suspend(proposal);
                     break;
                 case UNSUSPEND_MARKET:
+                    proposal.setStatus(ProposalStatus.ENACTED);
                     marketService.unsuspend(proposal);
                     break;
             }

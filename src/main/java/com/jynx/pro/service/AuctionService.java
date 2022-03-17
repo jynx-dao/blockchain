@@ -357,6 +357,7 @@ public class AuctionService {
                         fillCrossingOrders(uncrossingAsks, uncrossingPrice, BigDecimal.valueOf(volumeBids));
                         fillCrossingOrders(uncrossingBids, uncrossingPrice, BigDecimal.valueOf(volumeBids));
                     }
+                    orderService.handleMarkPriceChange(market, uncrossingPrice);
                 }
             }
         }
