@@ -233,16 +233,6 @@ public class AssetServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testAddFailWhenNotEnacted() {
-        try {
-            assetService.add(new Proposal().setStatus(ProposalStatus.OPEN));
-            Assertions.fail();
-        } catch(JynxProException e) {
-            Assertions.assertEquals(e.getMessage(), ErrorCode.PROPOSAL_NOT_ENACTED);
-        }
-    }
-
-    @Test
     public void testAddFailWhenAssetMissing() {
         try {
             assetService.add(new Proposal().setStatus(ProposalStatus.ENACTED).setLinkedId(UUID.randomUUID()));

@@ -449,9 +449,13 @@ public class EthereumService {
     ) {
         try {
             Credentials credentials = Credentials.create(ethereumPrivateKey);
-            JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.get().getBridgeAddress(), getWeb3j(),
-                    credentials, new DefaultGasProvider());
-            return jynxProBridge.used_nonces(new BigInteger(nonce)).send();
+            List<Config> configList = readOnlyRepository.getAllByEntity(Config.class);
+            if(configList.size() > 0) {
+                JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configList.get(0).getBridgeAddress(), getWeb3j(),
+                        credentials, new DefaultGasProvider());
+                return jynxProBridge.used_nonces(new BigInteger(nonce)).send();
+            }
+            throw new JynxProException(ErrorCode.CONFIG_NOT_FOUND);
         } catch(Exception e) {
             log.error(e.getMessage(), e);
             throw new JynxProException(ErrorCode.CANNOT_GET_NONCE);

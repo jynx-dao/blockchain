@@ -176,11 +176,12 @@ public class BridgeUpdateService {
                 }
                 byte[] signature = signatureStream.toByteArray();
                 try {
-                    // TODO - debug why these transactions are sometimes being executed twice [and nonce is reused]
-                    if (update.getType().equals(BridgeUpdateType.ADD_ASSET)) {
-                        ethereumService.addAsset(update.getAsset().getAddress(), nonce, signature);
-                    } else if (update.getType().equals(BridgeUpdateType.REMOVE_ASSET)) {
-                        ethereumService.removeAsset(update.getAsset().getAddress(), nonce, signature);
+                    if(!ethereumService.isNonceUsed(nonce.toString())) {
+                        if (update.getType().equals(BridgeUpdateType.ADD_ASSET)) {
+                            ethereumService.addAsset(update.getAsset().getAddress(), nonce, signature);
+                        } else if (update.getType().equals(BridgeUpdateType.REMOVE_ASSET)) {
+                            ethereumService.removeAsset(update.getAsset().getAddress(), nonce, signature);
+                        }
                     }
                 } catch(Exception e) {
                     log.error(e.getMessage(), e);

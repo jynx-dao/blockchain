@@ -43,7 +43,7 @@ import java.util.List;
 @SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class TendermintClientTest extends IntegrationTest {
 
-    private final long SLEEP_DURATION = 3000L;
+    private final long SLEEP_DURATION = 5000L;
 
     public static GenericContainer tendermint;
 
@@ -139,7 +139,6 @@ public class TendermintClientTest extends IntegrationTest {
     }
 
     @Test
-    @Disabled // TODO - fix this test, it appears to be broken...
     public void testSuspendAndUnsuspendAsset() {
         Asset asset = addAsset();
         SingleItemRequest request = new SingleItemRequest()
@@ -155,7 +154,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         tendermintClient.suspendAsset(request);
-        sleepUtils.sleep(SLEEP_DURATION);
+        sleepUtils.sleep(SLEEP_DURATION * 2);
         ResponseEntity<Asset> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/asset/%s", port, asset.getId().toString()), Asset.class);
         asset = responseEntity.getBody();
@@ -174,7 +173,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         tendermintClient.unsuspendAsset(request);
-        sleepUtils.sleep(SLEEP_DURATION);
+        sleepUtils.sleep(SLEEP_DURATION * 2);
         responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/asset/%s", port, asset.getId().toString()), Asset.class);
         asset = responseEntity.getBody();
