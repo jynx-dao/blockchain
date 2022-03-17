@@ -3,7 +3,7 @@ package com.jynx.pro.service;
 import com.jynx.pro.constant.WithdrawalStatus;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.repository.*;
-import com.jynx.pro.request.BatchValidatorRequest;
+import com.jynx.pro.request.BatchWithdrawalRequest;
 import com.jynx.pro.request.BulkSignWithdrawalRequest;
 import com.jynx.pro.request.DebitWithdrawalsRequest;
 import com.jynx.pro.request.SignWithdrawalBatchRequest;
@@ -46,7 +46,7 @@ public class WithdrawalService {
      * Create a new {@link WithdrawalBatch}
      */
     public List<Withdrawal> batchWithdrawals(
-            final BatchValidatorRequest request
+            final BatchWithdrawalRequest request
     ) {
         log.debug(request.toString());
         Optional<WithdrawalBatch> batchOptional = withdrawalBatchRepository.findAll().stream()
@@ -64,7 +64,7 @@ public class WithdrawalService {
                         .setCreated(configService.getTimestamp())
                         .setProcessed(false)
                         .setId(uuidUtils.next())
-                        .setNonce(ethereumService.getNonce().toString());
+                        .setNonce(request.getBridgeNonce());
                 withdrawalBatch = withdrawalBatchRepository.save(withdrawalBatch);
                 for (Withdrawal withdrawal : withdrawals) {
                     withdrawal.setWithdrawalBatch(withdrawalBatch);
@@ -76,7 +76,7 @@ public class WithdrawalService {
     }
 
     /**
-     * Save a signature for a {@link WithdrawalBatch}
+     * Save signatures for a {@link WithdrawalBatch}
      *
      * @param request {@link BulkSignWithdrawalRequest}
      *

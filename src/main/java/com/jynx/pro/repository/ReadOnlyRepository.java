@@ -565,6 +565,7 @@ public class ReadOnlyRepository {
      * Get {@link WithdrawalBatchSignature} by batch ID and validator ID
      *
      * @param batchId the batch ID
+     * @param validatorId the validator ID
      *
      * @return {@link Optional<WithdrawalBatchSignature>}
      */
@@ -600,6 +601,49 @@ public class ReadOnlyRepository {
         Root<WithdrawalBatchSignature> rootType = query.from(WithdrawalBatchSignature.class);
         Path<UUID> batch_id = rootType.join("withdrawalBatch").get("id");
         query = query.select(rootType).where(cb.equal(batch_id, batchId));
+        return getEntityManager().createQuery(query).getResultList();
+    }
+
+    /**
+     * Get {@link BridgeUpdateSignature} by batch ID and validator ID
+     *
+     * @param updateId the update ID
+     * @param validatorId the validator ID
+     *
+     * @return {@link Optional<BridgeUpdateSignature>}
+     */
+    public Optional<BridgeUpdateSignature> getSignatureByBridgeUpdateIdAndValidatorId(
+            final UUID updateId,
+            final UUID validatorId
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<BridgeUpdateSignature> query = cb.createQuery(BridgeUpdateSignature.class);
+        Root<BridgeUpdateSignature> rootType = query.from(BridgeUpdateSignature.class);
+        Path<UUID> update_id = rootType.join("bridgeUpdate").get("id");
+        Path<UUID> validator_id = rootType.join("validator").get("id");
+        query = query.select(rootType).where(cb.equal(update_id, updateId), cb.equal(validator_id, validatorId));
+        try {
+            return Optional.of(getEntityManager().createQuery(query).getSingleResult());
+        } catch(Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Get {@link BridgeUpdateSignature} by batch ID
+     *
+     * @param updateId the update ID
+     *
+     * @return {@link Optional<BridgeUpdateSignature>}
+     */
+    public List<BridgeUpdateSignature> getSignatureByBridgeUpdateId(
+            final UUID updateId
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<BridgeUpdateSignature> query = cb.createQuery(BridgeUpdateSignature.class);
+        Root<BridgeUpdateSignature> rootType = query.from(BridgeUpdateSignature.class);
+        Path<UUID> batch_id = rootType.join("bridgeUpdate").get("id");
+        query = query.select(rootType).where(cb.equal(batch_id, updateId));
         return getEntityManager().createQuery(query).getResultList();
     }
 }

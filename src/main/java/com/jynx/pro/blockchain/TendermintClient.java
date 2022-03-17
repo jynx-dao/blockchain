@@ -205,10 +205,10 @@ public class TendermintClient {
     /**
      * Batch withdrawals
      *
-     * @param request {@link BatchValidatorRequest}
+     * @param request {@link BatchWithdrawalRequest}
      */
     public void batchWithdrawals(
-            final BatchValidatorRequest request
+            final BatchWithdrawalRequest request
     ) {
         processTransaction(request, Object.class,
                 TendermintTransaction.BATCH_WITHDRAWALS, ErrorCode.BATCH_WITHDRAWALS_FAILED);
@@ -227,15 +227,39 @@ public class TendermintClient {
     }
 
     /**
+     * Sign bridge updates
+     *
+     * @param request {@link BulkSignBridgeUpdateRequest}
+     */
+    public void signBridgeUpdates(
+            final BulkSignBridgeUpdateRequest request
+    ) {
+        processTransaction(request, Object.class,
+                TendermintTransaction.SIGN_BRIDGE_UPDATES, ErrorCode.SIGN_BRIDGE_UPDATED_FAILED);
+    }
+
+    /**
      * Debit withdrawals
      *
-     * @param request
+     * @param request {@link DebitWithdrawalsRequest}
      */
     public void debitWithdrawals(
             final DebitWithdrawalsRequest request
     ) {
         processTransaction(request, Object.class,
                 TendermintTransaction.DEBIT_WITHDRAWALS, ErrorCode.DEBIT_WITHDRAWALS_FAILED);
+    }
+
+    /**
+     * Execute bridge updates
+     *
+     * @param request {@link ExecuteBridgeUpdatesRequest}
+     */
+    public void executeBridgeUpdates(
+            final ExecuteBridgeUpdatesRequest request
+    ) {
+        processTransaction(request, Object.class,
+                TendermintTransaction.EXECUTE_BRIDGE_UPDATES, ErrorCode.EXECUTE_BRIDGE_UPDATES_FAILED);
     }
 
     /**

@@ -9,6 +9,7 @@ import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.request.CreateWithdrawalRequest;
 import com.jynx.pro.request.SingleItemRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.DecoderException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,7 +45,7 @@ public class AccountServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testWithdrawFailsWithInsufficientBalance() throws InterruptedException {
+    public void testWithdrawFailsWithInsufficientBalance() throws DecoderException {
         Asset asset = createAndEnactAsset(false);
         try {
             CreateWithdrawalRequest request = new CreateWithdrawalRequest();
@@ -60,7 +61,7 @@ public class AccountServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testWithdrawFailsWithMissingAmount() throws InterruptedException {
+    public void testWithdrawFailsWithMissingAmount() throws DecoderException {
         Asset asset = createAndEnactAsset(false);
         try {
             CreateWithdrawalRequest request = new CreateWithdrawalRequest();
@@ -75,7 +76,7 @@ public class AccountServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testWithdrawFailsWithNegativeAmount() throws InterruptedException {
+    public void testWithdrawFailsWithNegativeAmount() throws DecoderException {
         Asset asset = createAndEnactAsset(false);
         try {
             CreateWithdrawalRequest request = new CreateWithdrawalRequest();
@@ -91,7 +92,7 @@ public class AccountServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testWithdrawFailsWithMissingDestination() throws InterruptedException {
+    public void testWithdrawFailsWithMissingDestination() throws DecoderException {
         Asset asset = createAndEnactAsset(false);
         try {
             CreateWithdrawalRequest request = new CreateWithdrawalRequest();
@@ -119,7 +120,7 @@ public class AccountServiceTest extends IntegrationTest {
         }
     }
 
-    private Withdrawal createWithdrawalRequest() throws InterruptedException {
+    private Withdrawal createWithdrawalRequest() throws DecoderException {
         Asset asset = createAndEnactAsset(false);
         CreateWithdrawalRequest request = new CreateWithdrawalRequest();
         request.setUser(makerUser);
@@ -135,7 +136,7 @@ public class AccountServiceTest extends IntegrationTest {
         return withdrawal;
     }
 
-    private Withdrawal cancelWithdrawal() throws InterruptedException {
+    private Withdrawal cancelWithdrawal() throws DecoderException {
         Withdrawal withdrawal = createWithdrawalRequest();
         SingleItemRequest request = new SingleItemRequest();
         request.setId(withdrawal.getId());
@@ -149,12 +150,12 @@ public class AccountServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testWithdrawalRequest() throws InterruptedException {
+    public void testWithdrawalRequest() throws DecoderException {
         createWithdrawalRequest();
     }
 
     @Test
-    public void testCancelWithdrawal() throws InterruptedException {
+    public void testCancelWithdrawal() throws DecoderException {
         cancelWithdrawal();
     }
 
@@ -184,7 +185,7 @@ public class AccountServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testCancelWithdrawalFailsWhenNotPending() throws InterruptedException {
+    public void testCancelWithdrawalFailsWhenNotPending() throws DecoderException {
         Withdrawal withdrawal = cancelWithdrawal();
         try {
             SingleItemRequest request = new SingleItemRequest();

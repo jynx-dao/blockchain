@@ -43,6 +43,8 @@ import java.util.List;
 @SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class TendermintClientTest extends IntegrationTest {
 
+    private final long SLEEP_DURATION = 5000L;
+
     public static GenericContainer tendermint;
 
     // TODO - remove direct calls to TendermintClient and proxy everything via REST (it will increase test coverage)
@@ -60,6 +62,8 @@ public class TendermintClientTest extends IntegrationTest {
             blockchainGateway.setValidatorAddress(address);
             blockchainGateway.setValidatorPrivateKey(privateKey);
             blockchainGateway.setValidatorPublicKey(publicKey);
+            ethereumService.setValidatorPrivateKey(privateKey);
+            ethereumService.setValidatorPublicKey(publicKey);
         } catch(Exception e) {
             log.error(e.getMessage(), e);
         }
@@ -106,6 +110,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        request.setBridgeNonce("200");
         request.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(request);
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
@@ -142,13 +147,14 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        request.setBridgeNonce(ethereumService.getNonce().toString());
         request.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(request);
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         tendermintClient.suspendAsset(request);
-        sleepUtils.sleep(3000L);
+        sleepUtils.sleep(SLEEP_DURATION * 2);
         ResponseEntity<Asset> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/asset/%s", port, asset.getId().toString()), Asset.class);
         asset = responseEntity.getBody();
@@ -160,13 +166,14 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        request.setBridgeNonce(ethereumService.getNonce().toString());
         request.setNonce(ethereumService.getNonce().toString());
         message = jsonUtils.toJson(request);
         sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         tendermintClient.unsuspendAsset(request);
-        sleepUtils.sleep(3000L);
+        sleepUtils.sleep(SLEEP_DURATION * 2);
         responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/asset/%s", port, asset.getId().toString()), Asset.class);
         asset = responseEntity.getBody();
@@ -184,6 +191,7 @@ public class TendermintClientTest extends IntegrationTest {
         long[] times = proposalTimes();
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        request.setBridgeNonce(ethereumService.getNonce().toString());
         request.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(request);
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
@@ -208,6 +216,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
         request.setEnactmentTime(times[2]);
+        request.setBridgeNonce(ethereumService.getNonce().toString());
         request.setNonce(ethereumService.getNonce().toString());
         String message = jsonUtils.toJson(request);
         String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
@@ -224,7 +233,7 @@ public class TendermintClientTest extends IntegrationTest {
     private Market addMarket() {
         Asset asset = getDai();
         Assertions.assertNotNull(asset);
-        sleepUtils.sleep(3000L);
+        sleepUtils.sleep(SLEEP_DURATION);
         AddMarketRequest request = new AddMarketRequest()
                 .setName("Tesla Motors")
                 .setSettlementAssetId(asset.getId())
@@ -247,7 +256,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         TransactionResponse<Proposal> txResponse = tendermintClient.addMarket(request);
-        sleepUtils.sleep(3000L);
+        sleepUtils.sleep(SLEEP_DURATION);
         Assertions.assertEquals(txResponse.getItem().getStatus(), ProposalStatus.CREATED);
         ResponseEntity<Market> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/market/%s", port,
@@ -280,7 +289,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         tendermintClient.amendMarket(request);
-        sleepUtils.sleep(3000L);
+        sleepUtils.sleep(SLEEP_DURATION);
         ResponseEntity<Market> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/market/%s", port, market.getId().toString()), Market.class);
         market = responseEntity.getBody();
@@ -303,7 +312,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         tendermintClient.suspendMarket(request);
-        sleepUtils.sleep(3000L);
+        sleepUtils.sleep(SLEEP_DURATION);
         ResponseEntity<Market> responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/market/%s", port, market.getId().toString()), Market.class);
         market = responseEntity.getBody();
@@ -321,7 +330,7 @@ public class TendermintClientTest extends IntegrationTest {
         request.setPublicKey(takerUser.getPublicKey());
         request.setSignature(sig);
         tendermintClient.unsuspendMarket(request);
-        sleepUtils.sleep(3000L);
+        sleepUtils.sleep(SLEEP_DURATION);
         responseEntity = this.restTemplate.getForEntity(
                 String.format("http://localhost:%s/market/%s", port, market.getId().toString()), Market.class);
         market = responseEntity.getBody();

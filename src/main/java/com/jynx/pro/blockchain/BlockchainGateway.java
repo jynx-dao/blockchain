@@ -3,6 +3,7 @@ package com.jynx.pro.blockchain;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Timestamp;
 import com.jynx.pro.constant.TendermintTransaction;
+import com.jynx.pro.entity.BridgeUpdate;
 import com.jynx.pro.entity.WithdrawalBatch;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
@@ -61,6 +62,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private ValidatorService validatorService;
     @Autowired
     private WithdrawalService withdrawalService;
+    @Autowired
+    private BridgeUpdateService bridgeUpdateService;
     @Autowired
     private AuctionService auctionService;
     @Autowired
@@ -187,10 +190,10 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                         .setProtectedFn(true)
                         .setRequestType(BatchValidatorRequest.class));
         transactionSettings.put(TendermintTransaction.BATCH_WITHDRAWALS,
-                new TransactionConfig<BatchValidatorRequest>()
+                new TransactionConfig<BatchWithdrawalRequest>()
                         .setDeliverFn(withdrawalService::batchWithdrawals)
                         .setProtectedFn(true)
-                        .setRequestType(BatchValidatorRequest.class));
+                        .setRequestType(BatchWithdrawalRequest.class));
         transactionSettings.put(TendermintTransaction.SIGN_WITHDRAWAL_BATCHES,
                 new TransactionConfig<BulkSignWithdrawalRequest>()
                         .setDeliverFn(withdrawalService::saveWithdrawalBatchSignatures)
@@ -221,6 +224,16 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                         .setDeliverFn(auctionService::monitorAuctions)
                         .setProtectedFn(true)
                         .setRequestType(BatchValidatorRequest.class));
+        transactionSettings.put(TendermintTransaction.SIGN_BRIDGE_UPDATES,
+                new TransactionConfig<BulkSignBridgeUpdateRequest>()
+                        .setDeliverFn(bridgeUpdateService::saveBridgeUpdateSignatures)
+                        .setProtectedFn(true)
+                        .setRequestType(BulkSignBridgeUpdateRequest.class));
+        transactionSettings.put(TendermintTransaction.EXECUTE_BRIDGE_UPDATES,
+                new TransactionConfig<ExecuteBridgeUpdatesRequest>()
+                        .setDeliverFn(bridgeUpdateService::executeBridgeUpdates)
+                        .setProtectedFn(true)
+                        .setRequestType(ExecuteBridgeUpdatesRequest.class));
     }
 
     /**
@@ -274,9 +287,11 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                 String publicKeyAsBase64 = Base64.getEncoder().encodeToString(Hex.decodeHex(request.getPublicKey()));
                 boolean result = validatorService.isValidator(publicKeyAsBase64);
                 if(!result) {
+                    log.info(request.toString());
                     throw new JynxProException(ErrorCode.SIGNATURE_INVALID);
                 }
             } catch(Exception e) {
+                log.info(request.toString());
                 log.error(e.getMessage(), e);
                 throw new JynxProException(ErrorCode.SIGNATURE_INVALID);
             }
@@ -286,6 +301,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         String message = jsonUtils.toJson(request);
         boolean result = cryptoUtils.verify(signature, message, publicKey);
         if(!result) {
+            log.info(request.toString());
             throw new JynxProException(ErrorCode.SIGNATURE_INVALID);
         }
     }
@@ -386,25 +402,78 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     }
 
     /**
-     * Handles off-chain asynchronous actions
+     * Confirm Ethereum events
      *
-     * @param proposerAddress the proposer's address
+     * @param proposerAddress the proposer address
      * @param blockHeight the current block height
      */
-    private void handleProposerActions(
+    private void confirmEthereumEvents(
             final String proposerAddress,
             final long blockHeight
     ) {
         executorService.submit(() -> tendermintClient.confirmEthereumEvents(
                 getBatchRequest(proposerAddress, blockHeight)));
+    }
+
+    /**
+     * Settle markets
+     *
+     * @param proposerAddress the proposer address
+     * @param blockHeight the current block height
+     */
+    private void settleMarkets(
+            final String proposerAddress,
+            final long blockHeight
+    ) {
         executorService.submit(() -> tendermintClient.settleMarkets(
                 getBatchRequest(proposerAddress, blockHeight)));
+    }
+
+    /**
+     * Sync proposals
+     *
+     * @param proposerAddress the proposer address
+     * @param blockHeight the current block height
+     */
+    private void syncProposals(
+            final String proposerAddress,
+            final long blockHeight
+    ) {
         executorService.submit(() -> tendermintClient.syncProposals(
                 getBatchRequest(proposerAddress, blockHeight)));
-        executorService.submit(() -> tendermintClient.batchWithdrawals(
-                getBatchRequest(proposerAddress, blockHeight)));
+    }
+
+    /**
+     * Batch withdrawals
+     */
+    private void batchWithdrawals() {
+        executorService.submit(() -> {
+            BatchWithdrawalRequest request = new BatchWithdrawalRequest()
+                    .setBridgeNonce(ethereumService.getNonce().toString());
+            request.setNonce(ethereumService.getNonce().toString());
+            ethereumService.addSignatureToRequest(request);
+            tendermintClient.batchWithdrawals(request);
+        });
+    }
+
+    /**
+     * Monitor auctions
+     *
+     * @param proposerAddress the proposer address
+     * @param blockHeight the current block height
+     */
+    private void monitorAuctions(
+            final String proposerAddress,
+            final long blockHeight
+    ) {
         executorService.submit(() -> tendermintClient.monitorAuctions(
                 getBatchRequest(proposerAddress, blockHeight)));
+    }
+
+    /**
+     * Sign withdrawals
+     */
+    private void signWithdrawals() {
         executorService.submit(() -> {
             try {
                 BulkSignWithdrawalRequest request = withdrawalService.signBatches(validatorPublicKey);
@@ -416,6 +485,12 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                 log.error(e.getMessage(), e);
             }
         });
+    }
+
+    /**
+     * Withdraw signed batches
+     */
+    private void withdrawSignedBatches() {
         executorService.submit(() -> {
             try {
                 List<WithdrawalBatch> batches = withdrawalService.getUnprocessedWithdrawalBatches();
@@ -423,13 +498,75 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                     List<UUID> ids = batches.stream().map(WithdrawalBatch::getId).collect(Collectors.toList());
                     DebitWithdrawalsRequest request = new DebitWithdrawalsRequest().setBatchIds(ids);
                     ethereumService.addSignatureToRequest(request);
+                    // TODO - we should check that the node has sufficient gas before broadcasting the Tendermint tx
                     tendermintClient.debitWithdrawals(request);
+                    // TODO - how do we undo the previous Tendermint transactions if the node has insufficient gas??
                     withdrawalService.withdrawSignedBatches(batches);
                 }
             } catch(Exception e) {
                 log.error(e.getMessage(), e);
             }
         });
+    }
+
+    /**
+     * Sign bridge updates
+     */
+    private void signBridgeUpdates() {
+        executorService.submit(() -> {
+            try {
+                BulkSignBridgeUpdateRequest request = bridgeUpdateService.signUpdates(validatorPublicKey);
+                ethereumService.addSignatureToRequest(request);
+                if(request.getSignatures().size() > 0) {
+                    tendermintClient.signBridgeUpdates(request);
+                }
+            } catch(Exception e) {
+                log.error(e.getMessage(), e);
+            }
+        });
+    }
+
+    /**
+     * Execute bridge updates
+     */
+    private void executeBridgeUpdates() {
+        executorService.submit(() -> {
+            try {
+                List<BridgeUpdate> updates = bridgeUpdateService.getUnprocessedBridgeUpdates();
+                if (updates.size() > 0) {
+                    List<UUID> ids = updates.stream().map(BridgeUpdate::getId).collect(Collectors.toList());
+                    ExecuteBridgeUpdatesRequest request = new ExecuteBridgeUpdatesRequest().setUpdateIds(ids);
+                    ethereumService.addSignatureToRequest(request);
+                    // TODO - we should check that the node has sufficient gas before broadcasting the Tendermint tx
+                    tendermintClient.executeBridgeUpdates(request);
+                    // TODO - how do we undo the previous Tendermint transactions if the node has insufficient gas??
+                    bridgeUpdateService.processSignedUpdates(updates);
+                }
+            } catch(Exception e) {
+                log.error(e.getMessage(), e);
+            }
+        });
+    }
+
+    /**
+     * Handles off-chain asynchronous actions
+     *
+     * @param proposerAddress the proposer's address
+     * @param blockHeight the current block height
+     */
+    private void handleProposerActions(
+            final String proposerAddress,
+            final long blockHeight
+    ) {
+        confirmEthereumEvents(proposerAddress, blockHeight);
+        settleMarkets(proposerAddress, blockHeight);
+        syncProposals(proposerAddress, blockHeight);
+        batchWithdrawals();
+        monitorAuctions(proposerAddress, blockHeight);
+        signWithdrawals();
+        withdrawSignedBatches();
+        signBridgeUpdates();
+        executeBridgeUpdates();
     }
 
     /**

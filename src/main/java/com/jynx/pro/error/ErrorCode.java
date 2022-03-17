@@ -88,4 +88,8 @@ public class ErrorCode {
     public static final String MARKET_ORDER_NOT_SUPPORTED = "Market orders are not supported during an auction.";
     public static final String EXCEEDS_LIQUIDATION_PRICE = "The stop-market order is above or below liquidation price.";
     public static final String MONITOR_AUCTIONS_FAILED = "Failed to monitor auctions.";
+    public static final String CANNOT_GET_ASSET = "Cannot get asset.";
+    public static final String CANNOT_GET_NONCE = "Cannot get nonce.";
+    public static final String SIGN_BRIDGE_UPDATED_FAILED = "Failed to sign bridge updates.";
+    public static final String EXECUTE_BRIDGE_UPDATES_FAILED = "Failed to execute bridge updates.";
 }

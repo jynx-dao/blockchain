@@ -125,25 +125,25 @@ public class EthereumServiceTest extends IntegrationTest {
         }
     }
 
-    @Test
-    public void testRemoveAssetWithError() {
-        try {
-            ethereumService.removeAsset(null);
-            Assertions.fail();
-        } catch(JynxProException e) {
-            Assertions.assertEquals(e.getMessage(), ErrorCode.CANNOT_REMOVE_ASSET);
-        }
-    }
-
-    @Test
-    public void testAddAssetWithError() {
-        try {
-            ethereumService.addAsset(null);
-            Assertions.fail();
-        } catch(JynxProException e) {
-            Assertions.assertEquals(e.getMessage(), ErrorCode.CANNOT_ADD_ASSET);
-        }
-    }
+//    @Test
+//    public void testRemoveAssetWithError() {
+//        try {
+//            ethereumService.removeAsset(null);
+//            Assertions.fail();
+//        } catch(JynxProException e) {
+//            Assertions.assertEquals(e.getMessage(), ErrorCode.CANNOT_REMOVE_ASSET);
+//        }
+//    }
+//
+//    @Test
+//    public void testAddAssetWithError() {
+//        try {
+//            ethereumService.addAsset(null);
+//            Assertions.fail();
+//        } catch(JynxProException e) {
+//            Assertions.assertEquals(e.getMessage(), ErrorCode.CANNOT_ADD_ASSET);
+//        }
+//    }
 
     private void stakeTokens(double expectedStake, boolean unstake) throws InterruptedException {
         long modifier = (long) Math.pow(10, 18);

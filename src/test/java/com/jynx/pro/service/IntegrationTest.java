@@ -15,6 +15,7 @@ import com.jynx.pro.request.AddMarketRequest;
 import com.jynx.pro.request.CreateOrderRequest;
 import com.jynx.pro.utils.*;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.DecoderException;
 import org.junit.jupiter.api.Assertions;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -25,6 +26,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.utility.DockerImageName;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -125,6 +127,10 @@ public abstract class IntegrationTest {
     protected TendermintClient tendermintClient;
     @Autowired
     protected BlockchainGateway blockchainGateway;
+    @Autowired
+    protected BridgeUpdateSignatureRepository bridgeUpdateSignatureRepository;
+    @Autowired
+    protected BridgeUpdateRepository bridgeUpdateRepository;
 
     protected static final String ETH_ADDRESS = "0xd7E1236C08731C3632519DCd1A581bFe6876a3B2";
     protected static final String ETH_PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
@@ -142,6 +148,24 @@ public abstract class IntegrationTest {
     protected User degenUser;
     protected User takerUser;
     protected User makerUser;
+
+    protected void addToBridge(
+            final String address,
+            final String nonce
+    ) throws DecoderException {
+        byte[] signature = ethereumService.getSignatureForAddAsset(
+                address, new BigInteger(nonce));
+        ethereumService.addAsset(address, new BigInteger(nonce), signature);
+    }
+
+    protected void removeFromBridge(
+            final String address,
+            final String nonce
+    ) throws DecoderException {
+        byte[] signature = ethereumService.getSignatureForRemoveAsset(
+                address, new BigInteger(nonce));
+        ethereumService.removeAsset(address, new BigInteger(nonce), signature);
+    }
 
     protected Asset getDai() {
         ResponseEntity<Asset[]> responseEntity = this.restTemplate.getForEntity(
@@ -168,9 +192,11 @@ public abstract class IntegrationTest {
 
     protected Asset createAndEnactAsset(
             final boolean activate
-    ) {
-        Proposal proposal = assetService.proposeToAdd(getAddAssetRequest(takerUser));
+    ) throws DecoderException {
+        AddAssetRequest addAssetRequest = getAddAssetRequest(takerUser);
+        Proposal proposal = assetService.proposeToAdd(addAssetRequest);
         Assertions.assertEquals(proposal.getStatus(), ProposalStatus.CREATED);
+        addToBridge(addAssetRequest.getAddress(), proposal.getNonce());
         sleepUtils.sleep(100L);
         if(activate) {
             configService.setTimestamp(nowAsMillis());
@@ -198,14 +224,14 @@ public abstract class IntegrationTest {
 
     protected Market createAndEnactMarket(
             final boolean activate
-    ) {
+    ) throws DecoderException {
         return createAndEnactMarket(activate, false);
     }
 
     protected Market createAndEnactMarket(
             final boolean activate,
             final boolean includeTriggers
-    ) {
+    ) throws DecoderException {
         Asset asset = createAndEnactAsset(true);
         List<AddMarketRequest.AuctionTrigger> triggers = new ArrayList<>();
         if(includeTriggers) {
@@ -254,7 +280,8 @@ public abstract class IntegrationTest {
                 .setName("DAI")
                 .setAddress(ethereumHelper.getDaiToken().getContractAddress())
                 .setType(AssetType.ERC20)
-                .setDecimalPlaces(8);
+                .setDecimalPlaces(8)
+                .setBridgeNonce(ethereumService.getNonce().toString());
         request.setUser(user);
         request.setOpenTime(times[0]);
         request.setClosingTime(times[1]);
@@ -274,7 +301,13 @@ public abstract class IntegrationTest {
             final int asks,
             final int stepSize
     ) {
-        Market market = createAndEnactMarket(true);
+        Market market = null;
+        try {
+            market = createAndEnactMarket(true);
+        } catch(Exception ignored) {
+            Assertions.fail();
+            return market;
+        }
         int dps = market.getSettlementAsset().getDecimalPlaces();
         for(int i=0; i<bids; i++) {
             Order buyOrder = orderService.create(getCreateOrderRequest(market.getId(),
@@ -367,7 +400,6 @@ public abstract class IntegrationTest {
     protected void clearState() {
         databaseTransactionManager.createTransaction();
         withdrawalBatchSignatureRepository.deleteAll();
-        validatorRepository.deleteAll();
         orderHistoryRepository.deleteAll();
         tradeRepository.deleteAll();
         orderRepository.deleteAll();
@@ -380,6 +412,9 @@ public abstract class IntegrationTest {
         transactionRepository.deleteAll();
         withdrawalRepository.deleteAll();
         withdrawalBatchRepository.deleteAll();
+        bridgeUpdateSignatureRepository.deleteAll();
+        bridgeUpdateRepository.deleteAll();
+        validatorRepository.deleteAll();
         assetRepository.deleteAll();
         voteRepository.deleteAll();
         proposalRepository.deleteAll();
@@ -436,8 +471,15 @@ public abstract class IntegrationTest {
         degenUser = userRepository.save(degenUser);
         stakeRepository.save(new Stake().setId(uuidUtils.next()).setUser(makerUser).setAmount(BigDecimal.valueOf(500000000L)));
         stakeRepository.save(new Stake().setId(uuidUtils.next()).setUser(takerUser).setAmount(BigDecimal.valueOf(700000000L)));
+        databaseTransactionManager.commit();
+        databaseTransactionManager.createTransaction();
         if(createAsset) {
-            createAndEnactAsset(true);
+            try {
+                createAndEnactAsset(true);
+            } catch(Exception e) {
+                log.error(e.getMessage(), e);
+                Assertions.fail();
+            }
         }
         databaseTransactionManager.commit();
     }

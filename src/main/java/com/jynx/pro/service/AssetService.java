@@ -1,13 +1,13 @@
 package com.jynx.pro.service;
 
-import com.jynx.pro.constant.AssetStatus;
-import com.jynx.pro.constant.AssetType;
-import com.jynx.pro.constant.ProposalType;
+import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.Asset;
+import com.jynx.pro.entity.BridgeUpdate;
 import com.jynx.pro.entity.Proposal;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.AssetRepository;
+import com.jynx.pro.repository.BridgeUpdateRepository;
 import com.jynx.pro.request.AddAssetRequest;
 import com.jynx.pro.request.SingleItemRequest;
 import com.jynx.pro.utils.UUIDUtils;
@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -30,6 +31,8 @@ public class AssetService {
     private StakeService stakeService;
     @Autowired
     private EthereumService ethereumService;
+    @Autowired
+    private BridgeUpdateRepository bridgeUpdateRepository;
     @Autowired
     private UUIDUtils uuidUtils;
 
@@ -77,6 +80,33 @@ public class AssetService {
     }
 
     /**
+     * Create the {@link BridgeUpdate} record if it doesn't exist
+     *
+     * @param asset {@link Asset}
+     * @param type {@link BridgeUpdateType}
+     * @param nonce the nonce for the bridge
+     */
+    private void createBridgeUpdate(
+            final Asset asset,
+            final BridgeUpdateType type,
+            final String nonce
+    ) {
+        List<BridgeUpdate> bridgeUpdates = bridgeUpdateRepository.findByAssetIdAndType(
+                        asset.getId(), type).stream()
+                .filter(b -> !b.getComplete())
+                .collect(Collectors.toList());
+        if(bridgeUpdates.size() == 0) {
+            BridgeUpdate bridgeUpdate = new BridgeUpdate()
+                    .setAsset(asset)
+                    .setNonce(nonce)
+                    .setId(uuidUtils.next())
+                    .setComplete(false)
+                    .setType(type);
+            bridgeUpdateRepository.save(bridgeUpdate);
+        }
+    }
+
+    /**
      * Add an asset for the given proposal
      *
      * @param proposal {@link Proposal}
@@ -84,10 +114,13 @@ public class AssetService {
     public void add(
             final Proposal proposal
     ) {
-        proposalService.checkEnacted(proposal);
         Asset asset = get(proposal.getLinkedId());
-        ethereumService.addAsset(asset.getAddress()); // TODO - how TF we gonna do this with multiple validators?
-        updateStatus(proposal, AssetStatus.ACTIVE);
+        createBridgeUpdate(asset, BridgeUpdateType.ADD_ASSET, proposal.getNonce());
+        boolean isActive = ethereumService.isAssetActive(asset.getAddress());
+        if(isActive) {
+            proposal.setStatus(ProposalStatus.ENACTED);
+            updateStatus(proposal, AssetStatus.ACTIVE);
+        }
     }
 
     /**
@@ -110,10 +143,13 @@ public class AssetService {
             final Proposal proposal
     ) {
         // TODO - need to suspend all markets that are using this asset
-        proposalService.checkEnacted(proposal);
         Asset asset = get(proposal.getLinkedId());
-        ethereumService.removeAsset(asset.getAddress()); // TODO - how TF we gonna do this with multiple validators?
-        updateStatus(proposal, AssetStatus.SUSPENDED);
+        createBridgeUpdate(asset, BridgeUpdateType.REMOVE_ASSET, proposal.getNonce());
+        boolean isActive = ethereumService.isAssetActive(asset.getAddress());
+        if(!isActive) {
+            proposal.setStatus(ProposalStatus.ENACTED);
+            updateStatus(proposal, AssetStatus.SUSPENDED);
+        }
     }
 
     /**
@@ -125,10 +161,13 @@ public class AssetService {
             final Proposal proposal
     ) {
         // TODO - need to suspend all markets that are using this asset
-        proposalService.checkEnacted(proposal);
         Asset asset = get(proposal.getLinkedId());
-        ethereumService.addAsset(asset.getAddress()); // TODO - how TF we gonna do this with multiple validators?
-        updateStatus(proposal, AssetStatus.ACTIVE);
+        createBridgeUpdate(asset, BridgeUpdateType.ADD_ASSET, proposal.getNonce());
+        boolean isActive = ethereumService.isAssetActive(asset.getAddress());
+        if(isActive) {
+            proposal.setStatus(ProposalStatus.ENACTED);
+            updateStatus(proposal, AssetStatus.ACTIVE);
+        }
     }
 
     /**
@@ -141,6 +180,7 @@ public class AssetService {
     public Proposal proposeToAdd(
             final AddAssetRequest request
     ) {
+        checkDuplicatedNonce(request.getBridgeNonce());
         stakeService.checkProposerStake(request.getUser());
         proposalService.checkProposalTimes(request.getOpenTime(), request.getClosingTime(), request.getEnactmentTime());
         List<Asset> assetCheck = assetRepository.findByAddressAndType(request.getAddress(), request.getType());
@@ -159,7 +199,7 @@ public class AssetService {
                 .setId(uuidUtils.next());
         asset = assetRepository.save(asset);
         return proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
-                request.getEnactmentTime(), asset.getId(), ProposalType.ADD_ASSET);
+                request.getEnactmentTime(), asset.getId(), ProposalType.ADD_ASSET, request.getBridgeNonce());
     }
 
     /**
@@ -172,6 +212,7 @@ public class AssetService {
     public Proposal proposeToSuspend(
             final SingleItemRequest request
     ) {
+        checkDuplicatedNonce(request.getBridgeNonce());
         stakeService.checkProposerStake(request.getUser());
         proposalService.checkProposalTimes(request.getOpenTime(), request.getClosingTime(), request.getEnactmentTime());
         Asset asset = this.get(request.getId());
@@ -179,7 +220,7 @@ public class AssetService {
             throw new JynxProException(ErrorCode.ASSET_NOT_ACTIVE);
         }
         return proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
-                request.getEnactmentTime(), asset.getId(), ProposalType.SUSPEND_ASSET);
+                request.getEnactmentTime(), asset.getId(), ProposalType.SUSPEND_ASSET, request.getBridgeNonce());
     }
 
     /**
@@ -192,6 +233,7 @@ public class AssetService {
     public Proposal proposeToUnsuspend(
             final SingleItemRequest request
     ) {
+        checkDuplicatedNonce(request.getBridgeNonce());
         stakeService.checkProposerStake(request.getUser());
         proposalService.checkProposalTimes(request.getOpenTime(), request.getClosingTime(), request.getEnactmentTime());
         Asset asset = this.get(request.getId());
@@ -199,6 +241,20 @@ public class AssetService {
             throw new JynxProException(ErrorCode.ASSET_NOT_SUSPENDED);
         }
         return proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
-                request.getEnactmentTime(), asset.getId(), ProposalType.UNSUSPEND_ASSET);
+                request.getEnactmentTime(), asset.getId(), ProposalType.UNSUSPEND_ASSET, request.getBridgeNonce());
+    }
+
+    /**
+     * Check that a nonce has not already been used
+     *
+     * @param nonce the nonce
+     */
+    private void checkDuplicatedNonce(
+            final String nonce
+    ) {
+        boolean result = proposalService.existsWithNonce(nonce);
+        if(ethereumService.isNonceUsed(nonce) && !result) {
+            throw new JynxProException(ErrorCode.NONCE_ALREADY_USED);
+        }
     }
 }
