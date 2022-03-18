@@ -16,6 +16,7 @@ import org.java_websocket.util.Base64;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -141,6 +142,7 @@ public class ValidatorService {
             Validator validator = new Validator()
                     .setId(uuidUtils.next())
                     .setPublicKey(publicKey)
+                    .setDelegation(BigDecimal.ONE)
                     .setActive(true);
             validatorRepository.save(validator);
         } else {

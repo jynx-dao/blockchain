@@ -30,6 +30,7 @@ import tendermint.abci.Types;
 import tendermint.crypto.Keys;
 
 import javax.annotation.PostConstruct;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -581,17 +582,14 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final long blockHeight,
             final Types.ResponseEndBlock.Builder builder
     ) {
+        List<Validator> activeValidators = validatorService.getActiveSet();
         List<Validator> validators = validatorService.getAll();
-        for(Validator validator : validators) {
-            ByteString key = ByteString.copyFrom(Base64.getDecoder().decode(validator.getPublicKey()));
-            Types.ValidatorUpdate validatorUpdate = Types.ValidatorUpdate.newBuilder()
-                    .setPower(0L)
-                    .setPubKey(Keys.PublicKey.newBuilder().setEd25519(key).build())
-                    .build();
-            builder.addValidatorUpdates(validatorUpdate);
-        }
-        validators = validatorService.getActiveSet();
-        for(Validator validator : validators) {
+        List<UUID> validatorIds = validators.stream().map(Validator::getId).collect(Collectors.toList());
+        List<Validator> nonActiveValidators = validators.stream()
+                .filter(v -> !validatorIds.contains(v.getId())).collect(Collectors.toList());
+        nonActiveValidators.forEach(v -> v.setDelegation(BigDecimal.ZERO));
+        activeValidators.addAll(nonActiveValidators);
+        for(Validator validator : activeValidators) {
             ByteString key = ByteString.copyFrom(Base64.getDecoder().decode(validator.getPublicKey()));
             Types.ValidatorUpdate validatorUpdate = Types.ValidatorUpdate.newBuilder()
                     .setPower(validator.getDelegation().longValue())
