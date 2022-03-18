@@ -1,14 +1,22 @@
 package com.jynx.pro.service;
 
 import com.jynx.pro.entity.Validator;
+import com.jynx.pro.error.ErrorCode;
+import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.ReadOnlyRepository;
 import com.jynx.pro.repository.ValidatorRepository;
+import com.jynx.pro.request.ValidatorApplicationRequest;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.binary.Hex;
+import org.java_websocket.util.Base64;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -19,14 +27,79 @@ public class ValidatorService {
     @Autowired
     private ReadOnlyRepository readOnlyRepository;
     @Autowired
+    private ConfigService configService;
+    @Autowired
     private UUIDUtils uuidUtils;
 
     /**
-     * Add a {@link Validator} to the database if it doesn't exist
+     * Apply to become a validator
+     *
+     * @param request {@link ValidatorApplicationRequest}
+     *
+     * @return {@link Validator}
+     */
+    public Validator apply(
+            final ValidatorApplicationRequest request
+    ) {
+        try {
+            String tendermintKeyAsHex = Hex.encodeHexString(Base64.decode(request.getTendermintPublicKey()));
+            if(!tendermintKeyAsHex.equals(request.getPublicKey())) {
+                throw new JynxProException(ErrorCode.TENDERMINT_SIGNATURE_INVALID);
+            }
+        } catch(Exception e) {
+            throw new JynxProException(ErrorCode.TENDERMINT_SIGNATURE_INVALID);
+        }
+        Validator validator = new Validator()
+                .setPublicKey(request.getTendermintPublicKey())
+                .setActive(false)
+                .setId(uuidUtils.next());
+        Optional<Validator> validatorOptional = validatorRepository.findByPublicKey(request.getTendermintPublicKey());
+        if(validatorOptional.isPresent()) {
+            throw new JynxProException(ErrorCode.VALIDATOR_ALREADY_EXISTS);
+        }
+        return validatorRepository.save(validator);
+    }
+
+    /**
+     * Get the backup set of validators
+     *
+     * @return {@link List<Validator>}
+     */
+    public List<Validator> getAll() {
+        return validatorRepository.findAll();
+    }
+
+    /**
+     * Get the backup set of validators
+     *
+     * @return {@link List<Validator>}
+     */
+    public List<Validator> getBackupSet() {
+        return validatorRepository.findAll().stream()
+                .sorted(Comparator.comparing(Validator::getDelegation).reversed())
+                .skip(configService.get().getActiveValidatorCount())
+                .limit(configService.get().getBackupValidatorCount())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Get the active set of validators
+     *
+     * @return {@link List<Validator>}
+     */
+    public List<Validator> getActiveSet() {
+        return validatorRepository.findAll().stream()
+                .sorted(Comparator.comparing(Validator::getDelegation).reversed())
+                .limit(configService.get().getActiveValidatorCount())
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Activate a {@link Validator}
      *
      * @param publicKey the validator's public key
      */
-    public void add(
+    public void activate(
             final String publicKey
     ) {
         Optional<Validator> validatorOptional = validatorRepository.findByPublicKey(publicKey);
@@ -36,6 +109,9 @@ public class ValidatorService {
                     .setPublicKey(publicKey)
                     .setActive(true);
             validatorRepository.save(validator);
+        } else {
+            validatorOptional.get().setActive(true);
+            validatorRepository.save(validatorOptional.get());
         }
     }
 

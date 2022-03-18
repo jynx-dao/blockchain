@@ -93,4 +93,6 @@ public class ErrorCode {
     public static final String SIGN_BRIDGE_UPDATED_FAILED = "Failed to sign bridge updates.";
     public static final String EXECUTE_BRIDGE_UPDATES_FAILED = "Failed to execute bridge updates.";
     public static final String CANNOT_CREATE_REDUCE_ONLY_ORDER = "Cannot create order because would not reduce position.";
+    public static final String TENDERMINT_SIGNATURE_INVALID = "You must sign the request using your Tendermint key.";
+    public static final String VALIDATOR_ALREADY_EXISTS = "This validator already exists.";
 }

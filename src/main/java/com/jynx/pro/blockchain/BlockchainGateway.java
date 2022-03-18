@@ -4,6 +4,7 @@ import com.google.protobuf.ByteString;
 import com.google.protobuf.Timestamp;
 import com.jynx.pro.constant.TendermintTransaction;
 import com.jynx.pro.entity.BridgeUpdate;
+import com.jynx.pro.entity.Validator;
 import com.jynx.pro.entity.WithdrawalBatch;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
@@ -26,6 +27,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import tendermint.abci.ABCIApplicationGrpc;
 import tendermint.abci.Types;
+import tendermint.crypto.Keys;
 
 import javax.annotation.PostConstruct;
 import java.nio.charset.StandardCharsets;
@@ -570,6 +572,36 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     }
 
     /**
+     * Update the active validator set
+     *
+     * @param builder {@link Types.ResponseEndBlock.Builder}
+     */
+    private void updateValidators(
+            final Types.ResponseEndBlock.Builder builder
+    ) {
+        List<Validator> validators = validatorService.getAll();
+        for(Validator validator : validators) {
+            ByteString key = ByteString.copyFrom(Base64.getDecoder().decode(validator.getPublicKey()));
+            Types.ValidatorUpdate validatorUpdate = Types.ValidatorUpdate.newBuilder()
+                    .setPower(0L)
+                    .setPubKey(Keys.PublicKey.newBuilder().setEd25519(key).build())
+                    .build();
+            builder.addValidatorUpdates(validatorUpdate);
+        }
+        validators = validatorService.getActiveSet();
+        for(Validator validator : validators) {
+            ByteString key = ByteString.copyFrom(Base64.getDecoder().decode(validator.getPublicKey()));
+            Types.ValidatorUpdate validatorUpdate = Types.ValidatorUpdate.newBuilder()
+                    .setPower(validator.getDelegation().longValue())
+                    .setPubKey(Keys.PublicKey.newBuilder().setEd25519(key).build())
+                    .build();
+            builder.addValidatorUpdates(validatorUpdate);
+        }
+        // TODO - we should keep a record of the validator's in each block and their weights
+        // TODO - this will be used to reward them later
+    }
+
+    /**
      * {@inheritDoc}
      */
     @Override
@@ -584,10 +616,11 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             log.error(e.getMessage(), e);
             log.error(ErrorCode.INVALID_APP_STATE);
         }
+        // TODO - the chain should not start until the genesis validator's have sufficient delegation
         request.getValidatorsList().forEach(v -> {
             String publicKey = Base64.getEncoder().encodeToString(
                     request.getValidatorsList().get(0).getPubKey().getEd25519().toByteArray());
-            validatorService.add(publicKey);
+            validatorService.activate(publicKey);
         });
         databaseTransactionManager.commit();
         responseObserver.onNext(resp);
@@ -632,10 +665,10 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
      */
     @Override
     public void endBlock(Types.RequestEndBlock req, StreamObserver<Types.ResponseEndBlock> responseObserver) {
-        // TODO - update validators
-        Types.ResponseEndBlock resp = Types.ResponseEndBlock.newBuilder().build();
+        Types.ResponseEndBlock.Builder builder = Types.ResponseEndBlock.newBuilder();
         appStateManager.setBlockHeight(req.getHeight());
-        responseObserver.onNext(resp);
+        updateValidators(builder);
+        responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
 

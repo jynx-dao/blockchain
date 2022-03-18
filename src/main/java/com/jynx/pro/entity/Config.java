@@ -43,4 +43,8 @@ public class Config {
     private String bridgeAddress;
     @Column(name = "eth_confirmations", nullable = false)
     private Integer ethConfirmations;
+    @Column(name = "active_validator_count", nullable = false)
+    private Integer activeValidatorCount;
+    @Column(name = "backup_validator_count", nullable = false)
+    private Integer backupValidatorCount;
 }
