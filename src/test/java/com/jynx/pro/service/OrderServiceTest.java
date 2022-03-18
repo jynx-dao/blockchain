@@ -1173,6 +1173,54 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
+    public void testCannotSelfTradeWithCrossingLimitOrder() {
+        Market market = createOrderBook(2, 2);
+        orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45605), BigDecimal.valueOf(1),
+                MarketSide.SELL, OrderType.LIMIT, takerUser));
+        orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45611), BigDecimal.valueOf(1),
+                MarketSide.BUY, OrderType.LIMIT, takerUser));
+        BigDecimal takerMargin = BigDecimal.valueOf(45610).multiply(market.getMarginRequirement());
+        BigDecimal makerMargin = BigDecimal.valueOf(45610).multiply(market.getMarginRequirement()).add(BigDecimal.valueOf(45611).multiply(market.getMarginRequirement()));
+        BigDecimal takerFee = BigDecimal.valueOf(45610).multiply(market.getTakerFee());
+        BigDecimal makerFee = BigDecimal.valueOf(45610).multiply(market.getMakerFee());
+        Trader taker = new Trader()
+                .setMargin(takerMargin)
+                .setBalance(BigDecimal.valueOf(INITIAL_BALANCE).subtract(takerFee))
+                .setAverageEntryPrice(BigDecimal.valueOf(45610))
+                .setUser(takerUser)
+                .setSide(MarketSide.BUY)
+                .setOpenVolume(BigDecimal.ONE)
+                .setRealisedProfit(takerFee.multiply(BigDecimal.valueOf(-1)))
+                .setTradeCount(1)
+                .setFee(takerFee.multiply(BigDecimal.valueOf(-1)));
+        Trader maker = new Trader()
+                .setMargin(makerMargin)
+                .setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(makerFee))
+                .setAverageEntryPrice(BigDecimal.valueOf(45610))
+                .setUser(makerUser)
+                .setSide(MarketSide.SELL)
+                .setOpenVolume(BigDecimal.ONE)
+                .setRealisedProfit(makerFee)
+                .setTradeCount(1)
+                .setFee(makerFee);
+        taker.setAvailableBalance(taker.getBalance().subtract(taker.getMargin()));
+        maker.setAvailableBalance(maker.getBalance().subtract(maker.getMargin()));
+        validateMarketState(
+                market.getId(),
+                BigDecimal.valueOf(1),
+                BigDecimal.valueOf(45610),
+                BigDecimal.valueOf(45590),
+                BigDecimal.valueOf(45605),
+                BigDecimal.valueOf(1),
+                BigDecimal.valueOf(1),
+                2,
+                2,
+                BigDecimal.ZERO,
+                List.of(maker, taker)
+        );
+    }
+
+    @Test
     public void testCannotSelfTradeWithMarketOrder() {
         Market market = createOrderBook(2, 2);
         orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45605), BigDecimal.valueOf(1),
