@@ -211,32 +211,13 @@ public class OrderService {
                 .setQuantity(request.getQuantity())
                 .setRemainingQuantity(request.getQuantity())
                 .setStatus(OrderStatus.OPEN)
+                .setReduceOnly(request.getReduceOnly())
                 .setType(request.getType())
                 .setPriority(getLimitOrderPriority(market, request.getSide(), request.getPrice()));
         order = orderRepository.save(order);
         accountService.allocateMargin(request.getUser(), market);
         handleMarkPriceChange(market, market.getLastPrice());
         return order;
-    }
-
-    /**
-     * Adjust the order quantity if reduce only is true
-     *
-     * @param order {@link Order}
-     */
-    private void checkReduceOnly(
-            final Order order
-    ) {
-        if(order.getReduceOnly()) {
-            Position position = positionService.getAndCreate(order.getUser(), order.getMarket());
-            if(position.getSide().equals(order.getSide())) {
-                order.setRemainingQuantity(BigDecimal.ZERO);
-            } else {
-                if (order.getRemainingQuantity().doubleValue() > position.getQuantity().doubleValue()) {
-                    order.setRemainingQuantity(position.getQuantity());
-                }
-            }
-        }
     }
 
     /**
@@ -254,9 +235,7 @@ public class OrderService {
             final Market market
     ) {
         BigDecimal price = BigDecimal.ZERO;
-        checkReduceOnly(order);
         for(Order passiveOrder : passiveOrders) {
-            checkReduceOnly(passiveOrder);
             price = passiveOrder.getPrice();
             User taker = order.getUser();
             User maker = passiveOrder.getUser();
@@ -289,7 +268,7 @@ public class OrderService {
                     .setUpdated(configService.getTimestamp());
             orderHistoryRepository.save(passiveOrderHistory);
             orderHistoryRepository.save(aggressiveOrderHistory);
-            if(order.getRemainingQuantity().equals(BigDecimal.ZERO)) {
+            if(order.getRemainingQuantity().doubleValue() == BigDecimal.ZERO.doubleValue()) {
                 order.setStatus(OrderStatus.FILLED);
                 break;
             }
@@ -509,6 +488,7 @@ public class OrderService {
                 .setSide(request.getSide())
                 .setMarket(market)
                 .setQuantity(request.getQuantity())
+                .setReduceOnly(request.getReduceOnly())
                 .setRemainingQuantity(request.getQuantity())
                 .setPrice(request.getPrice())
                 .setPriority(1L)
@@ -559,6 +539,7 @@ public class OrderService {
                 .setSide(request.getSide())
                 .setMarket(market)
                 .setQuantity(request.getQuantity())
+                .setReduceOnly(request.getReduceOnly())
                 .setRemainingQuantity(request.getQuantity())
                 .setPrice(request.getPrice())
                 .setPriority(getLimitOrderPriority(market, request.getSide(), request.getPrice()));
@@ -651,6 +632,41 @@ public class OrderService {
     }
 
     /**
+     * Adjust the order quantity when reduce only
+     *
+     * @param request {@link CreateOrderRequest}
+     */
+    private void adjustQuantityWhenReduceOnly(
+            final CreateOrderRequest request
+    ) {
+        Market market = marketService.get(request.getMarketId());
+        List<OrderStatus> statusList = List.of(OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED);
+        Position position = positionService.getAndCreate(request.getUser(), market);
+        if(request.getType().equals(OrderType.MARKET)) {
+            if(request.getSide().equals(position.getSide())) {
+                throw new JynxProException(ErrorCode.CANNOT_CREATE_REDUCE_ONLY_ORDER);
+            } else {
+                request.setQuantity(position.getQuantity());
+                return;
+            }
+        }
+        List<Order> openOrders = orderRepository.findByStatusInAndTypeAndMarketAndUser(
+                statusList, request.getType(), market, request.getUser());
+        BigDecimal remainingQuantity;
+        double existingVolume = openOrders.stream()
+                .filter(o -> o.getSide().equals(request.getSide()))
+                .mapToDouble(o -> o.getRemainingQuantity().doubleValue()).sum();
+        if(existingVolume >= position.getQuantity().doubleValue()) {
+            throw new JynxProException(ErrorCode.CANNOT_CREATE_REDUCE_ONLY_ORDER);
+        } else {
+            remainingQuantity = position.getQuantity().subtract(BigDecimal.valueOf(existingVolume));
+        }
+        if(request.getQuantity().doubleValue() > remainingQuantity.doubleValue()) {
+            request.setQuantity(remainingQuantity);
+        }
+    }
+
+    /**
      * Validate {@link CreateOrderRequest}
      *
      * @param request {@link CreateOrderRequest}
@@ -668,6 +684,9 @@ public class OrderService {
         }
         if(request.getReduceOnly() == null) {
             request.setReduceOnly(false);
+        }
+        if(request.getReduceOnly()) {
+            adjustQuantityWhenReduceOnly(request);
         }
         if(OrderType.MARKET.equals(request.getType())) {
             request.setPrice(null);
