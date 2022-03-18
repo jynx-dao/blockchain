@@ -36,6 +36,8 @@ public class ValidatorService {
     @Autowired
     private ConfigService configService;
     @Autowired
+    private StakeService stakeService;
+    @Autowired
     private UUIDUtils uuidUtils;
 
     /**
@@ -56,14 +58,18 @@ public class ValidatorService {
         } catch(Exception e) {
             throw new JynxProException(ErrorCode.TENDERMINT_SIGNATURE_INVALID);
         }
-        Validator validator = new Validator()
-                .setPublicKey(request.getTendermintPublicKey())
-                .setActive(false)
-                .setId(uuidUtils.next());
         Optional<Validator> validatorOptional = validatorRepository.findByPublicKey(request.getTendermintPublicKey());
         if(validatorOptional.isPresent()) {
             throw new JynxProException(ErrorCode.VALIDATOR_ALREADY_EXISTS);
         }
+        BigDecimal totalStake = stakeService.getStakeForUser(request.getUser());
+        if(totalStake.doubleValue() < configService.get().getValidatorBond().doubleValue()) {
+            throw new JynxProException(ErrorCode.INSUFFICIENT_VALIDATOR_STAKE);
+        }
+        Validator validator = new Validator()
+                .setPublicKey(request.getTendermintPublicKey())
+                .setActive(false)
+                .setId(uuidUtils.next());
         return validatorRepository.save(validator);
     }
 
@@ -83,6 +89,8 @@ public class ValidatorService {
      */
     public List<Validator> getBackupSet() {
         return validatorRepository.findAll().stream()
+                .filter(v -> v.getDelegation().doubleValue() > configService.get()
+                        .getValidatorMinDelegation().doubleValue())
                 .sorted(Comparator.comparing(Validator::getDelegation).reversed())
                 .skip(configService.get().getActiveValidatorCount())
                 .limit(configService.get().getBackupValidatorCount())
@@ -96,6 +104,8 @@ public class ValidatorService {
      */
     public List<Validator> getActiveSet() {
         return validatorRepository.findAll().stream()
+                .filter(v -> v.getDelegation().doubleValue() > configService.get()
+                        .getValidatorMinDelegation().doubleValue())
                 .sorted(Comparator.comparing(Validator::getDelegation).reversed())
                 .limit(configService.get().getActiveValidatorCount())
                 .collect(Collectors.toList());

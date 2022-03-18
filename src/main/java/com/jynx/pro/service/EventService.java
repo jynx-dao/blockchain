@@ -160,6 +160,7 @@ public class EventService {
         List<EventType> stakeEvents = List.of(EventType.ADD_STAKE, EventType.REMOVE_STAKE);
         if(stakeEvents.contains(event.getType())) {
             Stake stake = stakeService.getAndCreate(event.getUser());
+            // TODO - if a validator removes their self-owned stake then they might need to be removed from the active set
             if(event.getType().equals(EventType.ADD_STAKE)) {
                 stake.setAmount(stake.getAmount().add(event.getAmount()));
             } else {

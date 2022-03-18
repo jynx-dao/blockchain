@@ -47,4 +47,8 @@ public class Config {
     private Integer activeValidatorCount;
     @Column(name = "backup_validator_count", nullable = false)
     private Integer backupValidatorCount;
+    @Column(name = "validator_bond", nullable = false)
+    private BigDecimal validatorBond;
+    @Column(name = "validator_min_delegation", nullable = false)
+    private BigDecimal validatorMinDelegation;
 }

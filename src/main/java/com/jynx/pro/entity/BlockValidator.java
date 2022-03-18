@@ -25,4 +25,5 @@ public class BlockValidator {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private BlockValidatorStatus status;
+    // TODO - performance stats can be saved in here
 }
