@@ -1,8 +1,11 @@
 package com.jynx.pro.service;
 
+import com.jynx.pro.constant.BlockValidatorStatus;
+import com.jynx.pro.entity.BlockValidator;
 import com.jynx.pro.entity.Validator;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.repository.BlockValidatorRepository;
 import com.jynx.pro.repository.ReadOnlyRepository;
 import com.jynx.pro.repository.ValidatorRepository;
 import com.jynx.pro.request.ValidatorApplicationRequest;
@@ -13,6 +16,7 @@ import org.java_websocket.util.Base64;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -26,6 +30,8 @@ public class ValidatorService {
     private ValidatorRepository validatorRepository;
     @Autowired
     private ReadOnlyRepository readOnlyRepository;
+    @Autowired
+    private BlockValidatorRepository blockValidatorRepository;
     @Autowired
     private ConfigService configService;
     @Autowired
@@ -92,6 +98,34 @@ public class ValidatorService {
                 .sorted(Comparator.comparing(Validator::getDelegation).reversed())
                 .limit(configService.get().getActiveValidatorCount())
                 .collect(Collectors.toList());
+    }
+
+    /**
+     * Save the validator set for the current block
+     *
+     * @param blockHeight the current block height
+     */
+    public void saveBlockValidators(
+            final long blockHeight
+    ) {
+        List<BlockValidator> blockValidators = new ArrayList<>();
+        for(Validator validator : getActiveSet()) {
+            blockValidators.add(new BlockValidator()
+                    .setValidator(validator)
+                    .setBlockHeight(blockHeight)
+                    .setDelegation(validator.getDelegation())
+                    .setId(uuidUtils.next())
+                    .setStatus(BlockValidatorStatus.ACTIVE));
+        }
+        for(Validator validator : getBackupSet()) {
+            blockValidators.add(new BlockValidator()
+                    .setValidator(validator)
+                    .setBlockHeight(blockHeight)
+                    .setDelegation(validator.getDelegation())
+                    .setId(uuidUtils.next())
+                    .setStatus(BlockValidatorStatus.BACKUP));
+        }
+        blockValidatorRepository.saveAll(blockValidators);
     }
 
     /**

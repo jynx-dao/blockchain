@@ -574,9 +574,11 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     /**
      * Update the active validator set
      *
+     * @param blockHeight the current block height
      * @param builder {@link Types.ResponseEndBlock.Builder}
      */
     private void updateValidators(
+            final long blockHeight,
             final Types.ResponseEndBlock.Builder builder
     ) {
         List<Validator> validators = validatorService.getAll();
@@ -597,8 +599,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                     .build();
             builder.addValidatorUpdates(validatorUpdate);
         }
-        // TODO - we should keep a record of the validator's in each block and their weights
-        // TODO - this will be used to reward them later
+        validatorService.saveBlockValidators(blockHeight);
     }
 
     /**
@@ -667,7 +668,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     public void endBlock(Types.RequestEndBlock req, StreamObserver<Types.ResponseEndBlock> responseObserver) {
         Types.ResponseEndBlock.Builder builder = Types.ResponseEndBlock.newBuilder();
         appStateManager.setBlockHeight(req.getHeight());
-        updateValidators(builder);
+        updateValidators(req.getHeight(), builder);
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
