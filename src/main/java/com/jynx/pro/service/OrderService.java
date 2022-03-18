@@ -17,7 +17,6 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.*;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -654,23 +653,13 @@ public class OrderService {
         List<Order> openOrders = orderRepository.findByStatusInAndTypeAndMarketAndUser(
                 statusList, request.getType(), market, request.getUser());
         BigDecimal remainingQuantity;
-        Function<Order, Boolean> matchingFunction =
-                (o) -> o.getPrice().doubleValue() >= request.getPrice().doubleValue();
-        if(request.getSide().equals(MarketSide.SELL)) {
-            matchingFunction = (o) -> o.getPrice().doubleValue() <= request.getPrice().doubleValue();
-        }
         double existingVolume = openOrders.stream()
                 .filter(o -> o.getSide().equals(request.getSide()))
-                .filter(matchingFunction::apply)
                 .mapToDouble(o -> o.getRemainingQuantity().doubleValue()).sum();
         if(existingVolume >= position.getQuantity().doubleValue()) {
             throw new JynxProException(ErrorCode.CANNOT_CREATE_REDUCE_ONLY_ORDER);
         } else {
-            remainingQuantity = request.getQuantity().subtract(
-                    BigDecimal.valueOf(existingVolume)).subtract(position.getQuantity());
-        }
-        if(remainingQuantity.doubleValue() <= 0) {
-            throw new JynxProException(ErrorCode.CANNOT_CREATE_REDUCE_ONLY_ORDER);
+            remainingQuantity = position.getQuantity().subtract(BigDecimal.valueOf(existingVolume));
         }
         if(request.getQuantity().doubleValue() > remainingQuantity.doubleValue()) {
             request.setQuantity(remainingQuantity);

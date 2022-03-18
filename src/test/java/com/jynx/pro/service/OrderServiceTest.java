@@ -1221,11 +1221,95 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testReduceOnlyFailWhenDoesNotReduceSizeWithNoPosition() {
+    public void testReduceOnlyWithAmendOrderSizeDownBuy() {
+        Market market = createOrderBook(3, 3);
+        orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1),
+                MarketSide.BUY, OrderType.MARKET, takerUser));
+        Order order1 = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(48000), BigDecimal.valueOf(0.8),
+                MarketSide.SELL, OrderType.LIMIT, takerUser).setReduceOnly(true));
+        Order order2 = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(48000), BigDecimal.valueOf(0.5),
+                MarketSide.SELL, OrderType.LIMIT, takerUser).setReduceOnly(true));
+        Optional<Order> orderOptional1 = orderRepository.findById(order1.getId());
+        Assertions.assertTrue(orderOptional1.isPresent());
+        Optional<Order> orderOptional2 = orderRepository.findById(order2.getId());
+        Assertions.assertTrue(orderOptional2.isPresent());
+        Assertions.assertEquals(orderOptional1.get().getQuantity().doubleValue(), 0.8d);
+        Assertions.assertEquals(orderOptional2.get().getQuantity().doubleValue(), 0.2d);
+    }
+
+    @Test
+    public void testReduceOnlyWithoutAmendOrderSizeDownBuy() {
+        Market market = createOrderBook(3, 3);
+        orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1),
+                MarketSide.BUY, OrderType.MARKET, takerUser));
+        Order order = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(48000), BigDecimal.valueOf(0.5),
+                MarketSide.SELL, OrderType.LIMIT, takerUser).setReduceOnly(true));
+        Optional<Order> orderOptional = orderRepository.findById(order.getId());
+        Assertions.assertTrue(orderOptional.isPresent());
+        Assertions.assertEquals(orderOptional.get().getQuantity().doubleValue(), 0.5d);
+    }
+
+    @Test
+    public void testReduceOnlyWithAmendOrderSizeDownSell() {
+        Market market = createOrderBook(3, 3);
+        orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1),
+                MarketSide.SELL, OrderType.MARKET, takerUser));
+        Order order1 = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(40000), BigDecimal.valueOf(0.8),
+                MarketSide.BUY, OrderType.LIMIT, takerUser).setReduceOnly(true));
+        Order order2 = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(40000), BigDecimal.valueOf(0.5),
+                MarketSide.BUY, OrderType.LIMIT, takerUser).setReduceOnly(true));
+        Optional<Order> orderOptional1 = orderRepository.findById(order1.getId());
+        Assertions.assertTrue(orderOptional1.isPresent());
+        Optional<Order> orderOptional2 = orderRepository.findById(order2.getId());
+        Assertions.assertTrue(orderOptional2.isPresent());
+        Assertions.assertEquals(orderOptional1.get().getQuantity().doubleValue(), 0.8d);
+        Assertions.assertEquals(orderOptional2.get().getQuantity().doubleValue(), 0.2d);
+    }
+
+    @Test
+    public void testReduceOnlyWithoutAmendOrderSizeDownSell() {
+        Market market = createOrderBook(3, 3);
+        orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1),
+                MarketSide.BUY, OrderType.MARKET, takerUser));
+        Order order = orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(40000), BigDecimal.valueOf(0.5),
+                MarketSide.SELL, OrderType.LIMIT, takerUser).setReduceOnly(true));
+        Optional<Order> orderOptional = orderRepository.findById(order.getId());
+        Assertions.assertTrue(orderOptional.isPresent());
+        Assertions.assertEquals(orderOptional.get().getQuantity().doubleValue(), 0.5d);
+    }
+
+    @Test
+    public void testReduceOnlyFailWhenDoesNotReduceSizeWithNoPositionBuy() {
         Market market = createOrderBook(3, 3);
         try {
             orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45590), BigDecimal.ONE,
                     MarketSide.BUY, OrderType.LIMIT, makerUser).setReduceOnly(true));
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.CANNOT_CREATE_REDUCE_ONLY_ORDER);
+        }
+    }
+
+    @Test
+    public void testReduceOnlyFailWhenDoesNotReduceSizeWithNoPositionSell() {
+        Market market = createOrderBook(3, 3);
+        try {
+            orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45650), BigDecimal.ONE,
+                    MarketSide.SELL, OrderType.LIMIT, makerUser).setReduceOnly(true));
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.CANNOT_CREATE_REDUCE_ONLY_ORDER);
+        }
+    }
+
+    @Test
+    public void testReduceOnlyFailWhenSameDirection() {
+        Market market = createOrderBook(3, 3);
+        orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1),
+                MarketSide.SELL, OrderType.MARKET, takerUser));
+        try {
+            orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(1),
+                    MarketSide.SELL, OrderType.MARKET, takerUser).setReduceOnly(true));
             Assertions.fail();
         } catch(JynxProException e) {
             Assertions.assertEquals(e.getMessage(), ErrorCode.CANNOT_CREATE_REDUCE_ONLY_ORDER);
