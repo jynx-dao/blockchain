@@ -92,4 +92,5 @@ public class ErrorCode {
     public static final String CANNOT_GET_NONCE = "Cannot get nonce.";
     public static final String SIGN_BRIDGE_UPDATED_FAILED = "Failed to sign bridge updates.";
     public static final String EXECUTE_BRIDGE_UPDATES_FAILED = "Failed to execute bridge updates.";
+    public static final String CANNOT_CREATE_REDUCE_ONLY_ORDER = "Cannot create order because would not reduce position.";
 }

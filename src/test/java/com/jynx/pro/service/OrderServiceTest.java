@@ -52,12 +52,12 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void createLimitOrder() {
+    public void testCreateLimitOrder() {
         createOrderBook(2, 2);
     }
 
     @Test
-    public void createOrderFailedWithInsufficientMargin() throws DecoderException {
+    public void testCreateOrderFailedWithInsufficientMargin() throws DecoderException {
         Market market = createAndEnactMarket(true);
         try {
             orderService.create(getCreateOrderRequest(market.getId(),
@@ -69,7 +69,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void createOrderFailedWhenMarketInactive() throws DecoderException {
+    public void testCreateOrderFailedWhenMarketInactive() throws DecoderException {
         Market market = createAndEnactMarket(false);
         try {
             orderService.create(getCreateOrderRequest(market.getId(),
@@ -81,7 +81,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void cancelOrder() {
+    public void testCancelOrder() {
         Market market = createOrderBook(1, 1);
         List<Order> orders = orderService.getOpenLimitOrders(market);
         for(Order order : orders) {
@@ -105,7 +105,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void createMarketOrderBuy() {
+    public void testCreateMarketOrderBuy() {
         Market market = createOrderBook(1, 1);
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.MARKET, takerUser));
@@ -154,7 +154,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void createCrossingLimitOrderBuy() {
+    public void testCreateCrossingLimitOrderBuy() {
         Market market = createOrderBook(3, 3);
         orderService.create(getCreateOrderRequest(market.getId(),
                 BigDecimal.valueOf(45611), BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.LIMIT, takerUser));
@@ -208,7 +208,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void createCrossingLimitOrderBuyWithLeftover() {
+    public void testCreateCrossingLimitOrderBuyWithLeftover() {
         Market market = createOrderBook(3, 3);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         orderService.create(getCreateOrderRequest(market.getId(),
@@ -407,7 +407,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void createMarketOrderSell() {
+    public void testCreateMarketOrderSell() {
         Market market = createOrderBook(1, 1);
         orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.valueOf(0.5), MarketSide.SELL, OrderType.MARKET, takerUser));
@@ -457,7 +457,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void createCrossingLimitOrderSell() {
+    public void testCreateCrossingLimitOrderSell() {
         Market market = createOrderBook(3, 3);
         orderService.create(getCreateOrderRequest(market.getId(),
                 BigDecimal.valueOf(45589), BigDecimal.valueOf(0.5), MarketSide.SELL, OrderType.LIMIT, takerUser));
@@ -510,7 +510,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void createCrossingLimitOrderSellWithLeftover() {
+    public void testCreateCrossingLimitOrderSellWithLeftover() {
         Market market = createOrderBook(3, 3);
         int dps = market.getSettlementAsset().getDecimalPlaces();
         orderService.create(getCreateOrderRequest(market.getId(),
@@ -571,7 +571,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void createCrossingLimitOrderFailsWithPostOnlyTrue() {
+    public void testCreateCrossingLimitOrderFailsWithPostOnlyTrue() {
         Market market = createOrderBook(3, 3);
         try {
             orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45589), BigDecimal.valueOf(0.5),
@@ -583,7 +583,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void createMarketOrderFailsWithInsufficientPassiveVolume() {
+    public void testCreateMarketOrderFailsWithInsufficientPassiveVolume() {
         Market market = createOrderBook(3, 3);
         try {
             orderService.create(getCreateOrderRequest(market.getId(), null, BigDecimal.valueOf(4),
@@ -595,7 +595,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void cancelOrderFailsWithUnsupportedType() {
+    public void testCancelOrderFailsWithUnsupportedType() {
         Market market = createOrderBook(1, 1);
         Order order = orderService.create(getCreateOrderRequest(market.getId(),
                 BigDecimal.ONE, BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.MARKET, takerUser));
@@ -611,7 +611,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void cancelOrderFailsWithInvalidPermission() {
+    public void testCancelOrderFailsWithInvalidPermission() {
         Market market = createOrderBook(1, 1);
         Order order = orderService.create(getCreateOrderRequest(market.getId(),
                 null, BigDecimal.valueOf(0.5), MarketSide.BUY, OrderType.MARKET, takerUser));
@@ -627,7 +627,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void cancelOrderFailsWithInvalidID() {
+    public void testCancelOrderFailsWithInvalidID() {
         try {
             CancelOrderRequest request = new CancelOrderRequest();
             request.setUser(makerUser);
@@ -640,7 +640,7 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void cancelOrderFailsWithStatusFilled() {
+    public void testCancelOrderFailsWithStatusFilled() {
         Market market = createOrderBook(1, 1);
         List<Order> orders = orderService.getOpenLimitOrders(market).stream()
                 .filter(order -> order.getSide().equals(MarketSide.SELL)).collect(Collectors.toList());
@@ -1221,51 +1221,15 @@ public class OrderServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testCannotSelfTradeWithCrossingLimitOrder() {
-        Market market = createOrderBook(2, 2);
-        orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45605), BigDecimal.valueOf(1),
-                MarketSide.SELL, OrderType.LIMIT, takerUser));
-        orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45611), BigDecimal.valueOf(1),
-                MarketSide.BUY, OrderType.LIMIT, takerUser));
-        BigDecimal takerMargin = BigDecimal.valueOf(45610).multiply(market.getMarginRequirement());
-        BigDecimal makerMargin = BigDecimal.valueOf(45610).multiply(market.getMarginRequirement()).add(BigDecimal.valueOf(45611).multiply(market.getMarginRequirement()));
-        BigDecimal takerFee = BigDecimal.valueOf(45610).multiply(market.getTakerFee());
-        BigDecimal makerFee = BigDecimal.valueOf(45610).multiply(market.getMakerFee());
-        Trader taker = new Trader()
-                .setMargin(takerMargin)
-                .setBalance(BigDecimal.valueOf(INITIAL_BALANCE).subtract(takerFee))
-                .setAverageEntryPrice(BigDecimal.valueOf(45610))
-                .setUser(takerUser)
-                .setSide(MarketSide.BUY)
-                .setOpenVolume(BigDecimal.ONE)
-                .setRealisedProfit(takerFee.multiply(BigDecimal.valueOf(-1)))
-                .setTradeCount(1)
-                .setFee(takerFee.multiply(BigDecimal.valueOf(-1)));
-        Trader maker = new Trader()
-                .setMargin(makerMargin)
-                .setBalance(BigDecimal.valueOf(INITIAL_BALANCE).add(makerFee))
-                .setAverageEntryPrice(BigDecimal.valueOf(45610))
-                .setUser(makerUser)
-                .setSide(MarketSide.SELL)
-                .setOpenVolume(BigDecimal.ONE)
-                .setRealisedProfit(makerFee)
-                .setTradeCount(1)
-                .setFee(makerFee);
-        taker.setAvailableBalance(taker.getBalance().subtract(taker.getMargin()));
-        maker.setAvailableBalance(maker.getBalance().subtract(maker.getMargin()));
-        validateMarketState(
-                market.getId(),
-                BigDecimal.valueOf(1),
-                BigDecimal.valueOf(45610),
-                BigDecimal.valueOf(45590),
-                BigDecimal.valueOf(45605),
-                BigDecimal.valueOf(1),
-                BigDecimal.valueOf(1),
-                2,
-                2,
-                BigDecimal.ZERO,
-                List.of(maker, taker)
-        );
+    public void testReduceOnlyFailWhenDoesNotReduceSizeWithNoPosition() {
+        Market market = createOrderBook(3, 3);
+        try {
+            orderService.create(getCreateOrderRequest(market.getId(), BigDecimal.valueOf(45590), BigDecimal.ONE,
+                    MarketSide.BUY, OrderType.LIMIT, makerUser).setReduceOnly(true));
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.CANNOT_CREATE_REDUCE_ONLY_ORDER);
+        }
     }
 
     @Test
