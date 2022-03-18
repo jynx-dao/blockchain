@@ -21,8 +21,8 @@ public class Validator {
     private UUID id;
     @Column(name = "public_key", nullable = false)
     private String publicKey;
-    @Column(name = "active", nullable = false)
-    private Boolean active;
     @Column(name = "delegation", nullable = false)
     private BigDecimal delegation = BigDecimal.ZERO;
+    @Column(name = "enabled", nullable = false)
+    private Boolean enabled;
 }

@@ -619,7 +619,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         request.getValidatorsList().forEach(v -> {
             String publicKey = Base64.getEncoder().encodeToString(
                     request.getValidatorsList().get(0).getPubKey().getEd25519().toByteArray());
-            validatorService.activate(publicKey);
+            validatorService.addFromGenesis(publicKey);
         });
         databaseTransactionManager.commit();
         responseObserver.onNext(resp);

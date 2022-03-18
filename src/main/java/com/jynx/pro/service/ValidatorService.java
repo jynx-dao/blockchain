@@ -68,7 +68,7 @@ public class ValidatorService {
         }
         Validator validator = new Validator()
                 .setPublicKey(request.getTendermintPublicKey())
-                .setActive(false)
+                .setEnabled(true)
                 .setId(uuidUtils.next());
         return validatorRepository.save(validator);
     }
@@ -79,7 +79,7 @@ public class ValidatorService {
      * @return {@link List<Validator>}
      */
     public List<Validator> getAll() {
-        return validatorRepository.findAll();
+        return readOnlyRepository.getAllByEntity(Validator.class);
     }
 
     /**
@@ -88,9 +88,10 @@ public class ValidatorService {
      * @return {@link List<Validator>}
      */
     public List<Validator> getBackupSet() {
-        return validatorRepository.findAll().stream()
+        return readOnlyRepository.getAllByEntity(Validator.class).stream()
                 .filter(v -> v.getDelegation().doubleValue() > configService.get()
                         .getValidatorMinDelegation().doubleValue())
+                .filter(Validator::getEnabled)
                 .sorted(Comparator.comparing(Validator::getDelegation).reversed())
                 .skip(configService.get().getActiveValidatorCount())
                 .limit(configService.get().getBackupValidatorCount())
@@ -103,9 +104,10 @@ public class ValidatorService {
      * @return {@link List<Validator>}
      */
     public List<Validator> getActiveSet() {
-        return validatorRepository.findAll().stream()
+        return readOnlyRepository.getAllByEntity(Validator.class).stream()
                 .filter(v -> v.getDelegation().doubleValue() > configService.get()
                         .getValidatorMinDelegation().doubleValue())
+                .filter(Validator::getEnabled)
                 .sorted(Comparator.comparing(Validator::getDelegation).reversed())
                 .limit(configService.get().getActiveValidatorCount())
                 .collect(Collectors.toList());
@@ -140,11 +142,11 @@ public class ValidatorService {
     }
 
     /**
-     * Activate a {@link Validator}
+     * Add a genesis {@link Validator}
      *
      * @param publicKey the validator's public key
      */
-    public void activate(
+    public void addFromGenesis(
             final String publicKey
     ) {
         Optional<Validator> validatorOptional = validatorRepository.findByPublicKey(publicKey);
@@ -152,12 +154,9 @@ public class ValidatorService {
             Validator validator = new Validator()
                     .setId(uuidUtils.next())
                     .setPublicKey(publicKey)
-                    .setDelegation(BigDecimal.ONE)
-                    .setActive(true);
+                    .setEnabled(true)
+                    .setDelegation(BigDecimal.ONE);
             validatorRepository.save(validator);
-        } else {
-            validatorOptional.get().setActive(true);
-            validatorRepository.save(validatorOptional.get());
         }
     }
 
@@ -171,8 +170,23 @@ public class ValidatorService {
     public boolean isValidator(
             final String publicKey
     ) {
-        Optional<Validator> validatorOptional = readOnlyRepository.getValidatorByPublicKey(publicKey);
-        if(validatorOptional.isEmpty()) return false;
-        return validatorOptional.get().getActive();
+        boolean activeValidator = getActiveSet().stream().anyMatch(v -> v.getPublicKey().equals(publicKey));
+        boolean backupValidator = getBackupSet().stream().anyMatch(v -> v.getPublicKey().equals(publicKey));
+        return activeValidator || backupValidator;
+    }
+
+    /**
+     * Disable a validator when they do not have sufficient stake
+     *
+     * @param publicKey the validator's Tendermint key
+     */
+    public void disable(
+            final String publicKey
+    ) {
+        Optional<Validator> validatorOptional = validatorRepository.findByPublicKey(publicKey);
+        if(validatorOptional.isPresent()) {
+            validatorOptional.get().setEnabled(false);
+            validatorRepository.save(validatorOptional.get());
+        }
     }
 }

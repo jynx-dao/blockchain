@@ -4,6 +4,7 @@ import com.jynx.pro.entity.Config;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.ConfigRepository;
+import com.jynx.pro.repository.ReadOnlyRepository;
 import com.jynx.pro.utils.JSONUtils;
 import lombok.Getter;
 import lombok.Setter;
@@ -23,6 +24,8 @@ public class ConfigService {
 
     @Autowired
     private ConfigRepository configRepository;
+    @Autowired
+    private ReadOnlyRepository readOnlyRepository;
     @Autowired
     private JSONUtils jsonUtils;
 
@@ -49,7 +52,7 @@ public class ConfigService {
      * @return the {@link Config}
      */
     public Config get() {
-        return configRepository.findAll().stream().findFirst()
+        return readOnlyRepository.getAllByEntity(Config.class).stream().findFirst()
                 .orElseThrow(() -> new JynxProException(ErrorCode.CONFIG_NOT_FOUND));
     }
 }

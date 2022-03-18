@@ -12,6 +12,8 @@ import com.jynx.pro.repository.StakeRepository;
 import com.jynx.pro.utils.PriceUtils;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.codec.binary.Hex;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -41,6 +43,8 @@ public class EventService {
     private AssetService assetService;
     @Autowired
     private ConfigService configService;
+    @Autowired
+    private ValidatorService validatorService;
     @Autowired
     private UUIDUtils uuidUtils;
     @Autowired
@@ -157,22 +161,31 @@ public class EventService {
     public Event confirm(
             final Event event
     ) {
-        List<EventType> stakeEvents = List.of(EventType.ADD_STAKE, EventType.REMOVE_STAKE);
-        if(stakeEvents.contains(event.getType())) {
-            Stake stake = stakeService.getAndCreate(event.getUser());
-            // TODO - if a validator removes their self-owned stake then they might need to be removed from the active set
-            if(event.getType().equals(EventType.ADD_STAKE)) {
-                stake.setAmount(stake.getAmount().add(event.getAmount()));
+        try {
+            List<EventType> stakeEvents = List.of(EventType.ADD_STAKE, EventType.REMOVE_STAKE);
+            if (stakeEvents.contains(event.getType())) {
+                Stake stake = stakeService.getAndCreate(event.getUser());
+                String tendermintKey = Base64.encodeBase64String(Hex.decodeHex(event.getUser().getPublicKey()));
+                boolean isValidator = validatorService.isValidator(tendermintKey);
+                if (event.getType().equals(EventType.ADD_STAKE)) {
+                    stake.setAmount(stake.getAmount().add(event.getAmount()));
+                } else {
+                    stake.setAmount(stake.getAmount().subtract(event.getAmount()));
+                }
+                if(isValidator && stake.getAmount().doubleValue() < configService.get()
+                        .getValidatorBond().doubleValue()) {
+                    validatorService.disable(tendermintKey);
+                }
+                stakeRepository.save(stake);
             } else {
-                stake.setAmount(stake.getAmount().subtract(event.getAmount()));
+                Deposit deposit = depositRepository.findByEventId(event.getId())
+                        .orElseThrow(() -> new JynxProException(ErrorCode.DEPOSIT_NOT_FOUND));
+                accountService.credit(deposit);
             }
-            stakeRepository.save(stake);
-        } else {
-            Deposit deposit = depositRepository.findByEventId(event.getId())
-                    .orElseThrow(() -> new JynxProException(ErrorCode.DEPOSIT_NOT_FOUND));
-            accountService.credit(deposit);
+            event.setConfirmed(true);
+        } catch(Exception e) {
+            log.error(e.getMessage(), e);
         }
-        event.setConfirmed(true);
         return eventRepository.save(event);
     }
 
