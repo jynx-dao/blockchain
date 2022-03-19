@@ -62,8 +62,7 @@ public class SnapshotService {
         hashChain = saveEntity(WithdrawalBatch.class, hashChain, blockHeight);
         hashChain = saveEntity(WithdrawalBatchSignature.class, hashChain, blockHeight);
         String hash = DigestUtils.sha3_256Hex(BigInteger.valueOf(hashChain).toByteArray());
-        // TODO - save the hashChain
-        log.info("{}", hash);
+        saveHash(hash, blockHeight);
     }
 
     /**
@@ -93,6 +92,28 @@ public class SnapshotService {
         } catch(Exception e) {
             log.error(e.getMessage(), e);
             return hashChain;
+        }
+    }
+
+    /**
+     * Save the hash, used to verify consistency of state
+     *
+     * @param hash the state hash
+     * @param blockHeight the current block height
+     */
+    private void saveHash(
+            final String hash,
+            final long blockHeight
+    ) {
+        try {
+            File userDirectory = FileUtils.getUserDirectory();
+            String baseDir = String.format("%s/.jynx/snapshots/height_%s", userDirectory.toPath(), blockHeight);
+            Files.createDirectories(Paths.get(baseDir));
+            FileWriter fw = new FileWriter(String.format("%s/hash.json", baseDir), true);
+            fw.append(hash);
+            fw.close();
+        } catch(Exception e) {
+            log.error(e.getMessage(), e);
         }
     }
 
