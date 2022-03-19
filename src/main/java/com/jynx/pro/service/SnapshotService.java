@@ -296,9 +296,11 @@ public class SnapshotService {
         String baseDir = String.format("%s/.jynx/snapshots/height_%s", userDirectory.toPath(), blockHeight);
         boolean exists = Files.exists(Paths.get(baseDir));
         if(exists) {
-            entityConfig.forEach(c -> loadEntity(c, blockHeight));
+            int[] hashChain = {0};
+            entityConfig.forEach(c -> hashChain[0] = loadEntity(c, blockHeight, hashChain[0]));
+            String hash = DigestUtils.sha3_256Hex(BigInteger.valueOf(hashChain[0]).toByteArray());
+            // TODO - verify that the hash is correct
         }
-        // TODO - verify that the hash is correct
     }
 
     /**
@@ -306,11 +308,13 @@ public class SnapshotService {
      *
      * @param config {@link EntityConfig<T>}
      * @param blockHeight the current block height
+     * @param hashChain used to verify state consistency
      * @param <T> the entity type
      */
-    private <T> void loadEntity(
+    private <T> int loadEntity(
             final EntityConfig<T> config,
-            final long blockHeight
+            final long blockHeight,
+            final int hashChain
     ) {
         try {
             File file = new File(String.format("%s/%s.json", getBaseDir(blockHeight),
@@ -319,8 +323,10 @@ public class SnapshotService {
             List<T> items = objectMapper.readValue(content, new TypeReference<>() {});
             config.getRepository().deleteAll();
             config.getRepository().saveAll(items);
+            return List.of(hashChain, items.hashCode()).hashCode();
         } catch(Exception e) {
             log.error(e.getMessage(), e);
+            return 0;
         }
     }
 
