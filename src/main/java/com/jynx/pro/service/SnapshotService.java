@@ -1,19 +1,25 @@
 package com.jynx.pro.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jynx.pro.entity.*;
-import com.jynx.pro.repository.ReadOnlyRepository;
+import com.jynx.pro.repository.*;
+import lombok.Data;
+import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.apache.commons.io.FileUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import javax.annotation.PostConstruct;
 import java.io.File;
 import java.io.FileWriter;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -23,7 +29,156 @@ public class SnapshotService {
     @Autowired
     private ReadOnlyRepository readOnlyRepository;
     @Autowired
+    private AccountRepository accountRepository;
+    @Autowired
+    private AssetRepository assetRepository;
+    @Autowired
+    private AuctionTriggerRepository auctionTriggerRepository;
+    @Autowired
+    private BlockValidatorRepository blockValidatorRepository;
+    @Autowired
+    private BridgeUpdateRepository bridgeUpdateRepository;
+    @Autowired
+    private BridgeUpdateSignatureRepository bridgeUpdateSignatureRepository;
+    @Autowired
+    private ConfigRepository configRepository;
+    @Autowired
+    private DelegationRepository delegationRepository;
+    @Autowired
+    private DepositRepository depositRepository;
+    @Autowired
+    private EventRepository eventRepository;
+    @Autowired
+    private MarketRepository marketRepository;
+    @Autowired
+    private OracleRepository oracleRepository;
+    @Autowired
+    private OrderHistoryRepository orderHistoryRepository;
+    @Autowired
+    private OrderRepository orderRepository;
+    @Autowired
+    private PendingAuctionTriggerRepository pendingAuctionTriggerRepository;
+    @Autowired
+    private PositionRepository positionRepository;
+    @Autowired
+    private ProposalRepository proposalRepository;
+    @Autowired
+    private SettlementRepository settlementRepository;
+    @Autowired
+    private StakeRepository stakeRepository;
+    @Autowired
+    private TradeRepository tradeRepository;
+    @Autowired
+    private TransactionRepository transactionRepository;
+    @Autowired
+    private UserRepository userRepository;
+    @Autowired
+    private ValidatorRepository validatorRepository;
+    @Autowired
+    private VoteRepository voteRepository;
+    @Autowired
+    private WithdrawalBatchRepository withdrawalBatchRepository;
+    @Autowired
+    private WithdrawalBatchSignatureRepository withdrawalBatchSignatureRepository;
+    @Autowired
+    private WithdrawalRepository withdrawalRepository;
+    @Autowired
     private ObjectMapper objectMapper;
+
+    @Data
+    @Accessors(chain = true)
+    private static class EntityConfig<T> {
+        private EntityRepository<T> repository;
+        private Class<T> type;
+    }
+
+    private static final List<EntityConfig<?>> entityConfig = new ArrayList<>();
+
+    @PostConstruct
+    private void initializeConfig() {
+        // TODO - workout the correct hierarchy
+        entityConfig.add(new EntityConfig<Account>()
+                .setRepository(accountRepository)
+                .setType(Account.class));
+        entityConfig.add(new EntityConfig<Asset>()
+                .setRepository(assetRepository)
+                .setType(Asset.class));
+        entityConfig.add(new EntityConfig<AuctionTrigger>()
+                .setRepository(auctionTriggerRepository)
+                .setType(AuctionTrigger.class));
+        entityConfig.add(new EntityConfig<BlockValidator>()
+                .setRepository(blockValidatorRepository)
+                .setType(BlockValidator.class));
+        entityConfig.add(new EntityConfig<BridgeUpdate>()
+                .setRepository(bridgeUpdateRepository)
+                .setType(BridgeUpdate.class));
+        entityConfig.add(new EntityConfig<BridgeUpdateSignature>()
+                .setRepository(bridgeUpdateSignatureRepository)
+                .setType(BridgeUpdateSignature.class));
+        entityConfig.add(new EntityConfig<Config>()
+                .setRepository(configRepository)
+                .setType(Config.class));
+        entityConfig.add(new EntityConfig<Delegation>()
+                .setRepository(delegationRepository)
+                .setType(Delegation.class));
+        entityConfig.add(new EntityConfig<Deposit>()
+                .setRepository(depositRepository)
+                .setType(Deposit.class));
+        entityConfig.add(new EntityConfig<Event>()
+                .setRepository(eventRepository)
+                .setType(Event.class));
+        entityConfig.add(new EntityConfig<Market>()
+                .setRepository(marketRepository)
+                .setType(Market.class));
+        entityConfig.add(new EntityConfig<Oracle>()
+                .setRepository(oracleRepository)
+                .setType(Oracle.class));
+        entityConfig.add(new EntityConfig<OrderHistory>()
+                .setRepository(orderHistoryRepository)
+                .setType(OrderHistory.class));
+        entityConfig.add(new EntityConfig<Order>()
+                .setRepository(orderRepository)
+                .setType(Order.class));
+        entityConfig.add(new EntityConfig<PendingAuctionTrigger>()
+                .setRepository(pendingAuctionTriggerRepository)
+                .setType(PendingAuctionTrigger.class));
+        entityConfig.add(new EntityConfig<Position>()
+                .setRepository(positionRepository)
+                .setType(Position.class));
+        entityConfig.add(new EntityConfig<Proposal>()
+                .setRepository(proposalRepository)
+                .setType(Proposal.class));
+        entityConfig.add(new EntityConfig<Settlement>()
+                .setRepository(settlementRepository)
+                .setType(Settlement.class));
+        entityConfig.add(new EntityConfig<Stake>()
+                .setRepository(stakeRepository)
+                .setType(Stake.class));
+        entityConfig.add(new EntityConfig<Trade>()
+                .setRepository(tradeRepository)
+                .setType(Trade.class));
+        entityConfig.add(new EntityConfig<Transaction>()
+                .setRepository(transactionRepository)
+                .setType(Transaction.class));
+        entityConfig.add(new EntityConfig<User>()
+                .setRepository(userRepository)
+                .setType(User.class));
+        entityConfig.add(new EntityConfig<Validator>()
+                .setRepository(validatorRepository)
+                .setType(Validator.class));
+        entityConfig.add(new EntityConfig<Vote>()
+                .setRepository(voteRepository)
+                .setType(Vote.class));
+        entityConfig.add(new EntityConfig<WithdrawalBatch>()
+                .setRepository(withdrawalBatchRepository)
+                .setType(WithdrawalBatch.class));
+        entityConfig.add(new EntityConfig<WithdrawalBatchSignature>()
+                .setRepository(withdrawalBatchSignatureRepository)
+                .setType(WithdrawalBatchSignature.class));
+        entityConfig.add(new EntityConfig<Withdrawal>()
+                .setRepository(withdrawalRepository)
+                .setType(Withdrawal.class));
+    }
 
     /**
      * Capture the latest state snapshot
@@ -129,5 +284,57 @@ public class SnapshotService {
         } catch(Exception e) {
             log.error(e.getMessage(), e);
         }
+    }
+
+    /**
+     * Load state from snapshot
+     */
+    public void load(
+            final long blockHeight
+    ) {
+        File userDirectory = FileUtils.getUserDirectory();
+        String baseDir = String.format("%s/.jynx/snapshots/height_%s", userDirectory.toPath(), blockHeight);
+        boolean exists = Files.exists(Paths.get(baseDir));
+        if(exists) {
+            entityConfig.forEach(c -> loadEntity(c, blockHeight));
+        }
+        // TODO - verify that the hash is correct
+    }
+
+    /**
+     * Load entity from snapshot file
+     *
+     * @param config {@link EntityConfig<T>}
+     * @param blockHeight the current block height
+     * @param <T> the entity type
+     */
+    private <T> void loadEntity(
+            final EntityConfig<T> config,
+            final long blockHeight
+    ) {
+        try {
+            File file = new File(String.format("%s/%s.json", getBaseDir(blockHeight),
+                    config.getType().getCanonicalName()));
+            String content = FileUtils.readFileToString(file, StandardCharsets.UTF_8);
+            List<T> items = objectMapper.readValue(content, new TypeReference<>() {});
+            config.getRepository().deleteAll();
+            config.getRepository().saveAll(items);
+        } catch(Exception e) {
+            log.error(e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Get base snapshot directory
+     *
+     * @param blockHeight the current block height
+     *
+     * @return the directory
+     */
+    private String getBaseDir(
+            final long blockHeight
+    ) {
+        File userDirectory = FileUtils.getUserDirectory();
+        return String.format("%s/.jynx/snapshots/height_%s", userDirectory.toPath(), blockHeight);
     }
 }
