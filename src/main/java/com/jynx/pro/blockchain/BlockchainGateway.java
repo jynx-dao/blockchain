@@ -3,7 +3,10 @@ package com.jynx.pro.blockchain;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Timestamp;
 import com.jynx.pro.constant.TendermintTransaction;
-import com.jynx.pro.entity.*;
+import com.jynx.pro.entity.BridgeUpdate;
+import com.jynx.pro.entity.Snapshot;
+import com.jynx.pro.entity.Validator;
+import com.jynx.pro.entity.WithdrawalBatch;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.manager.AppStateManager;
@@ -19,7 +22,6 @@ import io.grpc.stub.StreamObserver;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Hex;
-import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -29,7 +31,6 @@ import tendermint.abci.Types;
 import tendermint.crypto.Keys;
 
 import javax.annotation.PostConstruct;
-import java.io.File;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -814,27 +815,10 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Override
     public void loadSnapshotChunk(Types.RequestLoadSnapshotChunk request,
                                   StreamObserver<Types.ResponseLoadSnapshotChunk> responseObserver) {
-        Optional<Snapshot> snapshotOptional = readOnlyRepository.getSnapshotByHeight(request.getHeight());
-        Types.ResponseLoadSnapshotChunk response = Types.ResponseLoadSnapshotChunk.newBuilder().build();
-        if(snapshotOptional.isPresent()) {
-            Snapshot snapshot = snapshotOptional.get();
-            Optional<SnapshotChunk> snapshotChunkOptional = readOnlyRepository
-                    .getSnapshotChunksBySnapshotIdAndChunkIndex(snapshot.getId(), request.getChunk());
-            if(snapshotChunkOptional.isPresent()) {
-                SnapshotChunk snapshotChunk = snapshotChunkOptional.get();
-                File chunkFile = new File(String.format("%s/%s.json",
-                        snapshotService.getBaseDir(snapshot.getBlockHeight()), snapshotChunk.getFileName()));
-                try {
-                    String chunkContent = FileUtils.readFileToString(chunkFile, StandardCharsets.UTF_8);
-                    response = Types.ResponseLoadSnapshotChunk.newBuilder()
-                            .setChunk(ByteString.copyFromUtf8(chunkContent))
-                            .build();
-                } catch(Exception e) {
-                    log.error(e.getMessage(), e);
-                }
-            }
-        }
-        responseObserver.onNext(response);
+        Types.ResponseLoadSnapshotChunk.Builder builder = Types.ResponseLoadSnapshotChunk.newBuilder();
+        Optional<String> chunkContent = snapshotService.getChunkContent(request.getHeight(), request.getChunk());
+        chunkContent.ifPresent(s -> builder.setChunk(ByteString.copyFromUtf8(s)));
+        responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
 

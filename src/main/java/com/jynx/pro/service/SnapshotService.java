@@ -26,6 +26,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Service
@@ -400,10 +401,42 @@ public class SnapshotService {
      *
      * @return the directory
      */
-    public String getBaseDir(
+    private String getBaseDir(
             final long blockHeight
     ) {
         File userDirectory = FileUtils.getUserDirectory();
         return String.format("%s/.jynx/snapshots/height_%s", userDirectory.toPath(), blockHeight);
+    }
+
+    /**
+     * Get the raw data for a snapshot chunk at given block height and chunk index
+     *
+     * @param blockHeight the block height
+     * @param chunkIndex the chunk index
+     *
+     * @return {@link Optional<String>}
+     */
+    public Optional<String> getChunkContent(
+            final long blockHeight,
+            final int chunkIndex
+    ) {
+        Optional<Snapshot> snapshotOptional = readOnlyRepository.getSnapshotByHeight(blockHeight);
+        if(snapshotOptional.isPresent()) {
+            Snapshot snapshot = snapshotOptional.get();
+            Optional<SnapshotChunk> snapshotChunkOptional = readOnlyRepository
+                    .getSnapshotChunksBySnapshotIdAndChunkIndex(snapshot.getId(), chunkIndex);
+            if(snapshotChunkOptional.isPresent()) {
+                SnapshotChunk snapshotChunk = snapshotChunkOptional.get();
+                File chunkFile = new File(String.format("%s/%s.json",
+                        getBaseDir(snapshot.getBlockHeight()), snapshotChunk.getFileName()));
+                try {
+                    String chunkContent = FileUtils.readFileToString(chunkFile, StandardCharsets.UTF_8);
+                    return Optional.of(chunkContent);
+                } catch(Exception e) {
+                    log.error(e.getMessage(), e);
+                }
+            }
+        }
+        return Optional.empty();
     }
 }
