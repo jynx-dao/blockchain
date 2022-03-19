@@ -19,6 +19,7 @@ import io.grpc.stub.StreamObserver;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Hex;
+import org.apache.commons.io.FileUtils;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +29,7 @@ import tendermint.abci.Types;
 import tendermint.crypto.Keys;
 
 import javax.annotation.PostConstruct;
+import java.io.File;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -816,14 +818,20 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         Types.ResponseLoadSnapshotChunk response = Types.ResponseLoadSnapshotChunk.newBuilder().build();
         if(snapshotOptional.isPresent()) {
             Snapshot snapshot = snapshotOptional.get();
-            Optional<SnapshotChunk> snapshotChunkOptional = readOnlyRepository.getSnapshotChunksBySnapshotIdAndChunkIndex(
-                    snapshot.getId(), request.getChunk());
+            Optional<SnapshotChunk> snapshotChunkOptional = readOnlyRepository
+                    .getSnapshotChunksBySnapshotIdAndChunkIndex(snapshot.getId(), request.getChunk());
             if(snapshotChunkOptional.isPresent()) {
                 SnapshotChunk snapshotChunk = snapshotChunkOptional.get();
-                // TODO - load the chunk from disk
-                response = Types.ResponseLoadSnapshotChunk.newBuilder()
-                        .setChunk(ByteString.EMPTY)
-                        .build();
+                File chunkFile = new File(String.format("%s/%s.json",
+                        snapshotService.getBaseDir(snapshot.getBlockHeight()), snapshotChunk.getFileName()));
+                try {
+                    String chunkContent = FileUtils.readFileToString(chunkFile, StandardCharsets.UTF_8);
+                    response = Types.ResponseLoadSnapshotChunk.newBuilder()
+                            .setChunk(ByteString.copyFromUtf8(chunkContent))
+                            .build();
+                } catch(Exception e) {
+                    log.error(e.getMessage(), e);
+                }
             }
         }
         responseObserver.onNext(response);

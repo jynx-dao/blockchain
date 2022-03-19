@@ -400,7 +400,7 @@ public class SnapshotService {
      *
      * @return the directory
      */
-    private String getBaseDir(
+    public String getBaseDir(
             final long blockHeight
     ) {
         File userDirectory = FileUtils.getUserDirectory();
