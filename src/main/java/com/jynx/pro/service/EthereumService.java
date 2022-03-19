@@ -1,13 +1,11 @@
 package com.jynx.pro.service;
 
 import com.jynx.pro.blockchain.TendermintClient;
-import com.jynx.pro.entity.Config;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.ethereum.ERC20Detailed;
 import com.jynx.pro.ethereum.JynxPro_Bridge;
 import com.jynx.pro.ethereum.type.EthereumType;
 import com.jynx.pro.exception.JynxProException;
-import com.jynx.pro.repository.ReadOnlyRepository;
 import com.jynx.pro.request.BatchValidatorRequest;
 import com.jynx.pro.request.DepositAssetRequest;
 import com.jynx.pro.request.SignedRequest;
@@ -63,8 +61,6 @@ public class EthereumService {
     private EventService eventService;
     @Autowired
     private ConfigService configService;
-    @Autowired
-    private ReadOnlyRepository readOnlyRepository;
     @Autowired
     private PriceUtils priceUtils;
     @Autowired
@@ -374,13 +370,9 @@ public class EthereumService {
     ) {
         try {
             Credentials credentials = Credentials.create(ethereumPrivateKey);
-            List<Config> configList = readOnlyRepository.getAllByEntity(Config.class);
-            if(configList.size() > 0) {
-                JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configList.get(0).getBridgeAddress(), getWeb3j(),
-                        credentials, new DefaultGasProvider());
-                return jynxProBridge.withdraw_assets(destinations, amounts, assets, nonce, signature).send();
-            }
-            throw new JynxProException(ErrorCode.CONFIG_NOT_FOUND);
+            JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.getStatic().getBridgeAddress(), getWeb3j(),
+                    credentials, new DefaultGasProvider());
+            return jynxProBridge.withdraw_assets(destinations, amounts, assets, nonce, signature).send();
         } catch(Exception e) {
             log.error(e.getMessage(), e);
             throw new JynxProException(ErrorCode.CANNOT_WITHDRAW_ASSETS);
@@ -451,13 +443,9 @@ public class EthereumService {
     ) {
         try {
             Credentials credentials = Credentials.create(ethereumPrivateKey);
-            List<Config> configList = readOnlyRepository.getAllByEntity(Config.class);
-            if(configList.size() > 0) {
-                JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configList.get(0).getBridgeAddress(), getWeb3j(),
-                        credentials, new DefaultGasProvider());
-                return jynxProBridge.used_nonces(new BigInteger(nonce)).send();
-            }
-            throw new JynxProException(ErrorCode.CONFIG_NOT_FOUND);
+            JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.getStatic().getBridgeAddress(), getWeb3j(),
+                    credentials, new DefaultGasProvider());
+            return jynxProBridge.used_nonces(new BigInteger(nonce)).send();
         } catch(Exception e) {
             log.error(e.getMessage(), e);
             throw new JynxProException(ErrorCode.CANNOT_GET_NONCE);
@@ -480,13 +468,9 @@ public class EthereumService {
     ) {
         try {
             Credentials credentials = Credentials.create(ethereumPrivateKey);
-            List<Config> configList = readOnlyRepository.getAllByEntity(Config.class);
-            if(configList.size() > 0) {
-                JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configList.get(0).getBridgeAddress(), getWeb3j(),
-                        credentials, new DefaultGasProvider());
-                return jynxProBridge.add_asset(asset, nonce, signature).send();
-            }
-            throw new JynxProException(ErrorCode.CONFIG_NOT_FOUND);
+            JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.getStatic().getBridgeAddress(), getWeb3j(),
+                    credentials, new DefaultGasProvider());
+            return jynxProBridge.add_asset(asset, nonce, signature).send();
         } catch(Exception e) {
             log.error(e.getMessage(), e);
             throw new JynxProException(ErrorCode.CANNOT_ADD_ASSET);
@@ -509,13 +493,9 @@ public class EthereumService {
     ) {
         try {
             Credentials credentials = Credentials.create(ethereumPrivateKey);
-            List<Config> configList = readOnlyRepository.getAllByEntity(Config.class);
-            if(configList.size() > 0) {
-                JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configList.get(0).getBridgeAddress(), getWeb3j(),
-                        credentials, new DefaultGasProvider());
-                return jynxProBridge.remove_asset(asset, nonce, signature).send();
-            }
-            throw new JynxProException(ErrorCode.CONFIG_NOT_FOUND);
+            JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.getStatic().getBridgeAddress(), getWeb3j(),
+                    credentials, new DefaultGasProvider());
+            return jynxProBridge.remove_asset(asset, nonce, signature).send();
         } catch(Exception e) {
             log.error(e.getMessage(), e);
             throw new JynxProException(ErrorCode.CANNOT_REMOVE_ASSET);

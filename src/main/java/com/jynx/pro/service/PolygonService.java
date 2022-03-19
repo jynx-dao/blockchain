@@ -35,7 +35,7 @@ public class PolygonService implements ExchangeService {
             final String symbol,
             final Long time
     ) {
-        long from = (time - 120) * 1000;
+        long from = (time - (86400 * 3)) * 1000;
         long to = (time + 120) * 1000;
         String path = "v2/aggs/ticker/%s/range/1/minute/%s/%s?apiKey=%s";
         String url = String.format(API_URL, String.format(path, symbol, from, to, apiKey));

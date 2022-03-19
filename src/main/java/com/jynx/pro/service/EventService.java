@@ -12,6 +12,7 @@ import com.jynx.pro.repository.StakeRepository;
 import com.jynx.pro.utils.PriceUtils;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.binary.Hex;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -161,31 +162,32 @@ public class EventService {
     public Event confirm(
             final Event event
     ) {
-        try {
-            List<EventType> stakeEvents = List.of(EventType.ADD_STAKE, EventType.REMOVE_STAKE);
-            if (stakeEvents.contains(event.getType())) {
-                Stake stake = stakeService.getAndCreate(event.getUser());
-                String tendermintKey = Base64.encodeBase64String(Hex.decodeHex(event.getUser().getPublicKey()));
-                boolean isValidator = validatorService.isValidator(tendermintKey);
-                if (event.getType().equals(EventType.ADD_STAKE)) {
-                    stake.setAmount(stake.getAmount().add(event.getAmount()));
-                } else {
-                    stake.setAmount(stake.getAmount().subtract(event.getAmount()));
-                }
-                if(isValidator && stake.getAmount().doubleValue() < configService.get()
-                        .getValidatorBond().doubleValue()) {
-                    validatorService.disable(tendermintKey);
-                }
-                stakeRepository.save(stake);
-            } else {
-                Deposit deposit = depositRepository.findByEventId(event.getId())
-                        .orElseThrow(() -> new JynxProException(ErrorCode.DEPOSIT_NOT_FOUND));
-                accountService.credit(deposit);
+        List<EventType> stakeEvents = List.of(EventType.ADD_STAKE, EventType.REMOVE_STAKE);
+        if (stakeEvents.contains(event.getType())) {
+            Stake stake = stakeService.getAndCreate(event.getUser());
+            String tendermintKey = "";
+            try {
+                Base64.encodeBase64String(Hex.decodeHex(event.getUser().getPublicKey()));
+            } catch (DecoderException e) {
+                log.error(e.getMessage(), e);
             }
-            event.setConfirmed(true);
-        } catch(Exception e) {
-            log.error(e.getMessage(), e);
+            boolean isValidator = validatorService.isValidator(tendermintKey);
+            if (event.getType().equals(EventType.ADD_STAKE)) {
+                stake.setAmount(stake.getAmount().add(event.getAmount()));
+            } else {
+                stake.setAmount(stake.getAmount().subtract(event.getAmount()));
+            }
+            if(isValidator && stake.getAmount().doubleValue() < configService.get()
+                    .getValidatorBond().doubleValue()) {
+                validatorService.disable(tendermintKey);
+            }
+            stakeRepository.save(stake);
+        } else {
+            Deposit deposit = depositRepository.findByEventId(event.getId())
+                    .orElseThrow(() -> new JynxProException(ErrorCode.DEPOSIT_NOT_FOUND));
+            accountService.credit(deposit);
         }
+        event.setConfirmed(true);
         return eventRepository.save(event);
     }
 

@@ -62,6 +62,9 @@ public class AuctionService {
         if(orderBook.getBids().size() == 0 || orderBook.getAsks().size() == 0) {
             return true;
         }
+        if(openVolume.doubleValue() == 0) {
+            return false;
+        }
         boolean auctionTriggered = false;
         BigDecimal bestBid = orderBook.getBids().get(0).getPrice();
         BigDecimal bestAsk = orderBook.getAsks().get(0).getPrice();
