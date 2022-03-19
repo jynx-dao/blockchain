@@ -62,7 +62,7 @@ public class AuctionServiceTest extends IntegrationTest {
                 .setDepth(depth)
                 .setOpenVolumeRatio(ratio));
         OrderBook orderBook = orderService.getOrderBook(market);
-        return auctionService.isAuctionTriggered(market.getOpenVolume(), orderBook, triggers);
+        return auctionService.isAuctionTriggered(market.getOpenVolume(), orderBook, triggers, market);
     }
 
     @Test

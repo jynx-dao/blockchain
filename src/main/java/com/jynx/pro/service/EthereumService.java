@@ -325,8 +325,10 @@ public class EthereumService {
     ) {
         try {
             ERC20Detailed erc20contract = getERC20Contract(contractAddress);
-            double modifier = BigInteger.TEN.pow(erc20contract.decimals().send().intValue()).doubleValue();
-            return BigDecimal.valueOf(erc20contract.totalSupply().send().doubleValue() / modifier);
+            int dps = erc20contract.decimals().send().intValue();
+            BigInteger modifier = BigInteger.TEN.pow(dps);
+            return new BigDecimal(erc20contract.totalSupply().send())
+                    .divide(new BigDecimal(modifier), dps, RoundingMode.HALF_UP);
         } catch (Exception e) {
             log.error(e.getMessage(), e);
             throw new JynxProException(ErrorCode.CANNOT_GET_SUPPLY);

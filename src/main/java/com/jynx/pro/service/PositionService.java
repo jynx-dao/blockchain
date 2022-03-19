@@ -218,7 +218,7 @@ public class PositionService {
         List<Position> positions = positionRepository.findByMarket(market).stream()
                 .filter(p -> p.getQuantity().doubleValue() > 0 && p.getSide().equals(MarketSide.BUY))
                 .collect(Collectors.toList());
-        return BigDecimal.valueOf(positions.stream().mapToDouble(p -> p.getQuantity().doubleValue()).sum());
+        return positions.stream().map(Position::getQuantity).reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     /**
@@ -422,8 +422,7 @@ public class PositionService {
     ) {
         List<Transaction> transactions = transactionRepository.findByUserAndAsset(
                 position.getUser(), position.getMarket().getSettlementAsset());
-        BigDecimal txSum = BigDecimal.valueOf(transactions.stream()
-                .mapToDouble(t -> t.getAmount().doubleValue()).sum());
+        BigDecimal txSum = transactions.stream().map(Transaction::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
         position.setRealisedPnl(txSum);
         position.setUnrealisedPnl(BigDecimal.ZERO);
         position.setSide(null);
@@ -471,10 +470,11 @@ public class PositionService {
                 market.getSettlementAsset(), BigDecimal.ZERO).stream()
                 .filter(a -> validUserIds.contains(a.getUser().getId()))
                 .collect(Collectors.toList());
-        double sumAvailableBalance = accounts.stream().mapToDouble(a -> a.getAvailableBalance().doubleValue()).sum();
+        BigDecimal sumAvailableBalance = accounts.stream().map(Account::getAvailableBalance)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         for(Account account : accounts) {
             BigDecimal shareOfLoss = (account.getAvailableBalance()
-                    .divide(BigDecimal.valueOf(sumAvailableBalance), dps, RoundingMode.HALF_UP))
+                    .divide(sumAvailableBalance, dps, RoundingMode.HALF_UP))
                     .multiply(lossToSocialize);
             account.setAvailableBalance(account.getAvailableBalance().subtract(shareOfLoss));
             account.setBalance(account.getBalance().subtract(shareOfLoss));

@@ -108,7 +108,7 @@ public class EventService {
                 .setBlockNumber(blockNumber)
                 .setHash(txHash)
                 .setType(type)
-                .setAmount(BigDecimal.valueOf(amount.doubleValue())
+                .setAmount(new BigDecimal(amount)
                         .divide(BigDecimal.valueOf(modifier), 8, RoundingMode.HALF_DOWN));
         if(assetAddress != null) {
             event.setAsset(assetAddress);

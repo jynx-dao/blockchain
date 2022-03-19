@@ -2,12 +2,16 @@ package com.jynx.pro.service;
 
 import com.jynx.pro.constant.BlockValidatorStatus;
 import com.jynx.pro.entity.BlockValidator;
+import com.jynx.pro.entity.Delegation;
+import com.jynx.pro.entity.Stake;
 import com.jynx.pro.entity.Validator;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.BlockValidatorRepository;
+import com.jynx.pro.repository.DelegationRepository;
 import com.jynx.pro.repository.ReadOnlyRepository;
 import com.jynx.pro.repository.ValidatorRepository;
+import com.jynx.pro.request.UpdateDelegationRequest;
 import com.jynx.pro.request.ValidatorApplicationRequest;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -34,11 +38,80 @@ public class ValidatorService {
     @Autowired
     private BlockValidatorRepository blockValidatorRepository;
     @Autowired
+    private DelegationRepository delegationRepository;
+    @Autowired
     private ConfigService configService;
     @Autowired
     private StakeService stakeService;
     @Autowired
     private UUIDUtils uuidUtils;
+
+    /**
+     * Add delegation to a validator
+     *
+     * @param request {@link UpdateDelegationRequest}
+     *
+     * @return {@link Delegation}
+     */
+    public Delegation addDelegation(
+            final UpdateDelegationRequest request
+    ) {
+        Validator validator = validatorRepository.findById(request.getValidatorId())
+                .orElseThrow(() -> new JynxProException(ErrorCode.VALIDATOR_NOT_FOUND));
+        Optional<Delegation> delegationOptional = delegationRepository.findByValidatorIdAndStakeId(
+                validator.getId(), request.getUser().getId());
+        Stake stake = stakeService.getAndCreate(request.getUser());
+        List<Delegation> currentDelegation = delegationRepository.findByStakeId(stake.getId());
+        BigDecimal totalDelegation = currentDelegation.stream().map(Delegation::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal availableStake = stake.getAmount().subtract(totalDelegation);
+        Delegation delegation = new Delegation();
+        if(request.getAmount().doubleValue() > availableStake.doubleValue()) {
+            throw new JynxProException(ErrorCode.INSUFFICIENT_STAKE);
+        }
+        if(delegationOptional.isPresent()) {
+            delegation = delegationOptional.get();
+            delegation.setAmount(delegation.getAmount().add(request.getAmount()));
+        } else {
+            delegation.setValidator(validator);
+            delegation.setStake(stake);
+            delegation.setId(uuidUtils.next());
+            delegation.setAmount(request.getAmount());
+        }
+        return delegationRepository.save(delegation);
+    }
+
+    /**
+     * Remove delegation from a validator
+     *
+     * @param request {@link UpdateDelegationRequest}
+     *
+     * @return {@link Delegation}
+     */
+    public Delegation removeDelegation(
+            final UpdateDelegationRequest request
+    ) {
+        Validator validator = validatorRepository.findById(request.getValidatorId())
+                .orElseThrow(() -> new JynxProException(ErrorCode.VALIDATOR_NOT_FOUND));
+        Optional<Delegation> delegationOptional = delegationRepository.findByValidatorIdAndStakeId(
+                validator.getId(), request.getUser().getId());
+        Stake stake = stakeService.getAndCreate(request.getUser());
+        Delegation delegation = new Delegation();
+        if(delegationOptional.isPresent()) {
+            delegation = delegationOptional.get();
+            if(request.getAmount().doubleValue() > delegation.getAmount().doubleValue()) {
+                delegation.setAmount(BigDecimal.ZERO);
+            } else {
+                delegation.setAmount(delegation.getAmount().subtract(request.getAmount()));
+            }
+        } else {
+            delegation.setValidator(validator);
+            delegation.setStake(stake);
+            delegation.setId(uuidUtils.next());
+            delegation.setAmount(BigDecimal.ZERO);
+        }
+        return delegationRepository.save(delegation);
+    }
 
     /**
      * Apply to become a validator

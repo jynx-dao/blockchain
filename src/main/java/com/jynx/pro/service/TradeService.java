@@ -118,8 +118,8 @@ public class TradeService {
             if(intervalTrades.size() > 0) {
                 open = intervalTrades.get(0).getPrice();
                 close = intervalTrades.get(intervalTrades.size() - 1).getPrice();
-                volume = BigDecimal.valueOf(intervalTrades.stream()
-                        .mapToDouble(t -> t.getQuantity().doubleValue()).sum());
+                volume = intervalTrades.stream()
+                        .map(Trade::getQuantity).reduce(BigDecimal.ZERO, BigDecimal::add);
             }
             kline.add(new Kline()
                     .setOpen(open)

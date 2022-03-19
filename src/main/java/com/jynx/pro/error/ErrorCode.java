@@ -96,4 +96,6 @@ public class ErrorCode {
     public static final String TENDERMINT_SIGNATURE_INVALID = "You must sign the request using your Tendermint key.";
     public static final String VALIDATOR_ALREADY_EXISTS = "This validator already exists.";
     public static final String INSUFFICIENT_VALIDATOR_STAKE = "Insufficient stake to become a validator.";
+    public static final String VALIDATOR_NOT_FOUND = "Validator was not found.";
+    public static final String INSUFFICIENT_STAKE = "You do not have enough stake.";
 }

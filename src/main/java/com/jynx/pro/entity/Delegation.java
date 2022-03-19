@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.experimental.Accessors;
 
 import javax.persistence.*;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Data
@@ -22,5 +23,5 @@ public class Delegation {
     @JoinColumn(name = "validator_id", nullable = false)
     private Validator validator;
     @Column(name = "amount", nullable = false)
-    private Long amount;
+    private BigDecimal amount;
 }
