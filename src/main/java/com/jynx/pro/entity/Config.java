@@ -51,4 +51,8 @@ public class Config {
     private BigDecimal validatorBond;
     @Column(name = "validator_min_delegation", nullable = false)
     private BigDecimal validatorMinDelegation;
+    @Column(name = "snapshot_frequency", nullable = false)
+    private Integer snapshotFrequency;
+    @Column(name = "async_task_frequency", nullable = false)
+    private Integer asyncTaskFrequency;
 }

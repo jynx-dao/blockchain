@@ -32,6 +32,8 @@ import tendermint.crypto.Keys;
 import javax.annotation.PostConstruct;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -70,6 +72,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Autowired
     private AuctionService auctionService;
     @Autowired
+    private SnapshotService snapshotService;
+    @Autowired
     private AppStateManager appStateManager;
     @Autowired
     private DatabaseTransactionManager databaseTransactionManager;
@@ -86,17 +90,81 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Setter
     @Value("${validator.public.key}")
     private String validatorPublicKey;
-    @Value("${batch.block.frequency}")
-    private Integer batchBlockFrequency;
 
     private static final Set<String> nonceHistory = new HashSet<>();
     private static final ExecutorService executorService = Executors.newFixedThreadPool(1);
     private final Map<TendermintTransaction, TransactionConfig> transactionSettings = new HashMap<>();
 
     /**
-     * Initialize transaction settings
+     * Initializes the settings for protected transactions, which can only be executed by an active validator
      */
-    private void initializeSettings() {
+    private void initializeProtectedTransactionSettings() {
+        transactionSettings.put(TendermintTransaction.CONFIRM_ETHEREUM_EVENTS,
+                new TransactionConfig<BatchValidatorRequest>()
+                        .setDeliverFn(ethereumService::confirmEvents)
+                        .setProtectedFn(true)
+                        .setRequestType(BatchValidatorRequest.class));
+        transactionSettings.put(TendermintTransaction.SYNC_PROPOSALS,
+                new TransactionConfig<BatchValidatorRequest>()
+                        .setDeliverFn(proposalService::sync)
+                        .setProtectedFn(true)
+                        .setRequestType(BatchValidatorRequest.class));
+        transactionSettings.put(TendermintTransaction.SETTLE_MARKETS,
+                new TransactionConfig<BatchValidatorRequest>()
+                        .setDeliverFn(marketService::settleMarkets)
+                        .setProtectedFn(true)
+                        .setRequestType(BatchValidatorRequest.class));
+        transactionSettings.put(TendermintTransaction.BATCH_WITHDRAWALS,
+                new TransactionConfig<BatchWithdrawalRequest>()
+                        .setDeliverFn(withdrawalService::batchWithdrawals)
+                        .setProtectedFn(true)
+                        .setRequestType(BatchWithdrawalRequest.class));
+        transactionSettings.put(TendermintTransaction.SIGN_WITHDRAWAL_BATCHES,
+                new TransactionConfig<BulkSignWithdrawalRequest>()
+                        .setDeliverFn(withdrawalService::saveWithdrawalBatchSignatures)
+                        .setProtectedFn(true)
+                        .setRequestType(BulkSignWithdrawalRequest.class));
+        transactionSettings.put(TendermintTransaction.DEBIT_WITHDRAWALS,
+                new TransactionConfig<DebitWithdrawalsRequest>()
+                        .setDeliverFn(withdrawalService::debitWithdrawals)
+                        .setProtectedFn(true)
+                        .setRequestType(DebitWithdrawalsRequest.class));
+        transactionSettings.put(TendermintTransaction.ADD_STAKE,
+                new TransactionConfig<UpdateStakeRequest>()
+                        .setDeliverFn(stakeService::add)
+                        .setProtectedFn(true)
+                        .setRequestType(UpdateStakeRequest.class));
+        transactionSettings.put(TendermintTransaction.REMOVE_STAKE,
+                new TransactionConfig<UpdateStakeRequest>()
+                        .setDeliverFn(stakeService::remove)
+                        .setProtectedFn(true)
+                        .setRequestType(UpdateStakeRequest.class));
+        transactionSettings.put(TendermintTransaction.DEPOSIT_ASSET,
+                new TransactionConfig<DepositAssetRequest>()
+                        .setDeliverFn(accountService::deposit)
+                        .setProtectedFn(true)
+                        .setRequestType(DepositAssetRequest.class));
+        transactionSettings.put(TendermintTransaction.MONITOR_AUCTIONS,
+                new TransactionConfig<BatchValidatorRequest>()
+                        .setDeliverFn(auctionService::monitorAuctions)
+                        .setProtectedFn(true)
+                        .setRequestType(BatchValidatorRequest.class));
+        transactionSettings.put(TendermintTransaction.SIGN_BRIDGE_UPDATES,
+                new TransactionConfig<BulkSignBridgeUpdateRequest>()
+                        .setDeliverFn(bridgeUpdateService::saveBridgeUpdateSignatures)
+                        .setProtectedFn(true)
+                        .setRequestType(BulkSignBridgeUpdateRequest.class));
+        transactionSettings.put(TendermintTransaction.EXECUTE_BRIDGE_UPDATES,
+                new TransactionConfig<ExecuteBridgeUpdatesRequest>()
+                        .setDeliverFn(bridgeUpdateService::executeBridgeUpdates)
+                        .setProtectedFn(true)
+                        .setRequestType(ExecuteBridgeUpdatesRequest.class));
+    }
+
+    /**
+     * Initializes the transaction settings for public functions, which can be executed by anybody
+     */
+    private void initializedPublicTransactionSettings() {
         transactionSettings.put(TendermintTransaction.CREATE_ORDER,
                 new TransactionConfig<CreateOrderRequest>()
                         .setDeliverFn(orderService::create)
@@ -177,66 +245,24 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                         .setDeliverFn(proposalService::vote)
                         .setProtectedFn(false)
                         .setRequestType(CastVoteRequest.class));
-        transactionSettings.put(TendermintTransaction.CONFIRM_ETHEREUM_EVENTS,
-                new TransactionConfig<BatchValidatorRequest>()
-                        .setDeliverFn(ethereumService::confirmEvents)
-                        .setProtectedFn(true)
-                        .setRequestType(BatchValidatorRequest.class));
-        transactionSettings.put(TendermintTransaction.SYNC_PROPOSALS,
-                new TransactionConfig<BatchValidatorRequest>()
-                        .setDeliverFn(proposalService::sync)
-                        .setProtectedFn(true)
-                        .setRequestType(BatchValidatorRequest.class));
-        transactionSettings.put(TendermintTransaction.SETTLE_MARKETS,
-                new TransactionConfig<BatchValidatorRequest>()
-                        .setDeliverFn(marketService::settleMarkets)
-                        .setProtectedFn(true)
-                        .setRequestType(BatchValidatorRequest.class));
-        transactionSettings.put(TendermintTransaction.BATCH_WITHDRAWALS,
-                new TransactionConfig<BatchWithdrawalRequest>()
-                        .setDeliverFn(withdrawalService::batchWithdrawals)
-                        .setProtectedFn(true)
-                        .setRequestType(BatchWithdrawalRequest.class));
-        transactionSettings.put(TendermintTransaction.SIGN_WITHDRAWAL_BATCHES,
-                new TransactionConfig<BulkSignWithdrawalRequest>()
-                        .setDeliverFn(withdrawalService::saveWithdrawalBatchSignatures)
-                        .setProtectedFn(true)
-                        .setRequestType(BulkSignWithdrawalRequest.class));
-        transactionSettings.put(TendermintTransaction.DEBIT_WITHDRAWALS,
-                new TransactionConfig<DebitWithdrawalsRequest>()
-                        .setDeliverFn(withdrawalService::debitWithdrawals)
-                        .setProtectedFn(true)
-                        .setRequestType(DebitWithdrawalsRequest.class));
-        transactionSettings.put(TendermintTransaction.ADD_STAKE,
-                new TransactionConfig<UpdateStakeRequest>()
-                        .setDeliverFn(stakeService::add)
-                        .setProtectedFn(true)
-                        .setRequestType(UpdateStakeRequest.class));
-        transactionSettings.put(TendermintTransaction.REMOVE_STAKE,
-                new TransactionConfig<UpdateStakeRequest>()
-                        .setDeliverFn(stakeService::remove)
-                        .setProtectedFn(true)
-                        .setRequestType(UpdateStakeRequest.class));
-        transactionSettings.put(TendermintTransaction.DEPOSIT_ASSET,
-                new TransactionConfig<DepositAssetRequest>()
-                        .setDeliverFn(accountService::deposit)
-                        .setProtectedFn(true)
-                        .setRequestType(DepositAssetRequest.class));
-        transactionSettings.put(TendermintTransaction.MONITOR_AUCTIONS,
-                new TransactionConfig<BatchValidatorRequest>()
-                        .setDeliverFn(auctionService::monitorAuctions)
-                        .setProtectedFn(true)
-                        .setRequestType(BatchValidatorRequest.class));
-        transactionSettings.put(TendermintTransaction.SIGN_BRIDGE_UPDATES,
-                new TransactionConfig<BulkSignBridgeUpdateRequest>()
-                        .setDeliverFn(bridgeUpdateService::saveBridgeUpdateSignatures)
-                        .setProtectedFn(true)
-                        .setRequestType(BulkSignBridgeUpdateRequest.class));
-        transactionSettings.put(TendermintTransaction.EXECUTE_BRIDGE_UPDATES,
-                new TransactionConfig<ExecuteBridgeUpdatesRequest>()
-                        .setDeliverFn(bridgeUpdateService::executeBridgeUpdates)
-                        .setProtectedFn(true)
-                        .setRequestType(ExecuteBridgeUpdatesRequest.class));
+        transactionSettings.put(TendermintTransaction.ADD_DELEGATION,
+                new TransactionConfig<UpdateDelegationRequest>()
+                        .setDeliverFn(validatorService::addDelegation)
+                        .setProtectedFn(false)
+                        .setRequestType(UpdateDelegationRequest.class));
+        transactionSettings.put(TendermintTransaction.REMOVE_DELEGATION,
+                new TransactionConfig<UpdateDelegationRequest>()
+                        .setDeliverFn(validatorService::removeDelegation)
+                        .setProtectedFn(false)
+                        .setRequestType(UpdateDelegationRequest.class));
+    }
+
+    /**
+     * Initialize transaction settings
+     */
+    private void initializeSettings() {
+        initializedPublicTransactionSettings();
+        initializeProtectedTransactionSettings();
     }
 
     /**
@@ -611,11 +637,14 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         String appState = request.getAppStateBytes().toStringUtf8();
         try {
             configService.initializeNetworkConfig(new JSONObject(appState));
-        } catch (JSONException e) {
+            snapshotService.initializeSnapshots();
+        } catch (Exception e) {
             log.error(e.getMessage(), e);
             log.error(ErrorCode.INVALID_APP_STATE);
         }
         // TODO - the chain should not start until the genesis validator's have sufficient delegation
+        // TODO - we'll implement this elsewhere, by effectively blocking all transactions until the
+        // TODO - required threshold has been met
         request.getValidatorsList().forEach(v -> {
             String publicKey = Base64.getEncoder().encodeToString(
                     request.getValidatorsList().get(0).getPubKey().getEd25519().toByteArray());
@@ -652,7 +681,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         String proposerAddress = Hex.encodeHexString(req.getHeader().getProposerAddress().toByteArray());
         long blockHeight = req.getHeader().getHeight();
         if(validatorAddress.toLowerCase(Locale.ROOT).equals(proposerAddress.toLowerCase(Locale.ROOT)) &&
-                blockHeight % batchBlockFrequency == 0 && blockHeight > 1) {
+                blockHeight % configService.getStatic().getAsyncTaskFrequency() == 0 && blockHeight > 1) {
             handleProposerActions(proposerAddress, blockHeight);
         }
         responseObserver.onNext(resp);
@@ -667,6 +696,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         Types.ResponseEndBlock.Builder builder = Types.ResponseEndBlock.newBuilder();
         appStateManager.setBlockHeight(req.getHeight());
         updateValidators(req.getHeight(), builder);
+        if(req.getHeight() % configService.getStatic().getSnapshotFrequency() == 0) {
+            snapshotService.capture(req.getHeight());
+        }
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
@@ -735,5 +767,51 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         responseObserver.onCompleted();
     }
 
-    // TODO - implement snapshot functions
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void listSnapshots(Types.RequestListSnapshots request,
+                              StreamObserver<Types.ResponseListSnapshots> responseObserver) {
+        Types.ResponseListSnapshots response = Types.ResponseListSnapshots.newBuilder().build();
+        // TODO - build correct response
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void offerSnapshot(Types.RequestOfferSnapshot request,
+                              StreamObserver<Types.ResponseOfferSnapshot> responseObserver) {
+        Types.ResponseOfferSnapshot response = Types.ResponseOfferSnapshot.newBuilder().build();
+        // TODO - build correct response
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void loadSnapshotChunk(Types.RequestLoadSnapshotChunk request,
+                                  StreamObserver<Types.ResponseLoadSnapshotChunk> responseObserver) {
+        Types.ResponseLoadSnapshotChunk response = Types.ResponseLoadSnapshotChunk.newBuilder().build();
+        // TODO - build correct response
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void applySnapshotChunk(Types.RequestApplySnapshotChunk request,
+                                   StreamObserver<Types.ResponseApplySnapshotChunk> responseObserver) {
+        Types.ResponseApplySnapshotChunk response = Types.ResponseApplySnapshotChunk.newBuilder().build();
+        // TODO - build correct response
+        responseObserver.onNext(response);
+        responseObserver.onCompleted();
+    }
 }

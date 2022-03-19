@@ -453,6 +453,8 @@ public abstract class IntegrationTest {
                     .setEthConfirmations(0)
                     .setActiveValidatorCount(1)
                     .setBackupValidatorCount(1)
+                    .setAsyncTaskFrequency(1)
+                    .setSnapshotFrequency(1)
                     .setValidatorMinDelegation(BigDecimal.ONE)
                     .setValidatorBond(BigDecimal.ONE)
                     .setBridgeAddress(ethereumHelper.getJynxProBridge().getContractAddress());
