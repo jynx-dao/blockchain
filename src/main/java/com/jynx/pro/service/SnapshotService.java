@@ -2,10 +2,12 @@ package com.jynx.pro.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Lists;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.*;
+import com.jynx.pro.utils.UUIDUtils;
 import lombok.Data;
 import lombok.experimental.Accessors;
 import lombok.extern.slf4j.Slf4j;
@@ -29,6 +31,8 @@ import java.util.List;
 @Service
 public class SnapshotService {
 
+    @Autowired
+    private ConfigService configService;
     @Autowired
     private ReadOnlyRepository readOnlyRepository;
     @Autowired
@@ -86,7 +90,13 @@ public class SnapshotService {
     @Autowired
     private WithdrawalRepository withdrawalRepository;
     @Autowired
+    private SnapshotRepository snapshotRepository;
+    @Autowired
+    private SnapshotChunkRepository snapshotChunkRepository;
+    @Autowired
     private ObjectMapper objectMapper;
+    @Autowired
+    private UUIDUtils uuidUtils;
 
     @Data
     @Accessors(chain = true)
@@ -191,34 +201,41 @@ public class SnapshotService {
             final long blockHeight
     ) {
         int hashChain = 0;
-        hashChain = saveEntity(Account.class, hashChain, blockHeight);
-        hashChain = saveEntity(Asset.class, hashChain, blockHeight);
-        hashChain = saveEntity(AuctionTrigger.class, hashChain, blockHeight);
-        hashChain = saveEntity(BlockValidator.class, hashChain, blockHeight);
-        hashChain = saveEntity(BridgeUpdate.class, hashChain, blockHeight);
-        hashChain = saveEntity(BridgeUpdateSignature.class, hashChain, blockHeight);
-        hashChain = saveEntity(Config.class, hashChain, blockHeight);
-        hashChain = saveEntity(Delegation.class, hashChain, blockHeight);
-        hashChain = saveEntity(Deposit.class, hashChain, blockHeight);
-        hashChain = saveEntity(Event.class, hashChain, blockHeight);
-        hashChain = saveEntity(Market.class, hashChain, blockHeight);
-        hashChain = saveEntity(Oracle.class, hashChain, blockHeight);
-        hashChain = saveEntity(Order.class, hashChain, blockHeight);
-        hashChain = saveEntity(OrderHistory.class, hashChain, blockHeight);
-        hashChain = saveEntity(PendingAuctionTrigger.class, hashChain, blockHeight);
-        hashChain = saveEntity(Position.class, hashChain, blockHeight);
-        hashChain = saveEntity(Proposal.class, hashChain, blockHeight);
-        hashChain = saveEntity(Settlement.class, hashChain, blockHeight);
-        hashChain = saveEntity(Stake.class, hashChain, blockHeight);
-        hashChain = saveEntity(Trade.class, hashChain, blockHeight);
-        hashChain = saveEntity(Transaction.class, hashChain, blockHeight);
-        hashChain = saveEntity(User.class, hashChain, blockHeight);
-        hashChain = saveEntity(Validator.class, hashChain, blockHeight);
-        hashChain = saveEntity(Vote.class, hashChain, blockHeight);
-        hashChain = saveEntity(Withdrawal.class, hashChain, blockHeight);
-        hashChain = saveEntity(WithdrawalBatch.class, hashChain, blockHeight);
-        hashChain = saveEntity(WithdrawalBatchSignature.class, hashChain, blockHeight);
+        Snapshot snapshot = new Snapshot()
+                .setId(uuidUtils.next())
+                .setBlockHeight(blockHeight)
+                .setFormat(1);
+        snapshot = snapshotRepository.save(snapshot);
+        hashChain = saveEntity(Account.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(Asset.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(AuctionTrigger.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(BlockValidator.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(BridgeUpdate.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(BridgeUpdateSignature.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(Config.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(Delegation.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(Deposit.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(Event.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(Market.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(Oracle.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(Order.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(OrderHistory.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(PendingAuctionTrigger.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(Position.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(Proposal.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(Settlement.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(Stake.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(Trade.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(Transaction.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(User.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(Validator.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(Vote.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(Withdrawal.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(WithdrawalBatch.class, hashChain, blockHeight, snapshot);
+        hashChain = saveEntity(WithdrawalBatchSignature.class, hashChain, blockHeight, snapshot);
         String hash = DigestUtils.sha3_256Hex(BigInteger.valueOf(hashChain).toByteArray());
+        snapshot.setHash(hash);
+        snapshotRepository.save(snapshot);
         saveHash(hash, blockHeight);
     }
 
@@ -228,24 +245,44 @@ public class SnapshotService {
      * @param type {@link Class<T>}
      * @param hashChain used to assert consistency of state
      * @param blockHeight the current block height
+     * @param snapshot {@link Snapshot}
      * @param <T> the entity type
      */
     private <T> int saveEntity(
             final Class<T> type,
-            final int hashChain,
-            final long blockHeight
+            int hashChain,
+            final long blockHeight,
+            final Snapshot snapshot
     ) {
         try {
             List<T> items = readOnlyRepository.getAllByEntity(type);
-            String json = objectMapper.writeValueAsString(items);
-            String fileName = type.getCanonicalName();
-            File userDirectory = FileUtils.getUserDirectory();
-            String baseDir = String.format("%s/.jynx/snapshots/height_%s", userDirectory.toPath(), blockHeight);
-            Files.createDirectories(Paths.get(baseDir));
-            FileWriter fw = new FileWriter(String.format("%s/%s.json", baseDir, fileName), true);
-            fw.append(json);
-            fw.close();
-            return List.of(hashChain, items.hashCode()).hashCode();
+            List<List<T>> chunks = Lists.partition(items, configService.getStatic().getSnapshotChunkRows());
+            int idx = 0;
+            List<SnapshotChunk> snapshotChunks = new ArrayList<>();
+            for(List<T> chunk : chunks) {
+                String json = objectMapper.writeValueAsString(chunk);
+                String fileName = type.getCanonicalName();
+                File userDirectory = FileUtils.getUserDirectory();
+                String baseDir = String.format("%s/.jynx/snapshots/height_%s", userDirectory.toPath(), blockHeight);
+                Files.createDirectories(Paths.get(baseDir));
+                FileWriter fw = new FileWriter(String.format("%s/%s.%s.json", baseDir, fileName, idx), true);
+                fw.append(json);
+                fw.close();
+                int chunkHashCode = chunk.hashCode();
+                String chunkHash = DigestUtils.sha3_256Hex(BigInteger.valueOf(chunkHashCode).toByteArray());
+                SnapshotChunk snapshotChunk = new SnapshotChunk()
+                        .setSnapshot(snapshot)
+                        .setId(uuidUtils.next())
+                        .setChunkIndex(idx)
+                        .setFileName(fileName)
+                        .setHash(chunkHash);
+                snapshotChunks.add(snapshotChunk);
+                snapshot.setTotalChunks(snapshot.getTotalChunks() + 1);
+                hashChain = List.of(hashChain, chunkHashCode).hashCode();
+                idx++;
+            }
+            snapshotChunkRepository.saveAll(snapshotChunks);
+            return hashChain;
         } catch(Exception e) {
             log.error(e.getMessage(), e);
             return hashChain;

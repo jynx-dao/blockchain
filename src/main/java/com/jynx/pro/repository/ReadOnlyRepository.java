@@ -630,7 +630,7 @@ public class ReadOnlyRepository {
     }
 
     /**
-     * Get {@link BridgeUpdateSignature} by batch ID
+     * Get {@link BridgeUpdateSignature}s by batch ID
      *
      * @param updateId the update ID
      *
@@ -645,5 +645,52 @@ public class ReadOnlyRepository {
         Path<UUID> batch_id = rootType.join("bridgeUpdate").get("id");
         query = query.select(rootType).where(cb.equal(batch_id, updateId));
         return getEntityManager().createQuery(query).getResultList();
+    }
+
+    /**
+     * Get {@link Snapshot} by height
+     *
+     * @param height the block height
+     *
+     * @return {@link Optional<Snapshot>}
+     */
+    public Optional<Snapshot> getSnapshotByHeight(
+            final long height
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Snapshot> query = cb.createQuery(Snapshot.class);
+        Root<Snapshot> rootType = query.from(Snapshot.class);
+        Path<Long> blockHeight = rootType.get("blockHeight");
+        query = query.select(rootType).where(cb.equal(blockHeight, height));
+        try {
+            return Optional.of(getEntityManager().createQuery(query).getSingleResult());
+        } catch(Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Get {@link SnapshotChunk}s by snapshot ID
+     *
+     * @param snapshotId the snapshot ID
+     * @param chunkIndex the chunk index
+     *
+     * @return {@link Optional<SnapshotChunk>}
+     */
+    public Optional<SnapshotChunk> getSnapshotChunksBySnapshotIdAndChunkIndex(
+            final UUID snapshotId,
+            final int chunkIndex
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<SnapshotChunk> query = cb.createQuery(SnapshotChunk.class);
+        Root<SnapshotChunk> rootType = query.from(SnapshotChunk.class);
+        Path<UUID> snapshot_id = rootType.join("snapshot").get("id");
+        Path<UUID> chunk_index = rootType.get("chunkIndex");
+        query = query.select(rootType).where(cb.equal(snapshot_id, snapshotId), cb.equal(chunk_index, chunkIndex));
+        try {
+            return Optional.of(getEntityManager().createQuery(query).getSingleResult());
+        } catch(Exception e) {
+            return Optional.empty();
+        }
     }
 }

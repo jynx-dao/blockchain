@@ -55,4 +55,6 @@ public class Config {
     private Integer snapshotFrequency;
     @Column(name = "async_task_frequency", nullable = false)
     private Integer asyncTaskFrequency;
+    @Column(name = "snapshot_chunk_rows", nullable = false)
+    private Integer snapshotChunkRows;
 }

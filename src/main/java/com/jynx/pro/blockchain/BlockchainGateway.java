@@ -3,15 +3,14 @@ package com.jynx.pro.blockchain;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Timestamp;
 import com.jynx.pro.constant.TendermintTransaction;
-import com.jynx.pro.entity.BridgeUpdate;
-import com.jynx.pro.entity.Validator;
-import com.jynx.pro.entity.WithdrawalBatch;
+import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.manager.AppStateManager;
 import com.jynx.pro.manager.DatabaseTransactionManager;
 import com.jynx.pro.model.CheckTxResult;
 import com.jynx.pro.model.TransactionConfig;
+import com.jynx.pro.repository.ReadOnlyRepository;
 import com.jynx.pro.request.*;
 import com.jynx.pro.service.*;
 import com.jynx.pro.utils.CryptoUtils;
@@ -20,7 +19,6 @@ import io.grpc.stub.StreamObserver;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Hex;
-import org.json.JSONException;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,8 +30,6 @@ import tendermint.crypto.Keys;
 import javax.annotation.PostConstruct;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Paths;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -77,6 +73,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private AppStateManager appStateManager;
     @Autowired
     private DatabaseTransactionManager databaseTransactionManager;
+    @Autowired
+    private ReadOnlyRepository readOnlyRepository;
     @Autowired
     private JSONUtils jsonUtils;
     @Autowired
@@ -696,9 +694,6 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         Types.ResponseEndBlock.Builder builder = Types.ResponseEndBlock.newBuilder();
         appStateManager.setBlockHeight(req.getHeight());
         updateValidators(req.getHeight(), builder);
-        if(req.getHeight() % configService.getStatic().getSnapshotFrequency() == 0) {
-            snapshotService.capture(req.getHeight());
-        }
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
@@ -733,6 +728,10 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                 .setData(ByteString.copyFrom(appStateManager.getStateAsBytes()))
                 .build();
         databaseTransactionManager.commit();
+        long blockHeight = appStateManager.getBlockHeight();
+        if(blockHeight % configService.getStatic().getSnapshotFrequency() == 0) {
+            executorService.submit(() -> snapshotService.capture(blockHeight));
+        }
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
@@ -773,8 +772,24 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Override
     public void listSnapshots(Types.RequestListSnapshots request,
                               StreamObserver<Types.ResponseListSnapshots> responseObserver) {
-        Types.ResponseListSnapshots response = Types.ResponseListSnapshots.newBuilder().build();
-        // TODO - build correct response
+        List<Snapshot> appSnapshots = readOnlyRepository.getAllByEntity(Snapshot.class).stream()
+                .sorted(Comparator.comparing(Snapshot::getBlockHeight).reversed())
+                .limit(10L)
+                .collect(Collectors.toList());
+        List<Types.Snapshot> snapshots = new ArrayList<>();
+        for(Snapshot appSnapshot : appSnapshots) {
+            Types.Snapshot tendermintSnapshot = Types.Snapshot.newBuilder()
+                    .setChunks(appSnapshot.getTotalChunks())
+                    .setHeight(appSnapshot.getBlockHeight())
+                    .setFormat(appSnapshot.getFormat())
+                    .setHash(ByteString.copyFromUtf8(appSnapshot.getHash()))
+                    .setMetadata(ByteString.copyFromUtf8(appSnapshot.getHash()))
+                    .build();
+            snapshots.add(tendermintSnapshot);
+        }
+        Types.ResponseListSnapshots response = Types.ResponseListSnapshots.newBuilder()
+                .addAllSnapshots(snapshots)
+                .build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
@@ -797,8 +812,20 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Override
     public void loadSnapshotChunk(Types.RequestLoadSnapshotChunk request,
                                   StreamObserver<Types.ResponseLoadSnapshotChunk> responseObserver) {
+        Optional<Snapshot> snapshotOptional = readOnlyRepository.getSnapshotByHeight(request.getHeight());
         Types.ResponseLoadSnapshotChunk response = Types.ResponseLoadSnapshotChunk.newBuilder().build();
-        // TODO - build correct response
+        if(snapshotOptional.isPresent()) {
+            Snapshot snapshot = snapshotOptional.get();
+            Optional<SnapshotChunk> snapshotChunkOptional = readOnlyRepository.getSnapshotChunksBySnapshotIdAndChunkIndex(
+                    snapshot.getId(), request.getChunk());
+            if(snapshotChunkOptional.isPresent()) {
+                SnapshotChunk snapshotChunk = snapshotChunkOptional.get();
+                // TODO - load the chunk from disk
+                response = Types.ResponseLoadSnapshotChunk.newBuilder()
+                        .setChunk(ByteString.EMPTY)
+                        .build();
+            }
+        }
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
