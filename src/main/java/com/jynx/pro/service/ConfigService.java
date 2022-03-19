@@ -52,6 +52,16 @@ public class ConfigService {
      * @return the {@link Config}
      */
     public Config get() {
+        return configRepository.findAll().stream().findFirst()
+                .orElseThrow(() -> new JynxProException(ErrorCode.CONFIG_NOT_FOUND));
+    }
+
+    /**
+     * Fetches the network config from {@link ReadOnlyRepository}
+     *
+     * @return the {@link Config}
+     */
+    public Config getStatic() {
         return readOnlyRepository.getAllByEntity(Config.class).stream().findFirst()
                 .orElseThrow(() -> new JynxProException(ErrorCode.CONFIG_NOT_FOUND));
     }

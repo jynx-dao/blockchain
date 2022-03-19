@@ -162,12 +162,12 @@ public class ValidatorService {
      */
     public List<Validator> getBackupSet() {
         return readOnlyRepository.getAllByEntity(Validator.class).stream()
-                .filter(v -> v.getDelegation().doubleValue() > configService.get()
+                .filter(v -> v.getDelegation().doubleValue() >= configService.getStatic()
                         .getValidatorMinDelegation().doubleValue())
                 .filter(Validator::getEnabled)
                 .sorted(Comparator.comparing(Validator::getDelegation).reversed())
-                .skip(configService.get().getActiveValidatorCount())
-                .limit(configService.get().getBackupValidatorCount())
+                .skip(configService.getStatic().getActiveValidatorCount())
+                .limit(configService.getStatic().getBackupValidatorCount())
                 .collect(Collectors.toList());
     }
 
@@ -178,11 +178,11 @@ public class ValidatorService {
      */
     public List<Validator> getActiveSet() {
         return readOnlyRepository.getAllByEntity(Validator.class).stream()
-                .filter(v -> v.getDelegation().doubleValue() > configService.get()
+                .filter(v -> v.getDelegation().doubleValue() >= configService.getStatic()
                         .getValidatorMinDelegation().doubleValue())
                 .filter(Validator::getEnabled)
                 .sorted(Comparator.comparing(Validator::getDelegation).reversed())
-                .limit(configService.get().getActiveValidatorCount())
+                .limit(configService.getStatic().getActiveValidatorCount())
                 .collect(Collectors.toList());
     }
 
