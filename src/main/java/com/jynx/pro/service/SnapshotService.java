@@ -3,6 +3,8 @@ package com.jynx.pro.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jynx.pro.entity.*;
+import com.jynx.pro.error.ErrorCode;
+import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.*;
 import lombok.Data;
 import lombok.experimental.Accessors;
@@ -20,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 @Slf4j
@@ -96,16 +99,30 @@ public class SnapshotService {
 
     @PostConstruct
     private void initializeConfig() {
-        // TODO - workout the correct hierarchy
-        entityConfig.add(new EntityConfig<Account>()
-                .setRepository(accountRepository)
-                .setType(Account.class));
+        entityConfig.add(new EntityConfig<Config>()
+                .setRepository(configRepository)
+                .setType(Config.class));
+        entityConfig.add(new EntityConfig<User>()
+                .setRepository(userRepository)
+                .setType(User.class));
         entityConfig.add(new EntityConfig<Asset>()
                 .setRepository(assetRepository)
                 .setType(Asset.class));
+        entityConfig.add(new EntityConfig<Account>()
+                .setRepository(accountRepository)
+                .setType(Account.class));
+        entityConfig.add(new EntityConfig<Oracle>()
+                .setRepository(oracleRepository)
+                .setType(Oracle.class));
+        entityConfig.add(new EntityConfig<Market>()
+                .setRepository(marketRepository)
+                .setType(Market.class));
         entityConfig.add(new EntityConfig<AuctionTrigger>()
                 .setRepository(auctionTriggerRepository)
                 .setType(AuctionTrigger.class));
+        entityConfig.add(new EntityConfig<Validator>()
+                .setRepository(validatorRepository)
+                .setType(Validator.class));
         entityConfig.add(new EntityConfig<BlockValidator>()
                 .setRepository(blockValidatorRepository)
                 .setType(BlockValidator.class));
@@ -115,30 +132,27 @@ public class SnapshotService {
         entityConfig.add(new EntityConfig<BridgeUpdateSignature>()
                 .setRepository(bridgeUpdateSignatureRepository)
                 .setType(BridgeUpdateSignature.class));
-        entityConfig.add(new EntityConfig<Config>()
-                .setRepository(configRepository)
-                .setType(Config.class));
+        entityConfig.add(new EntityConfig<Stake>()
+                .setRepository(stakeRepository)
+                .setType(Stake.class));
         entityConfig.add(new EntityConfig<Delegation>()
                 .setRepository(delegationRepository)
                 .setType(Delegation.class));
-        entityConfig.add(new EntityConfig<Deposit>()
-                .setRepository(depositRepository)
-                .setType(Deposit.class));
         entityConfig.add(new EntityConfig<Event>()
                 .setRepository(eventRepository)
                 .setType(Event.class));
-        entityConfig.add(new EntityConfig<Market>()
-                .setRepository(marketRepository)
-                .setType(Market.class));
-        entityConfig.add(new EntityConfig<Oracle>()
-                .setRepository(oracleRepository)
-                .setType(Oracle.class));
-        entityConfig.add(new EntityConfig<OrderHistory>()
-                .setRepository(orderHistoryRepository)
-                .setType(OrderHistory.class));
+        entityConfig.add(new EntityConfig<Deposit>()
+                .setRepository(depositRepository)
+                .setType(Deposit.class));
         entityConfig.add(new EntityConfig<Order>()
                 .setRepository(orderRepository)
                 .setType(Order.class));
+        entityConfig.add(new EntityConfig<Trade>()
+                .setRepository(tradeRepository)
+                .setType(Trade.class));
+        entityConfig.add(new EntityConfig<OrderHistory>()
+                .setRepository(orderHistoryRepository)
+                .setType(OrderHistory.class));
         entityConfig.add(new EntityConfig<PendingAuctionTrigger>()
                 .setRepository(pendingAuctionTriggerRepository)
                 .setType(PendingAuctionTrigger.class));
@@ -151,21 +165,9 @@ public class SnapshotService {
         entityConfig.add(new EntityConfig<Settlement>()
                 .setRepository(settlementRepository)
                 .setType(Settlement.class));
-        entityConfig.add(new EntityConfig<Stake>()
-                .setRepository(stakeRepository)
-                .setType(Stake.class));
-        entityConfig.add(new EntityConfig<Trade>()
-                .setRepository(tradeRepository)
-                .setType(Trade.class));
         entityConfig.add(new EntityConfig<Transaction>()
                 .setRepository(transactionRepository)
                 .setType(Transaction.class));
-        entityConfig.add(new EntityConfig<User>()
-                .setRepository(userRepository)
-                .setType(User.class));
-        entityConfig.add(new EntityConfig<Validator>()
-                .setRepository(validatorRepository)
-                .setType(Validator.class));
         entityConfig.add(new EntityConfig<Vote>()
                 .setRepository(voteRepository)
                 .setType(Vote.class));
@@ -297,9 +299,34 @@ public class SnapshotService {
         boolean exists = Files.exists(Paths.get(baseDir));
         if(exists) {
             int[] hashChain = {0};
+            List<EntityConfig<?>> invertedEntityConfig = new ArrayList<>(entityConfig);
+            Collections.reverse(invertedEntityConfig);
+            invertedEntityConfig.forEach(c -> c.getRepository().deleteAll());
             entityConfig.forEach(c -> hashChain[0] = loadEntity(c, blockHeight, hashChain[0]));
             String hash = DigestUtils.sha3_256Hex(BigInteger.valueOf(hashChain[0]).toByteArray());
-            // TODO - verify that the hash is correct
+            verifyHash(hash, blockHeight);
+        }
+    }
+
+    /**
+     * Verify that the hash matches
+     *
+     * @param hash the hash
+     * @param blockHeight the current block height
+     */
+    private void verifyHash(
+            final String hash,
+            final long blockHeight
+    ) {
+        try {
+            File hashFile = new File(String.format("%s/hash.json", getBaseDir(blockHeight)));
+            String hashFromFile = FileUtils.readFileToString(hashFile, StandardCharsets.UTF_8);
+            if(!hash.equals(hashFromFile)) {
+                throw new JynxProException(ErrorCode.SNAPSHOT_HASH_MISMATCH);
+            }
+        } catch(Exception e) {
+            log.error(e.getMessage(), e);
+            throw new JynxProException(ErrorCode.SNAPSHOT_HASH_MISMATCH);
         }
     }
 
@@ -321,7 +348,6 @@ public class SnapshotService {
                     config.getType().getCanonicalName()));
             String content = FileUtils.readFileToString(file, StandardCharsets.UTF_8);
             List<T> items = objectMapper.readValue(content, new TypeReference<>() {});
-            config.getRepository().deleteAll();
             config.getRepository().saveAll(items);
             return List.of(hashChain, items.hashCode()).hashCode();
         } catch(Exception e) {
