@@ -96,21 +96,17 @@ public class ValidatorService {
         Stake stake = stakeService.getAndCreate(request.getUser());
         Optional<Delegation> delegationOptional = delegationRepository.findByValidatorIdAndStakeId(
                 validator.getId(), stake.getId());
-        Delegation delegation = new Delegation();
         if(delegationOptional.isPresent()) {
-            delegation = delegationOptional.get();
+            Delegation delegation = delegationOptional.get();
             if(request.getAmount().doubleValue() > delegation.getAmount().doubleValue()) {
                 delegation.setAmount(BigDecimal.ZERO);
             } else {
                 delegation.setAmount(delegation.getAmount().subtract(request.getAmount()));
             }
+            return delegationRepository.save(delegation);
         } else {
-            delegation.setValidator(validator);
-            delegation.setStake(stake);
-            delegation.setId(uuidUtils.next());
-            delegation.setAmount(BigDecimal.ZERO);
+            throw new JynxProException(ErrorCode.NO_DELEGATION);
         }
-        return delegationRepository.save(delegation);
     }
 
     /**

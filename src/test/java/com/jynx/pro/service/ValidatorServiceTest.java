@@ -199,8 +199,8 @@ public class ValidatorServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testRemoveDelegationTwice() {
-        addDelegation();
+    public void testRemoveDelegationFailsWhenDelegationMissing() {
+        apply(takerUser.getPublicKey(), takerUser);
         List<Validator> validators = validatorService.getAll();
         Assertions.assertEquals(validators.size(), 1);
         Validator validator = validators.get(0);
@@ -208,10 +208,12 @@ public class ValidatorServiceTest extends IntegrationTest {
                 .setAmount(BigDecimal.valueOf(0.5))
                 .setValidatorId(validator.getId());
         request.setUser(takerUser);
-        Delegation delegation = validatorService.removeDelegation(request);
-        Assertions.assertEquals(delegation.getAmount().doubleValue(), BigDecimal.valueOf(0.5).doubleValue());
-        delegation = validatorService.removeDelegation(request);
-        Assertions.assertEquals(delegation.getAmount().doubleValue(), BigDecimal.ZERO.doubleValue());
+        try {
+            validatorService.removeDelegation(request);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.NO_DELEGATION);
+        }
     }
 
     @Test

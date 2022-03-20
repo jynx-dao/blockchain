@@ -99,4 +99,5 @@ public class ErrorCode {
     public static final String VALIDATOR_NOT_FOUND = "Validator was not found.";
     public static final String INSUFFICIENT_STAKE = "You do not have enough stake.";
     public static final String SNAPSHOT_HASH_MISMATCH = "The snapshot state is inconsistent.";
+    public static final String NO_DELEGATION = "You have not delegated to this validator.";
 }
