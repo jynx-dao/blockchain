@@ -96,8 +96,6 @@ public class SnapshotService {
     private SnapshotChunkRepository snapshotChunkRepository;
     @Autowired
     private ObjectMapper objectMapper;
-    @Autowired
-    private UUIDUtils uuidUtils;
 
     @Data
     @Accessors(chain = true)

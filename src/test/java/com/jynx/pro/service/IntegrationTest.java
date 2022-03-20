@@ -133,6 +133,8 @@ public abstract class IntegrationTest {
     protected BridgeUpdateRepository bridgeUpdateRepository;
     @Autowired
     protected BlockValidatorRepository blockValidatorRepository;
+    @Autowired
+    protected DelegationRepository delegationRepository;
 
     protected static final String ETH_ADDRESS = "0xd7E1236C08731C3632519DCd1A581bFe6876a3B2";
     protected static final String ETH_PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
@@ -417,6 +419,7 @@ public abstract class IntegrationTest {
         bridgeUpdateSignatureRepository.deleteAll();
         bridgeUpdateRepository.deleteAll();
         blockValidatorRepository.deleteAll();
+        delegationRepository.deleteAll();
         validatorRepository.deleteAll();
         assetRepository.deleteAll();
         voteRepository.deleteAll();

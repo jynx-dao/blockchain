@@ -758,10 +758,6 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     public void info(Types.RequestInfo request, StreamObserver<Types.ResponseInfo> responseObserver) {
         Types.ResponseInfo response = Types.ResponseInfo.newBuilder().build();
         responseObserver.onNext(response);
-
-
-
-
         responseObserver.onCompleted();
     }
 

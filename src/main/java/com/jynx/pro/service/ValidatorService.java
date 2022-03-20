@@ -34,11 +34,11 @@ public class ValidatorService {
     @Autowired
     private ValidatorRepository validatorRepository;
     @Autowired
-    private ReadOnlyRepository readOnlyRepository;
-    @Autowired
     private BlockValidatorRepository blockValidatorRepository;
     @Autowired
     private DelegationRepository delegationRepository;
+    @Autowired
+    private ReadOnlyRepository readOnlyRepository;
     @Autowired
     private ConfigService configService;
     @Autowired
@@ -152,7 +152,7 @@ public class ValidatorService {
      * @return {@link List<Validator>}
      */
     public List<Validator> getAll() {
-        return readOnlyRepository.getAllByEntity(Validator.class);
+        return getAll(false);
     }
 
     /**
@@ -161,7 +161,45 @@ public class ValidatorService {
      * @return {@link List<Validator>}
      */
     public List<Validator> getBackupSet() {
-        return readOnlyRepository.getAllByEntity(Validator.class).stream()
+        return getBackupSet(false);
+    }
+
+    /**
+     * Get the active set of validators
+     *
+     * @return {@link List<Validator>}
+     */
+    public List<Validator> getActiveSet() {
+        return getActiveSet(false);
+    }
+
+    /**
+     * Get the backup set of validators
+     *
+     * @param readOnly use read-only repository
+     *
+     * @return {@link List<Validator>}
+     */
+    public List<Validator> getAll(
+            boolean readOnly
+    ) {
+        if(readOnly) {
+            return readOnlyRepository.getAllByEntity(Validator.class);
+        }
+        return validatorRepository.findAll();
+    }
+
+    /**
+     * Get the backup set of validators
+     *
+     * @param readOnly use read-only repository
+     *
+     * @return {@link List<Validator>}
+     */
+    public List<Validator> getBackupSet(
+            boolean readOnly
+    ) {
+        return getAll(readOnly).stream()
                 .filter(v -> v.getDelegation().doubleValue() >= configService.getStatic()
                         .getValidatorMinDelegation().doubleValue())
                 .filter(Validator::getEnabled)
@@ -174,10 +212,14 @@ public class ValidatorService {
     /**
      * Get the active set of validators
      *
+     * @param readOnly use read-only repository
+     *
      * @return {@link List<Validator>}
      */
-    public List<Validator> getActiveSet() {
-        return readOnlyRepository.getAllByEntity(Validator.class).stream()
+    public List<Validator> getActiveSet(
+            boolean readOnly
+    ) {
+        return getAll(readOnly).stream()
                 .filter(v -> v.getDelegation().doubleValue() >= configService.getStatic()
                         .getValidatorMinDelegation().doubleValue())
                 .filter(Validator::getEnabled)
@@ -243,8 +285,8 @@ public class ValidatorService {
     public boolean isValidator(
             final String publicKey
     ) {
-        boolean activeValidator = getActiveSet().stream().anyMatch(v -> v.getPublicKey().equals(publicKey));
-        boolean backupValidator = getBackupSet().stream().anyMatch(v -> v.getPublicKey().equals(publicKey));
+        boolean activeValidator = getActiveSet(true).stream().anyMatch(v -> v.getPublicKey().equals(publicKey));
+        boolean backupValidator = getBackupSet(true).stream().anyMatch(v -> v.getPublicKey().equals(publicKey));
         return activeValidator || backupValidator;
     }
 
