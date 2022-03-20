@@ -277,7 +277,8 @@ public class SnapshotService {
                         .setEntityName(fileName)
                         .setData(chunk);
                 String json = objectMapper.writeValueAsString(content);
-                FileWriter fw = new FileWriter(String.format("%s/%s.%s.json", getBaseDir(blockHeight), idx, fileName), true);
+                FileWriter fw = new FileWriter(String.format("%s/%s.%s.json",
+                        getBaseDir(blockHeight), idx, fileName), true);
                 fw.append(json);
                 fw.close();
                 int chunkHashCode = chunk.hashCode();
@@ -364,32 +365,6 @@ public class SnapshotService {
         } catch(Exception e) {
             log.error(e.getMessage(), e);
             throw new JynxProException(ErrorCode.SNAPSHOT_HASH_MISMATCH);
-        }
-    }
-
-    /**
-     * Load entity from snapshot file
-     *
-     * @param config {@link EntityConfig<T>}
-     * @param blockHeight the current block height
-     * @param hashChain used to verify state consistency
-     * @param <T> the entity type
-     */
-    private <T> int loadEntity(
-            final EntityConfig<T> config,
-            final long blockHeight,
-            final int hashChain
-    ) {
-        try {
-            File file = new File(String.format("%s/%s.json", getBaseDir(blockHeight),
-                    config.getType().getCanonicalName()));
-            String content = FileUtils.readFileToString(file, StandardCharsets.UTF_8);
-            List<T> items = objectMapper.readValue(content, new TypeReference<>() {});
-            config.getRepository().saveAll(items);
-            return List.of(hashChain, items.hashCode()).hashCode();
-        } catch(Exception e) {
-            log.error(e.getMessage(), e);
-            return 0;
         }
     }
 
