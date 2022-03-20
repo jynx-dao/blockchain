@@ -219,7 +219,7 @@ public class SnapshotService {
     ) {
         int hashChain = 0;
         Snapshot snapshot = new Snapshot()
-                .setId(uuidUtils.next())
+                .setId(UUID.randomUUID())
                 .setBlockHeight(blockHeight)
                 .setFormat(1);
         initializeSnapshotDirectoryAtHeight(blockHeight);
@@ -285,7 +285,7 @@ public class SnapshotService {
                 String chunkHash = DigestUtils.sha3_256Hex(BigInteger.valueOf(chunkHashCode).toByteArray());
                 SnapshotChunk snapshotChunk = new SnapshotChunk()
                         .setSnapshot(snapshot)
-                        .setId(uuidUtils.next())
+                        .setId(UUID.randomUUID())
                         .setChunkIndex(idx)
                         .setFileName(fileName)
                         .setHash(chunkHash);

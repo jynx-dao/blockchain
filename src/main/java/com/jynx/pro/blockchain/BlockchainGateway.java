@@ -91,6 +91,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Setter
     @Value("${validator.public.key}")
     private String validatorPublicKey;
+    @Value("${enable.snapshots}")
+    private Boolean enableSnapshots;
 
     private static final Set<String> nonceHistory = new HashSet<>();
     private static final ExecutorService executorService = Executors.newFixedThreadPool(1);
@@ -731,7 +733,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                 .setData(ByteString.copyFrom(appStateManager.getStateAsBytes()))
                 .build();
         long blockHeight = appStateManager.getBlockHeight();
-        if(blockHeight % configService.getStatic().getSnapshotFrequency() == 0) {
+        if(blockHeight % configService.getStatic().getSnapshotFrequency() == 0 && enableSnapshots) {
             snapshotService.capture(blockHeight); // TODO - this should happen on another Thread !?
         }
         databaseTransactionManager.commit();
@@ -756,6 +758,10 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     public void info(Types.RequestInfo request, StreamObserver<Types.ResponseInfo> responseObserver) {
         Types.ResponseInfo response = Types.ResponseInfo.newBuilder().build();
         responseObserver.onNext(response);
+
+
+
+
         responseObserver.onCompleted();
     }
 
