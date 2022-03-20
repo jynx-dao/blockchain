@@ -93,9 +93,9 @@ public class ValidatorService {
     ) {
         Validator validator = validatorRepository.findById(request.getValidatorId())
                 .orElseThrow(() -> new JynxProException(ErrorCode.VALIDATOR_NOT_FOUND));
-        Optional<Delegation> delegationOptional = delegationRepository.findByValidatorIdAndStakeId(
-                validator.getId(), request.getUser().getId());
         Stake stake = stakeService.getAndCreate(request.getUser());
+        Optional<Delegation> delegationOptional = delegationRepository.findByValidatorIdAndStakeId(
+                validator.getId(), stake.getId());
         Delegation delegation = new Delegation();
         if(delegationOptional.isPresent()) {
             delegation = delegationOptional.get();

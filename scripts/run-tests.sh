@@ -1,0 +1,19 @@
+export TENDERMINT_CLIENT_TEST=true
+export ACCOUNT_SERVICE_TEST=true
+export ASSET_SERVICE_TEST=true
+export AUCTION_SERVICE_TEST=true
+export BINANCE_SERVICE_TEST=true
+export COINBASE_SERVICE_TEST=true
+export ETHEREUM_SERVICE_TEST=true
+export EVENT_SERVICE_TEST=true
+export MARKET_SERVICE_TEST=true
+export ORACLE_SERVICE_TEST=true
+export ORDER_SERVICE_TEST=true
+export POLYGON_SERVICE_TEST=true
+export POSITION_SERVICE_TEST=true
+export SNAPSHOT_SERVICE_TEST=true
+export STAKE_SERVICE_TEST=true
+export VALIDATOR_SERVICE_TEST=true
+export CRYPTO_UTILS_TEST=true
+mvn clean install
+./$(dirname $0)/clear-test-state.sh

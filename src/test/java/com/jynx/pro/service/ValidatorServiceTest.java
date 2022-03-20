@@ -9,13 +9,13 @@ import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.UpdateDelegationRequest;
 import com.jynx.pro.request.ValidatorApplicationRequest;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.binary.Hex;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -28,6 +28,7 @@ import java.util.UUID;
 @Slf4j
 @Testcontainers
 @ActiveProfiles("test")
+@EnabledIfEnvironmentVariable(named = "VALIDATOR_SERVICE_TEST", matches = "true")
 @SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
 public class ValidatorServiceTest extends IntegrationTest {
 
@@ -109,13 +110,7 @@ public class ValidatorServiceTest extends IntegrationTest {
         }
     }
 
-    @Test
-    public void testApply() {
-        apply(takerUser.getPublicKey(), takerUser);
-    }
-
-    @Test
-    public void testAddDelegation() {
+    private void addDelegation() {
         apply(takerUser.getPublicKey(), takerUser);
         List<Validator> validators = validatorService.getAll();
         Assertions.assertEquals(validators.size(), 1);
@@ -126,6 +121,16 @@ public class ValidatorServiceTest extends IntegrationTest {
         request.setUser(takerUser);
         Delegation delegation = validatorService.addDelegation(request);
         Assertions.assertEquals(delegation.getAmount().doubleValue(), BigDecimal.ONE.doubleValue());
+    }
+
+    @Test
+    public void testApply() {
+        apply(takerUser.getPublicKey(), takerUser);
+    }
+
+    @Test
+    public void testAddDelegation() {
+        addDelegation();
     }
 
     @Test
@@ -167,13 +172,73 @@ public class ValidatorServiceTest extends IntegrationTest {
         apply(takerUser.getPublicKey(), takerUser);
         List<Validator> validators = validatorService.getAll();
         Assertions.assertEquals(validators.size(), 1);
-        Validator validator = validators.get(0);
         UpdateDelegationRequest request = new UpdateDelegationRequest()
-                .setAmount(BigDecimal.valueOf(1000000000).multiply(BigDecimal.valueOf(10000000)))
+                .setAmount(BigDecimal.valueOf(1))
                 .setValidatorId(UUID.randomUUID());
         request.setUser(takerUser);
         try {
             validatorService.addDelegation(request);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.VALIDATOR_NOT_FOUND);
+        }
+    }
+
+    @Test
+    public void testRemoveDelegation() {
+        addDelegation();
+        List<Validator> validators = validatorService.getAll();
+        Assertions.assertEquals(validators.size(), 1);
+        Validator validator = validators.get(0);
+        UpdateDelegationRequest request = new UpdateDelegationRequest()
+                .setAmount(BigDecimal.ONE)
+                .setValidatorId(validator.getId());
+        request.setUser(takerUser);
+        Delegation delegation = validatorService.removeDelegation(request);
+        Assertions.assertEquals(delegation.getAmount().doubleValue(), BigDecimal.ZERO.doubleValue());
+    }
+
+    @Test
+    public void testRemoveDelegationTwice() {
+        addDelegation();
+        List<Validator> validators = validatorService.getAll();
+        Assertions.assertEquals(validators.size(), 1);
+        Validator validator = validators.get(0);
+        UpdateDelegationRequest request = new UpdateDelegationRequest()
+                .setAmount(BigDecimal.valueOf(0.5))
+                .setValidatorId(validator.getId());
+        request.setUser(takerUser);
+        Delegation delegation = validatorService.removeDelegation(request);
+        Assertions.assertEquals(delegation.getAmount().doubleValue(), BigDecimal.valueOf(0.5).doubleValue());
+        delegation = validatorService.removeDelegation(request);
+        Assertions.assertEquals(delegation.getAmount().doubleValue(), BigDecimal.ZERO.doubleValue());
+    }
+
+    @Test
+    public void testRemoveDelegationExceedingAmount() {
+        addDelegation();
+        List<Validator> validators = validatorService.getAll();
+        Assertions.assertEquals(validators.size(), 1);
+        Validator validator = validators.get(0);
+        UpdateDelegationRequest request = new UpdateDelegationRequest()
+                .setAmount(BigDecimal.TEN)
+                .setValidatorId(validator.getId());
+        request.setUser(takerUser);
+        Delegation delegation = validatorService.removeDelegation(request);
+        Assertions.assertEquals(delegation.getAmount().doubleValue(), BigDecimal.ZERO.doubleValue());
+    }
+
+    @Test
+    public void testRemoveDelegationFailsWithMissingValidator() {
+        apply(takerUser.getPublicKey(), takerUser);
+        List<Validator> validators = validatorService.getAll();
+        Assertions.assertEquals(validators.size(), 1);
+        UpdateDelegationRequest request = new UpdateDelegationRequest()
+                .setAmount(BigDecimal.valueOf(1))
+                .setValidatorId(UUID.randomUUID());
+        request.setUser(takerUser);
+        try {
+            validatorService.removeDelegation(request);
             Assertions.fail();
         } catch(JynxProException e) {
             Assertions.assertEquals(e.getMessage(), ErrorCode.VALIDATOR_NOT_FOUND);

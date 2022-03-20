@@ -6,6 +6,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
@@ -14,6 +15,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Slf4j
 @Testcontainers
 @ActiveProfiles("test")
+@EnabledIfEnvironmentVariable(named = "SNAPSHOT_SERVICE_TEST", matches = "true")
 @SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.DEFINED_PORT)
 public class SnapshotServiceTest extends IntegrationTest {
 

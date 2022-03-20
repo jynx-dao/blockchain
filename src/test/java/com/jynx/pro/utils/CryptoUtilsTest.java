@@ -3,10 +3,12 @@ package com.jynx.pro.utils;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 import java.util.Optional;
 
 @Slf4j
+@EnabledIfEnvironmentVariable(named = "CRYPTO_UTILS_TEST", matches = "true")
 public class CryptoUtilsTest {
 
     private final CryptoUtils cryptoUtils = new CryptoUtils();

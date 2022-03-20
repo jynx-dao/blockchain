@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -16,6 +17,7 @@ import java.time.ZoneOffset;
 
 import static org.mockito.Mockito.mockStatic;
 
+@EnabledIfEnvironmentVariable(named = "POLYGON_SERVICE_TEST", matches = "true")
 public class PolygonServiceTest {
 
     private final PolygonService polygonService = new PolygonService();
