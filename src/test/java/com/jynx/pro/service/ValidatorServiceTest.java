@@ -5,6 +5,7 @@ import com.jynx.pro.entity.Delegation;
 import com.jynx.pro.entity.User;
 import com.jynx.pro.entity.Validator;
 import com.jynx.pro.error.ErrorCode;
+import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.UpdateDelegationRequest;
 import com.jynx.pro.request.ValidatorApplicationRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.UUID;
 
 @Slf4j
 @Testcontainers
@@ -124,5 +126,57 @@ public class ValidatorServiceTest extends IntegrationTest {
         request.setUser(takerUser);
         Delegation delegation = validatorService.addDelegation(request);
         Assertions.assertEquals(delegation.getAmount().doubleValue(), BigDecimal.ONE.doubleValue());
+    }
+
+    @Test
+    public void testAddDelegationTwice() {
+        apply(takerUser.getPublicKey(), takerUser);
+        List<Validator> validators = validatorService.getAll();
+        Assertions.assertEquals(validators.size(), 1);
+        Validator validator = validators.get(0);
+        UpdateDelegationRequest request = new UpdateDelegationRequest()
+                .setAmount(BigDecimal.ONE)
+                .setValidatorId(validator.getId());
+        request.setUser(takerUser);
+        Delegation delegation = validatorService.addDelegation(request);
+        Assertions.assertEquals(delegation.getAmount().doubleValue(), BigDecimal.ONE.doubleValue());
+        delegation = validatorService.addDelegation(request);
+        Assertions.assertEquals(delegation.getAmount().doubleValue(), BigDecimal.valueOf(2).doubleValue());
+    }
+
+    @Test
+    public void testAddDelegationFailsWithInsufficientStake() {
+        apply(takerUser.getPublicKey(), takerUser);
+        List<Validator> validators = validatorService.getAll();
+        Assertions.assertEquals(validators.size(), 1);
+        Validator validator = validators.get(0);
+        UpdateDelegationRequest request = new UpdateDelegationRequest()
+                .setAmount(BigDecimal.valueOf(1000000000).multiply(BigDecimal.valueOf(10000000)))
+                .setValidatorId(validator.getId());
+        request.setUser(takerUser);
+        try {
+            validatorService.addDelegation(request);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.INSUFFICIENT_STAKE);
+        }
+    }
+
+    @Test
+    public void testAddDelegationFailsWithMissingValidator() {
+        apply(takerUser.getPublicKey(), takerUser);
+        List<Validator> validators = validatorService.getAll();
+        Assertions.assertEquals(validators.size(), 1);
+        Validator validator = validators.get(0);
+        UpdateDelegationRequest request = new UpdateDelegationRequest()
+                .setAmount(BigDecimal.valueOf(1000000000).multiply(BigDecimal.valueOf(10000000)))
+                .setValidatorId(UUID.randomUUID());
+        request.setUser(takerUser);
+        try {
+            validatorService.addDelegation(request);
+            Assertions.fail();
+        } catch(JynxProException e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.VALIDATOR_NOT_FOUND);
+        }
     }
 }

@@ -58,9 +58,9 @@ public class ValidatorService {
     ) {
         Validator validator = validatorRepository.findById(request.getValidatorId())
                 .orElseThrow(() -> new JynxProException(ErrorCode.VALIDATOR_NOT_FOUND));
-        Optional<Delegation> delegationOptional = delegationRepository.findByValidatorIdAndStakeId(
-                validator.getId(), request.getUser().getId());
         Stake stake = stakeService.getAndCreate(request.getUser());
+        Optional<Delegation> delegationOptional = delegationRepository.findByValidatorIdAndStakeId(
+                validator.getId(), stake.getId());
         List<Delegation> currentDelegation = delegationRepository.findByStakeId(stake.getId());
         BigDecimal totalDelegation = currentDelegation.stream().map(Delegation::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
