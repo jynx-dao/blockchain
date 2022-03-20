@@ -730,11 +730,11 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         Types.ResponseCommit resp = Types.ResponseCommit.newBuilder()
                 .setData(ByteString.copyFrom(appStateManager.getStateAsBytes()))
                 .build();
-        databaseTransactionManager.commit();
         long blockHeight = appStateManager.getBlockHeight();
         if(blockHeight % configService.getStatic().getSnapshotFrequency() == 0) {
-            executorService.submit(() -> snapshotService.capture(blockHeight));
+            snapshotService.capture(blockHeight); // TODO - this should happen on another Thread !?
         }
+        databaseTransactionManager.commit();
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
@@ -775,23 +775,15 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Override
     public void listSnapshots(Types.RequestListSnapshots request,
                               StreamObserver<Types.ResponseListSnapshots> responseObserver) {
-        List<Snapshot> appSnapshots = readOnlyRepository.getAllByEntity(Snapshot.class).stream()
-                .sorted(Comparator.comparing(Snapshot::getBlockHeight).reversed())
-                .limit(10L)
-                .collect(Collectors.toList());
-        List<Types.Snapshot> snapshots = new ArrayList<>();
-        for(Snapshot appSnapshot : appSnapshots) {
-            Types.Snapshot tendermintSnapshot = Types.Snapshot.newBuilder()
-                    .setChunks(appSnapshot.getTotalChunks())
-                    .setHeight(appSnapshot.getBlockHeight())
-                    .setFormat(appSnapshot.getFormat())
-                    .setHash(ByteString.copyFromUtf8(appSnapshot.getHash()))
-                    .setMetadata(ByteString.copyFromUtf8(appSnapshot.getHash()))
-                    .build();
-            snapshots.add(tendermintSnapshot);
-        }
+        List<Snapshot> snapshots = snapshotService.getLatestSnapshots(10L);
         Types.ResponseListSnapshots response = Types.ResponseListSnapshots.newBuilder()
-                .addAllSnapshots(snapshots)
+                .addAllSnapshots(snapshots.stream().map(s -> Types.Snapshot.newBuilder()
+                        .setChunks(s.getTotalChunks())
+                        .setHeight(s.getBlockHeight())
+                        .setFormat(s.getFormat())
+                        .setHash(ByteString.copyFromUtf8(s.getHash()))
+                        .setMetadata(ByteString.copyFromUtf8(s.getHash()))
+                        .build()).collect(Collectors.toList()))
                 .build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
@@ -803,8 +795,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Override
     public void offerSnapshot(Types.RequestOfferSnapshot request,
                               StreamObserver<Types.ResponseOfferSnapshot> responseObserver) {
+        // TODO - should we be checking that this is the right block height here before accepting the snapshot?
+        snapshotService.clearState();
         Types.ResponseOfferSnapshot response = Types.ResponseOfferSnapshot.newBuilder().build();
-        // TODO - build correct response
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }
@@ -828,8 +821,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     @Override
     public void applySnapshotChunk(Types.RequestApplySnapshotChunk request,
                                    StreamObserver<Types.ResponseApplySnapshotChunk> responseObserver) {
+        snapshotService.saveChunk(request.getChunk().toStringUtf8());
+        // TODO - we definitely need some verification somewhere to ensure we have restored the correct app state
         Types.ResponseApplySnapshotChunk response = Types.ResponseApplySnapshotChunk.newBuilder().build();
-        // TODO - build correct response
         responseObserver.onNext(response);
         responseObserver.onCompleted();
     }

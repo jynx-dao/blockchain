@@ -3,9 +3,11 @@ package com.jynx.pro.service;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
+import com.google.gson.Gson;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.model.SnapshotContent;
 import com.jynx.pro.repository.*;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.Data;
@@ -23,10 +25,8 @@ import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -194,6 +194,22 @@ public class SnapshotService {
     }
 
     /**
+     * Get the latest N snapshots
+     *
+     * @param limit N snapshots
+     *
+     * @return {@link List<Snapshot>}
+     */
+    public List<Snapshot> getLatestSnapshots(
+            final long limit
+    ) {
+        return readOnlyRepository.getAllByEntity(Snapshot.class).stream()
+                .sorted(Comparator.comparing(Snapshot::getBlockHeight).reversed())
+                .limit(limit)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * Capture the latest state snapshot
      *
      * @param blockHeight the current block height
@@ -206,38 +222,33 @@ public class SnapshotService {
                 .setId(uuidUtils.next())
                 .setBlockHeight(blockHeight)
                 .setFormat(1);
+        initializeSnapshotDirectoryAtHeight(blockHeight);
         snapshot = snapshotRepository.save(snapshot);
-        hashChain = saveEntity(Account.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(Asset.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(AuctionTrigger.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(BlockValidator.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(BridgeUpdate.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(BridgeUpdateSignature.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(Config.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(Delegation.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(Deposit.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(Event.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(Market.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(Oracle.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(Order.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(OrderHistory.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(PendingAuctionTrigger.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(Position.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(Proposal.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(Settlement.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(Stake.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(Trade.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(Transaction.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(User.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(Validator.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(Vote.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(Withdrawal.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(WithdrawalBatch.class, hashChain, blockHeight, snapshot);
-        hashChain = saveEntity(WithdrawalBatchSignature.class, hashChain, blockHeight, snapshot);
+        for(EntityConfig<?> config : entityConfig) {
+            hashChain = saveEntity(config.getType(), hashChain, blockHeight, snapshot);
+        }
         String hash = DigestUtils.sha3_256Hex(BigInteger.valueOf(hashChain).toByteArray());
         snapshot.setHash(hash);
         snapshotRepository.save(snapshot);
         saveHash(hash, blockHeight);
+    }
+
+    /**
+     * Initialize the snapshot directory at specified block height
+     *
+     * @param blockHeight the block height
+     */
+    private void initializeSnapshotDirectoryAtHeight(
+            final long blockHeight
+    ) {
+        try {
+            File userDirectory = FileUtils.getUserDirectory();
+            String baseDir = String.format("%s/.jynx/snapshots/height_%s", userDirectory.toPath(), blockHeight);
+            FileUtils.deleteDirectory(new File(baseDir));
+            Files.createDirectories(Paths.get(baseDir));
+        } catch(Exception e) {
+            log.error(e.getMessage(), e);
+        }
     }
 
     /**
@@ -258,15 +269,15 @@ public class SnapshotService {
         try {
             List<T> items = readOnlyRepository.getAllByEntity(type);
             List<List<T>> chunks = Lists.partition(items, configService.getStatic().getSnapshotChunkRows());
-            int idx = 0;
             List<SnapshotChunk> snapshotChunks = new ArrayList<>();
             for(List<T> chunk : chunks) {
-                String json = objectMapper.writeValueAsString(chunk);
+                int idx = snapshot.getTotalChunks();
                 String fileName = type.getCanonicalName();
-                File userDirectory = FileUtils.getUserDirectory();
-                String baseDir = String.format("%s/.jynx/snapshots/height_%s", userDirectory.toPath(), blockHeight);
-                Files.createDirectories(Paths.get(baseDir));
-                FileWriter fw = new FileWriter(String.format("%s/%s.%s.json", baseDir, fileName, idx), true);
+                SnapshotContent<T> content = new SnapshotContent<T>()
+                        .setEntityName(fileName)
+                        .setData(chunk);
+                String json = objectMapper.writeValueAsString(content);
+                FileWriter fw = new FileWriter(String.format("%s/%s.%s.json", getBaseDir(blockHeight), idx, fileName), true);
                 fw.append(json);
                 fw.close();
                 int chunkHashCode = chunk.hashCode();
@@ -277,10 +288,9 @@ public class SnapshotService {
                         .setChunkIndex(idx)
                         .setFileName(fileName)
                         .setHash(chunkHash);
-                snapshotChunks.add(snapshotChunk);
                 snapshot.setTotalChunks(snapshot.getTotalChunks() + 1);
+                snapshotChunks.add(snapshotChunk);
                 hashChain = List.of(hashChain, chunkHashCode).hashCode();
-                idx++;
             }
             snapshotChunkRepository.saveAll(snapshotChunks);
             return hashChain;
@@ -327,23 +337,12 @@ public class SnapshotService {
     }
 
     /**
-     * Load state from snapshot
+     * Empty the state
      */
-    public void load(
-            final long blockHeight
-    ) {
-        File userDirectory = FileUtils.getUserDirectory();
-        String baseDir = String.format("%s/.jynx/snapshots/height_%s", userDirectory.toPath(), blockHeight);
-        boolean exists = Files.exists(Paths.get(baseDir));
-        if(exists) {
-            int[] hashChain = {0};
-            List<EntityConfig<?>> invertedEntityConfig = new ArrayList<>(entityConfig);
-            Collections.reverse(invertedEntityConfig);
-            invertedEntityConfig.forEach(c -> c.getRepository().deleteAll());
-            entityConfig.forEach(c -> hashChain[0] = loadEntity(c, blockHeight, hashChain[0]));
-            String hash = DigestUtils.sha3_256Hex(BigInteger.valueOf(hashChain[0]).toByteArray());
-            verifyHash(hash, blockHeight);
-        }
+    public void clearState() {
+        List<EntityConfig<?>> invertedEntityConfig = new ArrayList<>(entityConfig);
+        Collections.reverse(invertedEntityConfig);
+        invertedEntityConfig.forEach(c -> c.getRepository().deleteAll());
     }
 
     /**
@@ -438,5 +437,29 @@ public class SnapshotService {
             }
         }
         return Optional.empty();
+    }
+
+    /**
+     * Save a snapshot chunk to the database
+     *
+     * @param content the snapshot chunk content
+     */
+    public <T> void saveChunk(
+            final String content
+    ) {
+        try {
+            SnapshotContent<T> snapshotContent = objectMapper.readValue(content, new TypeReference<>() {});
+            Class<T> type = (Class<T>) Class.forName(snapshotContent.getEntityName());
+            Gson gson = new Gson();
+            List<T> data = snapshotContent.getData().stream()
+                    .map(d -> gson.fromJson(gson.toJsonTree(d), type))
+                    .collect(Collectors.toList());
+            entityConfig.stream()
+                    .filter(c -> c.getType().equals(type))
+                    .findFirst()
+                    .ifPresent(config -> ((EntityRepository<T>)config.getRepository()).saveAll(data));
+        } catch(Exception e) {
+            log.error(e.getMessage(), e);
+        }
     }
 }
