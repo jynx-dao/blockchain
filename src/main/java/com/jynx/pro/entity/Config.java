@@ -43,4 +43,18 @@ public class Config {
     private String bridgeAddress;
     @Column(name = "eth_confirmations", nullable = false)
     private Integer ethConfirmations;
+    @Column(name = "active_validator_count", nullable = false)
+    private Integer activeValidatorCount;
+    @Column(name = "backup_validator_count", nullable = false)
+    private Integer backupValidatorCount;
+    @Column(name = "validator_bond", nullable = false)
+    private BigDecimal validatorBond;
+    @Column(name = "validator_min_delegation", nullable = false)
+    private BigDecimal validatorMinDelegation;
+    @Column(name = "snapshot_frequency", nullable = false)
+    private Integer snapshotFrequency;
+    @Column(name = "async_task_frequency", nullable = false)
+    private Integer asyncTaskFrequency;
+    @Column(name = "snapshot_chunk_rows", nullable = false)
+    private Integer snapshotChunkRows;
 }

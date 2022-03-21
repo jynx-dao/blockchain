@@ -4,9 +4,11 @@ import com.jynx.pro.constant.MarketSide;
 import com.jynx.pro.entity.Position;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
 import java.math.BigDecimal;
 
+@EnabledIfEnvironmentVariable(named = "POSITION_SERVICE_TEST", matches = "true")
 public class PositionServiceTest {
 
     private final PositionService positionService = new PositionService();

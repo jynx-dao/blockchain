@@ -19,6 +19,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
@@ -39,6 +40,7 @@ import java.util.List;
 @Slf4j
 @Testcontainers
 @ActiveProfiles("tendermint")
+@EnabledIfEnvironmentVariable(named = "TENDERMINT_CLIENT_TEST", matches = "true")
 @DisabledIfEnvironmentVariable(named = "TRAVIS_CI", matches = "true")
 @SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class TendermintClientTest extends IntegrationTest {

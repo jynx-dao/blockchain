@@ -5,6 +5,7 @@ import com.jynx.pro.exception.JynxProException;
 import com.mashape.unirest.http.Unirest;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
 
@@ -14,6 +15,7 @@ import java.time.ZoneOffset;
 
 import static org.mockito.Mockito.mockStatic;
 
+@EnabledIfEnvironmentVariable(named = "BINANCE_SERVICE_TEST", matches = "true")
 public class BinanceServiceTest {
 
     private final BinanceService binanceService = new BinanceService();

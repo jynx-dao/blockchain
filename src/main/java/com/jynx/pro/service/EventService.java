@@ -12,6 +12,9 @@ import com.jynx.pro.repository.StakeRepository;
 import com.jynx.pro.utils.PriceUtils;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.DecoderException;
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.codec.binary.Hex;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -41,6 +44,8 @@ public class EventService {
     private AssetService assetService;
     @Autowired
     private ConfigService configService;
+    @Autowired
+    private ValidatorService validatorService;
     @Autowired
     private UUIDUtils uuidUtils;
     @Autowired
@@ -104,7 +109,7 @@ public class EventService {
                 .setBlockNumber(blockNumber)
                 .setHash(txHash)
                 .setType(type)
-                .setAmount(BigDecimal.valueOf(amount.doubleValue())
+                .setAmount(new BigDecimal(amount)
                         .divide(BigDecimal.valueOf(modifier), 8, RoundingMode.HALF_DOWN));
         if(assetAddress != null) {
             event.setAsset(assetAddress);
@@ -158,12 +163,23 @@ public class EventService {
             final Event event
     ) {
         List<EventType> stakeEvents = List.of(EventType.ADD_STAKE, EventType.REMOVE_STAKE);
-        if(stakeEvents.contains(event.getType())) {
+        if (stakeEvents.contains(event.getType())) {
             Stake stake = stakeService.getAndCreate(event.getUser());
-            if(event.getType().equals(EventType.ADD_STAKE)) {
+            String tendermintKey = "";
+            try {
+                Base64.encodeBase64String(Hex.decodeHex(event.getUser().getPublicKey()));
+            } catch (DecoderException e) {
+                log.error(e.getMessage(), e);
+            }
+            boolean isValidator = validatorService.isValidator(tendermintKey);
+            if (event.getType().equals(EventType.ADD_STAKE)) {
                 stake.setAmount(stake.getAmount().add(event.getAmount()));
             } else {
                 stake.setAmount(stake.getAmount().subtract(event.getAmount()));
+            }
+            if(isValidator && stake.getAmount().doubleValue() < configService.get()
+                    .getValidatorBond().doubleValue()) {
+                validatorService.disable(tendermintKey);
             }
             stakeRepository.save(stake);
         } else {

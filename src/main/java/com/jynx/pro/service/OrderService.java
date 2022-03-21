@@ -380,7 +380,8 @@ public class OrderService {
         BigDecimal quantity = orderOverride != null ? orderOverride.getQuantity() : request.getQuantity();
         List<Order> passiveOrders = getSideOfBook(market, getOtherSide(side)).stream()
                 .filter(o -> !o.getUser().getId().equals(user.getId())).collect(Collectors.toList());
-        double passiveVolume = passiveOrders.stream().mapToDouble(o -> o.getRemainingQuantity().doubleValue()).sum();
+        BigDecimal passiveVolume = passiveOrders.stream().map(Order::getRemainingQuantity)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         Order order;
         if(orderOverride != null) {
             order = orderOverride;
@@ -399,7 +400,7 @@ public class OrderService {
                     .setUser(user)
                     .setPriority(0L);
         }
-        if(quantity.doubleValue() > passiveVolume) {
+        if(quantity.doubleValue() > passiveVolume.doubleValue()) {
             order.setStatus(OrderStatus.REJECTED);
             order.setRejectedReason(ErrorCode.INSUFFICIENT_PASSIVE_VOLUME);
             orderRepository.save(order);
@@ -653,13 +654,13 @@ public class OrderService {
         List<Order> openOrders = orderRepository.findByStatusInAndTypeAndMarketAndUser(
                 statusList, request.getType(), market, request.getUser());
         BigDecimal remainingQuantity;
-        double existingVolume = openOrders.stream()
+        BigDecimal existingVolume = openOrders.stream()
                 .filter(o -> o.getSide().equals(request.getSide()))
-                .mapToDouble(o -> o.getRemainingQuantity().doubleValue()).sum();
-        if(existingVolume >= position.getQuantity().doubleValue()) {
+                .map(Order::getRemainingQuantity).reduce(BigDecimal.ZERO, BigDecimal::add);
+        if(existingVolume.doubleValue() >= position.getQuantity().doubleValue()) {
             throw new JynxProException(ErrorCode.CANNOT_CREATE_REDUCE_ONLY_ORDER);
         } else {
-            remainingQuantity = position.getQuantity().subtract(BigDecimal.valueOf(existingVolume));
+            remainingQuantity = position.getQuantity().subtract(existingVolume);
         }
         if(request.getQuantity().doubleValue() > remainingQuantity.doubleValue()) {
             request.setQuantity(remainingQuantity);

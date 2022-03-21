@@ -11,6 +11,8 @@ import com.jynx.pro.request.CreateWithdrawalRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
 import org.junit.jupiter.api.*;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
@@ -31,6 +33,7 @@ import java.util.Optional;
 @Slf4j
 @Testcontainers
 @ActiveProfiles("tendermint")
+@EnabledIfEnvironmentVariable(named = "ETHEREUM_SERVICE_TEST", matches = "true")
 @SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class EthereumServiceTest extends IntegrationTest {
 

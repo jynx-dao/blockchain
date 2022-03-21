@@ -93,4 +93,15 @@ public class ErrorCode {
     public static final String SIGN_BRIDGE_UPDATED_FAILED = "Failed to sign bridge updates.";
     public static final String EXECUTE_BRIDGE_UPDATES_FAILED = "Failed to execute bridge updates.";
     public static final String CANNOT_CREATE_REDUCE_ONLY_ORDER = "Cannot create order because would not reduce position.";
+    public static final String TENDERMINT_SIGNATURE_INVALID = "You must sign the request using your Tendermint key.";
+    public static final String VALIDATOR_ALREADY_EXISTS = "This validator already exists.";
+    public static final String INSUFFICIENT_VALIDATOR_STAKE = "Insufficient stake to become a validator.";
+    public static final String VALIDATOR_NOT_FOUND = "Validator was not found.";
+    public static final String INSUFFICIENT_STAKE = "You do not have enough stake.";
+    public static final String SNAPSHOT_HASH_MISMATCH = "The snapshot state is inconsistent.";
+    public static final String NO_DELEGATION = "You have not delegated to this validator.";
+    public static final String REMOVE_DELEGATION_FAILED = "Failed to remove delegation.";
+    public static final String ADD_DELEGATION_FAILED = "Failed to add delegation.";
+    public static final String VALIDATOR_APPLICATION_FAILED = "Validator application failed.";
+    public static final String VALIDATOR_RESIGNATION_FAILED = "Validator resignation failed.";
 }

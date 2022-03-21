@@ -8,6 +8,7 @@ import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.Table;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Data
@@ -18,10 +19,12 @@ import java.util.UUID;
 public class Validator {
     @Id
     private UUID id;
-    @Column(name = "address")
-    private String address;
     @Column(name = "public_key", nullable = false)
     private String publicKey;
-    @Column(name = "active", nullable = false)
-    private Boolean active;
+    @Column(name = "delegation", nullable = false)
+    private BigDecimal delegation = BigDecimal.ZERO;
+    @Column(name = "enabled", nullable = false)
+    private Boolean enabled;
+    @Column(name = "priority", nullable = false)
+    private Integer priority;
 }

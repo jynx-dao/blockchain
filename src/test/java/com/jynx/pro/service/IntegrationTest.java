@@ -131,6 +131,10 @@ public abstract class IntegrationTest {
     protected BridgeUpdateSignatureRepository bridgeUpdateSignatureRepository;
     @Autowired
     protected BridgeUpdateRepository bridgeUpdateRepository;
+    @Autowired
+    protected BlockValidatorRepository blockValidatorRepository;
+    @Autowired
+    protected DelegationRepository delegationRepository;
 
     protected static final String ETH_ADDRESS = "0xd7E1236C08731C3632519DCd1A581bFe6876a3B2";
     protected static final String ETH_PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
@@ -414,6 +418,8 @@ public abstract class IntegrationTest {
         withdrawalBatchRepository.deleteAll();
         bridgeUpdateSignatureRepository.deleteAll();
         bridgeUpdateRepository.deleteAll();
+        blockValidatorRepository.deleteAll();
+        delegationRepository.deleteAll();
         validatorRepository.deleteAll();
         assetRepository.deleteAll();
         voteRepository.deleteAll();
@@ -448,6 +454,13 @@ public abstract class IntegrationTest {
                     .setApprovalThreshold(BigDecimal.valueOf(0.66))
                     .setUuidSeed(1L)
                     .setEthConfirmations(0)
+                    .setActiveValidatorCount(1)
+                    .setBackupValidatorCount(1)
+                    .setAsyncTaskFrequency(1)
+                    .setSnapshotFrequency(1)
+                    .setSnapshotChunkRows(10)
+                    .setValidatorMinDelegation(BigDecimal.ONE)
+                    .setValidatorBond(BigDecimal.ONE)
                     .setBridgeAddress(ethereumHelper.getJynxProBridge().getContractAddress());
             configRepository.save(config);
             configService.setTimestamp(nowAsMillis());
