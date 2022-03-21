@@ -549,4 +549,32 @@ public class TendermintClient {
         return processTransaction(request, Delegation.class,
                 TendermintTransaction.ADD_DELEGATION, ErrorCode.ADD_DELEGATION_FAILED);
     }
+
+    /**
+     * Validator application
+     *
+     * @param request {@link ValidatorApplicationRequest}
+     *
+     * @return {@link TransactionResponse<Validator>}
+     */
+    public TransactionResponse<Validator> validatorApplication(
+            final ValidatorApplicationRequest request
+    ) {
+        return processTransaction(request, Validator.class,
+                TendermintTransaction.VALIDATOR_APPLICATION, ErrorCode.VALIDATOR_APPLICATION_FAILED);
+    }
+
+    /**
+     * Validator resignation
+     *
+     * @param request {@link SingleItemRequest}
+     *
+     * @return {@link TransactionResponse<Validator>}
+     */
+    public TransactionResponse<Validator> validatorResignation(
+            final SingleItemRequest request
+    ) {
+        return processTransaction(request, Validator.class,
+                TendermintTransaction.VALIDATOR_RESIGNATION, ErrorCode.VALIDATOR_RESIGNATION_FAILED);
+    }
 }

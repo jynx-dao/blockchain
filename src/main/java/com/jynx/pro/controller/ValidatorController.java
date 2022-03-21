@@ -4,7 +4,9 @@ import com.jynx.pro.entity.Delegation;
 import com.jynx.pro.entity.Validator;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.request.SingleItemRequest;
 import com.jynx.pro.request.UpdateDelegationRequest;
+import com.jynx.pro.request.ValidatorApplicationRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
@@ -27,6 +29,20 @@ public class ValidatorController extends AbstractController {
     @GetMapping
     public ResponseEntity<List<Validator>> getAll() {
         return ResponseEntity.ok(readOnlyRepository.getAllByEntity(Validator.class));
+    }
+
+    @PostMapping("/apply")
+    public ResponseEntity<Validator> apply(
+            @RequestBody ValidatorApplicationRequest request
+    ) {
+        return ResponseEntity.ok(tendermintClient.validatorApplication(request).getItem());
+    }
+
+    @PostMapping("/resign")
+    public ResponseEntity<Validator> resign(
+            @RequestBody SingleItemRequest request
+    ) {
+        return ResponseEntity.ok(tendermintClient.validatorResignation(request).getItem());
     }
 
     @PostMapping("/delegate")

@@ -258,6 +258,16 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                         .setDeliverFn(validatorService::removeDelegation)
                         .setProtectedFn(false)
                         .setRequestType(UpdateDelegationRequest.class));
+        transactionSettings.put(TendermintTransaction.VALIDATOR_APPLICATION,
+                new TransactionConfig<ValidatorApplicationRequest>()
+                        .setDeliverFn(validatorService::apply)
+                        .setProtectedFn(false)
+                        .setRequestType(ValidatorApplicationRequest.class));
+        transactionSettings.put(TendermintTransaction.VALIDATOR_RESIGNATION,
+                new TransactionConfig<SingleItemRequest>()
+                        .setDeliverFn(validatorService::resign)
+                        .setProtectedFn(false)
+                        .setRequestType(SingleItemRequest.class));
     }
 
     /**

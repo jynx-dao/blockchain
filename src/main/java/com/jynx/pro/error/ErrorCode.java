@@ -102,4 +102,6 @@ public class ErrorCode {
     public static final String NO_DELEGATION = "You have not delegated to this validator.";
     public static final String REMOVE_DELEGATION_FAILED = "Failed to remove delegation.";
     public static final String ADD_DELEGATION_FAILED = "Failed to add delegation.";
+    public static final String VALIDATOR_APPLICATION_FAILED = "Validator application failed.";
+    public static final String VALIDATOR_RESIGNATION_FAILED = "Validator resignation failed.";
 }
