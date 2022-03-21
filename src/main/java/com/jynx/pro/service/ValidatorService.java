@@ -345,7 +345,7 @@ public class ValidatorService {
     }
 
     /**
-     * Disable a validator when they have sufficient stake
+     * Enable a validator when they have sufficient stake
      *
      * @param publicKey the validator's Tendermint key
      */
