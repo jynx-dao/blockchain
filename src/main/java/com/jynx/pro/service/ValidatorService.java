@@ -72,12 +72,15 @@ public class ValidatorService {
         if(delegationOptional.isPresent()) {
             delegation = delegationOptional.get();
             delegation.setAmount(delegation.getAmount().add(request.getAmount()));
+            validator.setDelegation(validator.getDelegation().add(request.getAmount()));
         } else {
             delegation.setValidator(validator);
             delegation.setStake(stake);
             delegation.setId(uuidUtils.next());
             delegation.setAmount(request.getAmount());
+            validator.setDelegation(validator.getDelegation().add(request.getAmount()));
         }
+        validatorRepository.save(validator);
         return delegationRepository.save(delegation);
     }
 
@@ -99,10 +102,13 @@ public class ValidatorService {
         if(delegationOptional.isPresent()) {
             Delegation delegation = delegationOptional.get();
             if(request.getAmount().doubleValue() > delegation.getAmount().doubleValue()) {
+                validator.setDelegation(validator.getDelegation().subtract(delegation.getAmount()));
                 delegation.setAmount(BigDecimal.ZERO);
             } else {
+                validator.setDelegation(validator.getDelegation().subtract(request.getAmount()));
                 delegation.setAmount(delegation.getAmount().subtract(request.getAmount()));
             }
+            validatorRepository.save(validator);
             return delegationRepository.save(delegation);
         } else {
             throw new JynxProException(ErrorCode.NO_DELEGATION);
@@ -135,9 +141,11 @@ public class ValidatorService {
         if(totalStake.doubleValue() < configService.get().getValidatorBond().doubleValue()) {
             throw new JynxProException(ErrorCode.INSUFFICIENT_VALIDATOR_STAKE);
         }
+        List<Validator> validators = getAll();
         Validator validator = new Validator()
                 .setPublicKey(request.getTendermintPublicKey())
                 .setEnabled(true)
+                .setPriority(validators.size())
                 .setId(uuidUtils.next());
         return validatorRepository.save(validator);
     }
@@ -199,7 +207,7 @@ public class ValidatorService {
                 .filter(v -> v.getDelegation().doubleValue() >= configService.getStatic()
                         .getValidatorMinDelegation().doubleValue())
                 .filter(Validator::getEnabled)
-                .sorted(Comparator.comparing(Validator::getDelegation).reversed())
+                .sorted(Comparator.comparing(Validator::getDelegation).reversed().thenComparing(Validator::getPriority))
                 .skip(configService.getStatic().getActiveValidatorCount())
                 .limit(configService.getStatic().getBackupValidatorCount())
                 .collect(Collectors.toList());
@@ -219,7 +227,7 @@ public class ValidatorService {
                 .filter(v -> v.getDelegation().doubleValue() >= configService.getStatic()
                         .getValidatorMinDelegation().doubleValue())
                 .filter(Validator::getEnabled)
-                .sorted(Comparator.comparing(Validator::getDelegation).reversed())
+                .sorted(Comparator.comparing(Validator::getDelegation).reversed().thenComparing(Validator::getPriority))
                 .limit(configService.getStatic().getActiveValidatorCount())
                 .collect(Collectors.toList());
     }
@@ -261,11 +269,13 @@ public class ValidatorService {
             final String publicKey
     ) {
         Optional<Validator> validatorOptional = validatorRepository.findByPublicKey(publicKey);
+        List<Validator> validators = getAll();
         if(validatorOptional.isEmpty()) {
             Validator validator = new Validator()
                     .setId(uuidUtils.next())
                     .setPublicKey(publicKey)
                     .setEnabled(true)
+                    .setPriority(validators.size())
                     .setDelegation(BigDecimal.ONE);
             validatorRepository.save(validator);
         }

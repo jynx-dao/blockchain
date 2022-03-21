@@ -1,6 +1,8 @@
 package com.jynx.pro.service;
 
 import com.jynx.pro.Application;
+import com.jynx.pro.constant.BlockValidatorStatus;
+import com.jynx.pro.entity.BlockValidator;
 import com.jynx.pro.entity.Delegation;
 import com.jynx.pro.entity.User;
 import com.jynx.pro.entity.Validator;
@@ -9,6 +11,7 @@ import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.request.UpdateDelegationRequest;
 import com.jynx.pro.request.ValidatorApplicationRequest;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.codec.DecoderException;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.binary.Hex;
 import org.junit.jupiter.api.AfterEach;
@@ -23,6 +26,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -47,7 +51,7 @@ public class ValidatorServiceTest extends IntegrationTest {
         clearState();
     }
 
-    private void apply(
+    private Validator apply(
             final String tmKey,
             final User user
     ) {
@@ -64,6 +68,7 @@ public class ValidatorServiceTest extends IntegrationTest {
         Validator validator = validatorService.apply(request);
         Assertions.assertEquals(validator.getDelegation().doubleValue(), 0d);
         Assertions.assertTrue(validator.getEnabled());
+        return validator;
     }
 
 
@@ -245,5 +250,115 @@ public class ValidatorServiceTest extends IntegrationTest {
         } catch(JynxProException e) {
             Assertions.assertEquals(e.getMessage(), ErrorCode.VALIDATOR_NOT_FOUND);
         }
+    }
+
+    @Test
+    public void testGetBackupSet() {
+        Validator validator1 = apply(takerUser.getPublicKey(), takerUser);
+        Validator validator2 = apply(makerUser.getPublicKey(), makerUser);
+        UpdateDelegationRequest request = new UpdateDelegationRequest()
+                .setAmount(BigDecimal.TEN)
+                .setValidatorId(validator1.getId());
+        request.setUser(takerUser);
+        validatorService.addDelegation(request);
+        request.setValidatorId(validator2.getId());
+        validatorService.addDelegation(request);
+        List<Validator> backupSet = validatorService.getBackupSet();
+        Assertions.assertEquals(1, backupSet.size());
+        Assertions.assertEquals(backupSet.get(0).getId(), validator2.getId());
+        backupSet = validatorService.getBackupSet(true);
+        Assertions.assertEquals(0, backupSet.size());
+    }
+
+    @Test
+    public void testGetBackupSetInsufficientDelegation() {
+        Validator validator1 = apply(takerUser.getPublicKey(), takerUser);
+        apply(makerUser.getPublicKey(), makerUser);
+        UpdateDelegationRequest request = new UpdateDelegationRequest()
+                .setAmount(BigDecimal.TEN)
+                .setValidatorId(validator1.getId());
+        request.setUser(takerUser);
+        validatorService.addDelegation(request);
+        List<Validator> backupSet = validatorService.getBackupSet();
+        Assertions.assertEquals(0, backupSet.size());
+    }
+
+    @Test
+    public void testGetActiveSet() {
+        Validator validator1 = apply(takerUser.getPublicKey(), takerUser);
+        Validator validator2 = apply(makerUser.getPublicKey(), makerUser);
+        UpdateDelegationRequest request = new UpdateDelegationRequest()
+                .setAmount(BigDecimal.TEN)
+                .setValidatorId(validator1.getId());
+        request.setUser(takerUser);
+        validatorService.addDelegation(request);
+        request.setValidatorId(validator2.getId());
+        validatorService.addDelegation(request);
+        List<Validator> activeSet = validatorService.getActiveSet();
+        Assertions.assertEquals(1, activeSet.size());
+        Assertions.assertEquals(activeSet.get(0).getId(), validator1.getId());
+        activeSet = validatorService.getActiveSet(true);
+        Assertions.assertEquals(0, activeSet.size());
+    }
+
+    @Test
+    public void testGetActiveSetInsufficientDelegation() {
+        apply(takerUser.getPublicKey(), takerUser);
+        List<Validator> activeSet = validatorService.getActiveSet();
+        Assertions.assertEquals(0, activeSet.size());
+    }
+
+    @Test
+    public void testSaveBlockValidators() {
+        Validator validator1 = apply(takerUser.getPublicKey(), takerUser);
+        Validator validator2 = apply(makerUser.getPublicKey(), makerUser);
+        UpdateDelegationRequest request = new UpdateDelegationRequest()
+                .setAmount(BigDecimal.TEN)
+                .setValidatorId(validator1.getId());
+        request.setUser(takerUser);
+        validatorService.addDelegation(request);
+        request.setValidatorId(validator2.getId());
+        validatorService.addDelegation(request);
+        validatorService.saveBlockValidators(1L);
+        List<BlockValidator> blockValidators = blockValidatorRepository.findAll();
+        Assertions.assertEquals(2, blockValidators.size());
+        Optional<BlockValidator> activeValidator = blockValidators.stream()
+                .filter(v -> v.getStatus().equals(BlockValidatorStatus.ACTIVE)).findFirst();
+        Optional<BlockValidator> backupValidator = blockValidators.stream()
+                .filter(v -> v.getStatus().equals(BlockValidatorStatus.BACKUP)).findFirst();
+        Assertions.assertTrue(activeValidator.isPresent());
+        Assertions.assertTrue(backupValidator.isPresent());
+        Assertions.assertEquals(activeValidator.get().getValidator().getId(), validator1.getId());
+        Assertions.assertEquals(backupValidator.get().getValidator().getId(), validator2.getId());
+    }
+
+    @Test
+    public void testAddFromGenesisOnlyOnce() {
+        validatorService.addFromGenesis(takerUser.getPublicKey());
+        validatorService.addFromGenesis(takerUser.getPublicKey());
+        List<Validator> validators = validatorService.getActiveSet();
+        Assertions.assertEquals(1, validators.size());
+    }
+
+    @Test
+    public void testIsValidator() throws DecoderException {
+        Validator validator1 = apply(takerUser.getPublicKey(), takerUser);
+        Validator validator2 = apply(makerUser.getPublicKey(), makerUser);
+        UpdateDelegationRequest request = new UpdateDelegationRequest()
+                .setAmount(BigDecimal.TEN)
+                .setValidatorId(validator1.getId());
+        request.setUser(takerUser);
+        validatorService.addDelegation(request);
+        request.setValidatorId(validator2.getId());
+        validatorService.addDelegation(request);
+        databaseTransactionManager.commit();
+        databaseTransactionManager.createTransaction();
+        boolean isValidator = validatorService.isValidator(
+                Base64.encodeBase64String(Hex.decodeHex(takerUser.getPublicKey())));
+        Assertions.assertTrue(isValidator);
+        isValidator = validatorService.isValidator(Base64.encodeBase64String(Hex.decodeHex(makerUser.getPublicKey())));
+        Assertions.assertTrue(isValidator);
+        isValidator = validatorService.isValidator(Base64.encodeBase64String(Hex.decodeHex(degenUser.getPublicKey())));
+        Assertions.assertFalse(isValidator);
     }
 }

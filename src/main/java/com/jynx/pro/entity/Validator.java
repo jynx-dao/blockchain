@@ -25,4 +25,6 @@ public class Validator {
     private BigDecimal delegation = BigDecimal.ZERO;
     @Column(name = "enabled", nullable = false)
     private Boolean enabled;
+    @Column(name = "priority", nullable = false)
+    private Integer priority;
 }
