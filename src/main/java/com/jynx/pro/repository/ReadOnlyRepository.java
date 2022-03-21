@@ -467,6 +467,28 @@ public class ReadOnlyRepository {
     }
 
     /**
+     * Get {@link Validator} by ID
+     *
+     * @param id the validator's ID
+     *
+     * @return {@link Optional<Validator>}
+     */
+    public Optional<Validator> getValidatorById(
+            final UUID id
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Validator> query = cb.createQuery(Validator.class);
+        Root<Validator> rootType = query.from(Validator.class);
+        Path<UUID> validator_id = rootType.get("id");
+        query = query.select(rootType).where(cb.equal(validator_id, id));
+        try {
+            return Optional.of(getEntityManager().createQuery(query).getSingleResult());
+        } catch(Exception e) {
+            return Optional.empty();
+        }
+    }
+
+    /**
      * Get {@link Event}s by confirmed flag
      *
      * @param confirmed true / false

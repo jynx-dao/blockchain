@@ -11,6 +11,7 @@ import com.jynx.pro.repository.BlockValidatorRepository;
 import com.jynx.pro.repository.DelegationRepository;
 import com.jynx.pro.repository.ReadOnlyRepository;
 import com.jynx.pro.repository.ValidatorRepository;
+import com.jynx.pro.request.SingleItemRequest;
 import com.jynx.pro.request.UpdateDelegationRequest;
 import com.jynx.pro.request.ValidatorApplicationRequest;
 import com.jynx.pro.utils.UUIDUtils;
@@ -21,10 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -47,6 +45,20 @@ public class ValidatorService {
     private UUIDUtils uuidUtils;
 
     /**
+     * Get validator by ID
+     *
+     * @param id the validator ID
+     *
+     * @return {@link Validator}
+     */
+    private Validator get(
+            final UUID id
+    ) {
+        return validatorRepository.findById(id)
+                .orElseThrow(() -> new JynxProException(ErrorCode.VALIDATOR_NOT_FOUND));
+    }
+
+    /**
      * Add delegation to a validator
      *
      * @param request {@link UpdateDelegationRequest}
@@ -56,8 +68,7 @@ public class ValidatorService {
     public Delegation addDelegation(
             final UpdateDelegationRequest request
     ) {
-        Validator validator = validatorRepository.findById(request.getValidatorId())
-                .orElseThrow(() -> new JynxProException(ErrorCode.VALIDATOR_NOT_FOUND));
+        Validator validator = get(request.getValidatorId());
         Stake stake = stakeService.getAndCreate(request.getUser());
         Optional<Delegation> delegationOptional = delegationRepository.findByValidatorIdAndStakeId(
                 validator.getId(), stake.getId());
@@ -94,8 +105,7 @@ public class ValidatorService {
     public Delegation removeDelegation(
             final UpdateDelegationRequest request
     ) {
-        Validator validator = validatorRepository.findById(request.getValidatorId())
-                .orElseThrow(() -> new JynxProException(ErrorCode.VALIDATOR_NOT_FOUND));
+        Validator validator = get(request.getValidatorId());
         Stake stake = stakeService.getAndCreate(request.getUser());
         Optional<Delegation> delegationOptional = delegationRepository.findByValidatorIdAndStakeId(
                 validator.getId(), stake.getId());
@@ -147,6 +157,29 @@ public class ValidatorService {
                 .setEnabled(true)
                 .setPriority(validators.size())
                 .setId(uuidUtils.next());
+        return validatorRepository.save(validator);
+    }
+
+    /**
+     * Resign as a validator
+     *
+     * @param request {@link SingleItemRequest}
+     *
+     * @return {@link Validator}
+     */
+    public Validator resign(
+            final SingleItemRequest request
+    ) {
+        Validator validator = get(request.getId());
+        try {
+            String tendermintKey = Base64.encodeBytes(Hex.decodeHex(request.getPublicKey()));
+            if(!tendermintKey.equals(validator.getPublicKey())) {
+                throw new JynxProException(ErrorCode.TENDERMINT_SIGNATURE_INVALID);
+            }
+        } catch(Exception e) {
+            throw new JynxProException(ErrorCode.TENDERMINT_SIGNATURE_INVALID);
+        }
+        validator.setEnabled(false);
         return validatorRepository.save(validator);
     }
 

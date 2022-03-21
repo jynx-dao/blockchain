@@ -8,6 +8,7 @@ import com.jynx.pro.entity.User;
 import com.jynx.pro.entity.Validator;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.request.SingleItemRequest;
 import com.jynx.pro.request.UpdateDelegationRequest;
 import com.jynx.pro.request.ValidatorApplicationRequest;
 import lombok.extern.slf4j.Slf4j;
@@ -374,5 +375,40 @@ public class ValidatorServiceTest extends IntegrationTest {
         validators = validators.stream().filter(v -> !v.getEnabled()).collect(Collectors.toList());
         Assertions.assertEquals(1, validators.size());
         Assertions.assertEquals(validator.getId(), validators.get(0).getId());
+    }
+
+    @Test
+    public void testResignValidator() {
+        Validator validator = apply(takerUser.getPublicKey(), takerUser);
+        SingleItemRequest request = new SingleItemRequest().setId(validator.getId());
+        request.setPublicKey(takerUser.getPublicKey());
+        validator = validatorService.resign(request);
+        Assertions.assertFalse(validator.getEnabled());
+    }
+
+    @Test
+    public void testResignValidatorWithInvalidKeyFormat() throws DecoderException {
+        Validator validator = apply(takerUser.getPublicKey(), takerUser);
+        SingleItemRequest request = new SingleItemRequest().setId(validator.getId());
+        request.setPublicKey(Base64.encodeBase64String(Hex.decodeHex(takerUser.getPublicKey())));
+        try {
+            validatorService.resign(request);
+        } catch(Exception e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.TENDERMINT_SIGNATURE_INVALID);
+        }
+        Assertions.assertTrue(validator.getEnabled());
+    }
+
+    @Test
+    public void testResignValidatorWithIncorrectKey() {
+        Validator validator = apply(takerUser.getPublicKey(), takerUser);
+        SingleItemRequest request = new SingleItemRequest().setId(validator.getId());
+        request.setPublicKey(makerUser.getPublicKey());
+        try {
+            validatorService.resign(request);
+        } catch(Exception e) {
+            Assertions.assertEquals(e.getMessage(), ErrorCode.TENDERMINT_SIGNATURE_INVALID);
+        }
+        Assertions.assertTrue(validator.getEnabled());
     }
 }
