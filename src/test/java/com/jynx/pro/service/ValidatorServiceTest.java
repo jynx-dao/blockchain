@@ -28,6 +28,7 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Testcontainers
@@ -360,5 +361,18 @@ public class ValidatorServiceTest extends IntegrationTest {
         Assertions.assertTrue(isValidator);
         isValidator = validatorService.isValidator(Base64.encodeBase64String(Hex.decodeHex(degenUser.getPublicKey())));
         Assertions.assertFalse(isValidator);
+    }
+
+    @Test
+    public void testDisableValidator() throws DecoderException {
+        String base64key = Base64.encodeBase64String(Hex.decodeHex(takerUser.getPublicKey()));
+        validatorService.disable(base64key);
+        Validator validator = apply(takerUser.getPublicKey(), takerUser);
+        validatorService.disable(base64key);
+        List<Validator> validators = validatorService.getAll();
+        Assertions.assertEquals(1, validators.size());
+        validators = validators.stream().filter(v -> !v.getEnabled()).collect(Collectors.toList());
+        Assertions.assertEquals(1, validators.size());
+        Assertions.assertEquals(validator.getId(), validators.get(0).getId());
     }
 }
