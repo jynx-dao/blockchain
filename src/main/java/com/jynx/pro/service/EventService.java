@@ -180,6 +180,9 @@ public class EventService {
             if(isValidator && stake.getAmount().doubleValue() < configService.get()
                     .getValidatorBond().doubleValue()) {
                 validatorService.disable(tendermintKey);
+            } else if(isValidator && stake.getAmount().doubleValue() >= configService.get()
+                    .getValidatorBond().doubleValue()) {
+                validatorService.enable(tendermintKey);
             }
             stakeRepository.save(stake);
         } else {
