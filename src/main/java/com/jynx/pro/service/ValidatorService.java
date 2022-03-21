@@ -343,4 +343,19 @@ public class ValidatorService {
             validatorRepository.save(validatorOptional.get());
         }
     }
+
+    /**
+     * Enable a validator when they have sufficient stake
+     *
+     * @param publicKey the validator's Tendermint key
+     */
+    public void enable(
+            final String publicKey
+    ) {
+        Optional<Validator> validatorOptional = validatorRepository.findByPublicKey(publicKey);
+        if(validatorOptional.isPresent()) {
+            validatorOptional.get().setEnabled(true);
+            validatorRepository.save(validatorOptional.get());
+        }
+    }
 }

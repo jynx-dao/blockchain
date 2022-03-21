@@ -364,8 +364,7 @@ public class ValidatorServiceTest extends IntegrationTest {
         Assertions.assertFalse(isValidator);
     }
 
-    @Test
-    public void testDisableValidator() throws DecoderException {
+    private Validator disableValidator() throws DecoderException {
         String base64key = Base64.encodeBase64String(Hex.decodeHex(takerUser.getPublicKey()));
         validatorService.disable(base64key);
         Validator validator = apply(takerUser.getPublicKey(), takerUser);
@@ -373,6 +372,23 @@ public class ValidatorServiceTest extends IntegrationTest {
         List<Validator> validators = validatorService.getAll();
         Assertions.assertEquals(1, validators.size());
         validators = validators.stream().filter(v -> !v.getEnabled()).collect(Collectors.toList());
+        Assertions.assertEquals(1, validators.size());
+        Assertions.assertEquals(validator.getId(), validators.get(0).getId());
+        return validator;
+    }
+
+    @Test
+    public void testDisableValidator() throws DecoderException {
+        disableValidator();
+    }
+
+    @Test
+    public void testEnableValidator() throws DecoderException {
+        Validator validator = disableValidator();
+        validatorService.enable(validator.getPublicKey());
+        List<Validator> validators = validatorService.getAll();
+        Assertions.assertEquals(1, validators.size());
+        validators = validators.stream().filter(Validator::getEnabled).collect(Collectors.toList());
         Assertions.assertEquals(1, validators.size());
         Assertions.assertEquals(validator.getId(), validators.get(0).getId());
     }
