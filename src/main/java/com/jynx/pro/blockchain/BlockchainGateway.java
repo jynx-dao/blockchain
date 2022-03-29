@@ -32,6 +32,7 @@ import tendermint.crypto.Keys;
 
 import javax.annotation.PostConstruct;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -398,10 +399,31 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             SignedRequest request = (SignedRequest) jsonUtils.fromJson(txAsJson,
                     transactionSettings.get(tendermintTx).getRequestType());
             verifySignature(request, transactionSettings.get(tendermintTx).isProtectedFn());
+            checkDelegationThreshold(tendermintTx);
             return new CheckTxResult().setCode(0);
         } catch(Exception e) {
             log.error(e.getMessage(), e);
             return new CheckTxResult().setCode(1).setError(e.getMessage());
+        }
+    }
+
+    /**
+     * Check if the minimum total delegation has been met
+     *
+     * @param tendermintTx {@link TendermintTransaction}
+     */
+    private void checkDelegationThreshold(
+            final TendermintTransaction tendermintTx
+    ) {
+        List<TendermintTransaction> validTransactions = List.of(TendermintTransaction.ADD_DELEGATION,
+                TendermintTransaction.REMOVE_DELEGATION);
+        if(!validTransactions.contains(tendermintTx)) {
+            List<Validator> validators = readOnlyRepository.getAllByEntity(Validator.class);
+            BigDecimal totalDelegation = validators.stream().map(Validator::getDelegation)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            if(totalDelegation.doubleValue() < configService.getStatic().getMinTotalDelegation().doubleValue()) {
+                throw new JynxProException(ErrorCode.INSUFFICIENT_TOTAL_DELEGATION);
+            }
         }
     }
 
@@ -540,10 +562,13 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                     List<UUID> ids = batches.stream().map(WithdrawalBatch::getId).collect(Collectors.toList());
                     DebitWithdrawalsRequest request = new DebitWithdrawalsRequest().setBatchIds(ids);
                     ethereumService.addSignatureToRequest(request);
-                    // TODO - we should check that the node has sufficient gas before broadcasting the Tendermint tx
-                    tendermintClient.debitWithdrawals(request);
-                    // TODO - how do we undo the previous Tendermint transactions if the node has insufficient gas??
-                    withdrawalService.withdrawSignedBatches(batches);
+                    BigDecimal balance = ethereumService.getBalance(ethereumService.getAddress());
+                    BigInteger gasPrice = ethereumService.getGasPrice().divide(BigInteger.valueOf(1000000000));
+                    if(balance.doubleValue() >= configService.getStatic().getValidatorMinEthBalance().doubleValue() &&
+                            gasPrice.intValue() < configService.getStatic().getEthMaxGasPrice()) {
+                        tendermintClient.debitWithdrawals(request);
+                        withdrawalService.withdrawSignedBatches(batches);
+                    }
                 }
             } catch(Exception e) {
                 log.error(e.getMessage(), e);
@@ -579,10 +604,13 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                     List<UUID> ids = updates.stream().map(BridgeUpdate::getId).collect(Collectors.toList());
                     ExecuteBridgeUpdatesRequest request = new ExecuteBridgeUpdatesRequest().setUpdateIds(ids);
                     ethereumService.addSignatureToRequest(request);
-                    // TODO - we should check that the node has sufficient gas before broadcasting the Tendermint tx
-                    tendermintClient.executeBridgeUpdates(request);
-                    // TODO - how do we undo the previous Tendermint transactions if the node has insufficient gas??
-                    bridgeUpdateService.processSignedUpdates(updates);
+                    BigDecimal balance = ethereumService.getBalance(ethereumService.getAddress());
+                    BigInteger gasPrice = ethereumService.getGasPrice().divide(BigInteger.valueOf(1000000000));
+                    if(balance.doubleValue() >= configService.getStatic().getValidatorMinEthBalance().doubleValue() &&
+                            gasPrice.intValue() < configService.getStatic().getEthMaxGasPrice()) {
+                        tendermintClient.executeBridgeUpdates(request);
+                        bridgeUpdateService.processSignedUpdates(updates);
+                    }
                 }
             } catch(Exception e) {
                 log.error(e.getMessage(), e);
@@ -655,9 +683,6 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             log.error(e.getMessage(), e);
             log.error(ErrorCode.INVALID_APP_STATE);
         }
-        // TODO - the chain should not start until the genesis validator's have sufficient delegation
-        // TODO - we'll implement this elsewhere, by effectively blocking all transactions until the
-        // TODO - required threshold has been met
         request.getValidatorsList().forEach(v -> {
             String publicKey = Base64.getEncoder().encodeToString(
                     request.getValidatorsList().get(0).getPubKey().getEd25519().toByteArray());
@@ -745,7 +770,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                 .build();
         long blockHeight = appStateManager.getBlockHeight();
         if(blockHeight % configService.getStatic().getSnapshotFrequency() == 0 && enableSnapshots) {
-            snapshotService.capture(blockHeight); // TODO - this should happen on another Thread !?
+            snapshotService.capture(blockHeight);
         }
         databaseTransactionManager.commit();
         responseObserver.onNext(resp);

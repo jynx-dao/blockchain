@@ -440,7 +440,7 @@ public abstract class IntegrationTest {
                 ganache.start();
             }
             ethereumHelper.deploy(ganache.getHost(), ganache.getFirstMappedPort(), ETH_PRIVATE_KEY);
-            ethereumService.setRpcHost(ganache.getHost());
+            ethereumService.setRpcBaseUri(String.format("http://%s", ganache.getHost()));
             ethereumService.setRpcPort(ganache.getFirstMappedPort());
             Config config = new Config()
                     .setId(1L)
@@ -453,7 +453,10 @@ public abstract class IntegrationTest {
                     .setParticipationThreshold(BigDecimal.valueOf(0.66))
                     .setApprovalThreshold(BigDecimal.valueOf(0.66))
                     .setUuidSeed(1L)
+                    .setMinTotalDelegation(BigDecimal.ZERO)
                     .setEthConfirmations(0)
+                    .setEthMaxGasPrice(100)
+                    .setValidatorMinEthBalance(BigDecimal.ONE)
                     .setActiveValidatorCount(1)
                     .setBackupValidatorCount(1)
                     .setAsyncTaskFrequency(1)
