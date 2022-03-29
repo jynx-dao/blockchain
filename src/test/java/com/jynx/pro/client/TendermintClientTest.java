@@ -40,8 +40,8 @@ import java.util.List;
 @Slf4j
 @Testcontainers
 @ActiveProfiles("tendermint")
-//@EnabledIfEnvironmentVariable(named = "TENDERMINT_CLIENT_TEST", matches = "true")
-//@DisabledIfEnvironmentVariable(named = "TRAVIS_CI", matches = "true")
+@EnabledIfEnvironmentVariable(named = "TENDERMINT_CLIENT_TEST", matches = "true")
+@DisabledIfEnvironmentVariable(named = "TRAVIS_CI", matches = "true")
 @SpringBootTest(classes = Application.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 public class TendermintClientTest extends IntegrationTest {
 
