@@ -11,6 +11,7 @@ import org.mockito.Mockito;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 
 import static org.mockito.Mockito.mockStatic;
@@ -22,14 +23,14 @@ public class CoinbaseServiceTest {
 
     @Test
     public void testGetPrice() {
-        long time = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
+        long time = LocalDateTime.now().atZone(ZoneId.systemDefault()).toEpochSecond();
         BigDecimal price = coinbaseService.getPriceAt("BTC-USDT", time);
         Assertions.assertTrue(price.doubleValue() > 0);
     }
 
     @Test
     public void testGetPriceFailsWhenOutOfRange() {
-        long time = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
+        long time = LocalDateTime.now().atZone(ZoneId.systemDefault()).toEpochSecond();
         try {
             coinbaseService.getPriceAt("BTC-USDT", time / 1000);
             Assertions.fail();
@@ -43,7 +44,7 @@ public class CoinbaseServiceTest {
         try (MockedStatic mocked = mockStatic(Unirest.class)) {
             mocked.when(() -> Unirest.get(Mockito.anyString())).thenReturn(null);
             try {
-                long time = LocalDateTime.now().toEpochSecond(ZoneOffset.UTC);
+                long time = LocalDateTime.now().atZone(ZoneId.systemDefault()).toEpochSecond();
                 coinbaseService.getPriceAt("BTC-USDT", time);
                 Assertions.fail();
             } catch(JynxProException e) {

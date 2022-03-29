@@ -29,7 +29,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -382,7 +382,7 @@ public abstract class IntegrationTest {
     }
 
     protected long nowAsMillis() {
-        return LocalDateTime.now().toInstant(ZoneOffset.UTC).toEpochMilli();
+        return LocalDateTime.now().atZone(ZoneId.systemDefault()).toInstant().toEpochMilli();
     }
 
     protected long[] proposalTimes(

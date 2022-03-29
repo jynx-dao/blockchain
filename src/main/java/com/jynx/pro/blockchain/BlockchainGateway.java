@@ -688,6 +688,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
      */
     @Override
     public void beginBlock(Types.RequestBeginBlock req, StreamObserver<Types.ResponseBeginBlock> responseObserver) {
+        // TODO - in here we can track the performance of each validator by looking at LastCommitInfo
         Types.ResponseBeginBlock resp = Types.ResponseBeginBlock.newBuilder().build();
         databaseTransactionManager.createTransaction();
         configService.setTimestamp(getBlockTimeAsMillis(req.getHeader().getTime()));
