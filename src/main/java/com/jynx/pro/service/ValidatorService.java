@@ -299,9 +299,11 @@ public class ValidatorService {
      * Add a genesis {@link Validator}
      *
      * @param publicKey the validator's public key
+     * @param address the validator's address
      */
     public void addFromGenesis(
-            final String publicKey
+            final String publicKey,
+            final String address
     ) {
         Optional<Validator> validatorOptional = validatorRepository.findByPublicKey(publicKey);
         List<Validator> validators = getAll();
@@ -309,7 +311,7 @@ public class ValidatorService {
             Validator validator = new Validator()
                     .setId(uuidUtils.next())
                     .setPublicKey(publicKey)
-                    .setAddress(publicKey)
+                    .setAddress(address)
                     .setEnabled(true)
                     .setPriority(validators.size())
                     .setDelegation(BigDecimal.ONE);

@@ -1,5 +1,6 @@
 package com.jynx.pro.blockchain;
 
+import com.google.common.hash.Hashing;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Timestamp;
 import com.jynx.pro.constant.TendermintTransaction;
@@ -686,7 +687,10 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         request.getValidatorsList().forEach(v -> {
             String publicKey = Base64.getEncoder().encodeToString(
                     request.getValidatorsList().get(0).getPubKey().getEd25519().toByteArray());
-            validatorService.addFromGenesis(publicKey);
+            byte[] publicKeyHash = Hashing.sha256().hashBytes(Base64.getDecoder().decode(publicKey)).asBytes();
+            String address = Hex.encodeHexString(Arrays.copyOfRange(publicKeyHash, 0, 20))
+                    .toUpperCase(Locale.ROOT);
+            validatorService.addFromGenesis(publicKey, address);
         });
         databaseTransactionManager.commit();
         responseObserver.onNext(resp);
@@ -715,7 +719,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     public void beginBlock(Types.RequestBeginBlock req, StreamObserver<Types.ResponseBeginBlock> responseObserver) {
         Types.ResponseBeginBlock resp = Types.ResponseBeginBlock.newBuilder().build();
         databaseTransactionManager.createTransaction();
-        updateValidatorPerformance(req.getByzantineValidatorsList(), req.getLastCommitInfo().getVotesList(), req.getHeader().getHeight()-1);
+        updateValidatorPerformance(req.getByzantineValidatorsList(),
+                req.getLastCommitInfo().getVotesList(), req.getHeader().getHeight()-1);
         configService.setTimestamp(getBlockTimeAsMillis(req.getHeader().getTime()));
         String proposerAddress = Hex.encodeHexString(req.getHeader().getProposerAddress().toByteArray());
         long blockHeight = req.getHeader().getHeight();
@@ -741,8 +746,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     ) {
         List<BlockValidator> blockValidators = blockValidatorRepository.getByBlockHeight(blockHeight);
         votes.forEach(vote -> {
+            String address = Hex.encodeHexString(vote.getValidator().getAddress().toByteArray()).toUpperCase(Locale.ROOT);
             Optional<BlockValidator> blockValidatorOptional = blockValidators.stream()
-                    .filter(v -> v.getValidator().getAddress().equals(vote.getValidator().getAddress().toStringUtf8()))
+                    .filter(v -> v.getValidator().getAddress().equals(address))
                     .findFirst();
             if(blockValidatorOptional.isPresent()) {
                 BlockValidator blockValidator = blockValidatorOptional.get();
@@ -753,8 +759,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             }
         });
         evidenceList.forEach(evidence -> {
+            String address = Hex.encodeHexString(evidence.getValidator().getAddress().toByteArray()).toUpperCase(Locale.ROOT);
             Optional<BlockValidator> blockValidatorOptional = blockValidators.stream()
-                    .filter(v -> v.getValidator().getAddress().equals(evidence.getValidator().getAddress().toStringUtf8()))
+                    .filter(v -> v.getValidator().getAddress().equals(address))
                     .findFirst();
             if(blockValidatorOptional.isPresent()) {
                 BlockValidator blockValidator = blockValidatorOptional.get();
