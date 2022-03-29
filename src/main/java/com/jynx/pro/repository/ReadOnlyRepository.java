@@ -670,6 +670,23 @@ public class ReadOnlyRepository {
     }
 
     /**
+     * Get {@link BlockValidator}s by height
+     *
+     * @param blockHeight the block height
+     *
+     * @return {@link List<BlockValidator>}
+     */
+    public List<BlockValidator> getBlockValidatorsByBlockHeight(
+            final Long blockHeight
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<BlockValidator> query = cb.createQuery(BlockValidator.class);
+        Root<BlockValidator> rootType = query.from(BlockValidator.class);
+        query = query.select(rootType).where(cb.equal(rootType.get("blockHeight"), blockHeight));
+        return getEntityManager().createQuery(query).getResultList();
+    }
+
+    /**
      * Get {@link Snapshot} by height
      *
      * @param height the block height

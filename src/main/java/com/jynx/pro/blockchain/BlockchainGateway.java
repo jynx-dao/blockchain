@@ -3,16 +3,14 @@ package com.jynx.pro.blockchain;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Timestamp;
 import com.jynx.pro.constant.TendermintTransaction;
-import com.jynx.pro.entity.BridgeUpdate;
-import com.jynx.pro.entity.Snapshot;
-import com.jynx.pro.entity.Validator;
-import com.jynx.pro.entity.WithdrawalBatch;
+import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.manager.AppStateManager;
 import com.jynx.pro.manager.DatabaseTransactionManager;
 import com.jynx.pro.model.CheckTxResult;
 import com.jynx.pro.model.TransactionConfig;
+import com.jynx.pro.repository.BlockValidatorRepository;
 import com.jynx.pro.repository.ReadOnlyRepository;
 import com.jynx.pro.request.*;
 import com.jynx.pro.service.*;
@@ -79,6 +77,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private DatabaseTransactionManager databaseTransactionManager;
     @Autowired
     private ReadOnlyRepository readOnlyRepository;
+    @Autowired
+    private BlockValidatorRepository blockValidatorRepository;
     @Autowired
     private JSONUtils jsonUtils;
     @Autowired
@@ -713,9 +713,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
      */
     @Override
     public void beginBlock(Types.RequestBeginBlock req, StreamObserver<Types.ResponseBeginBlock> responseObserver) {
-        // TODO - in here we can track the performance of each validator by looking at LastCommitInfo
         Types.ResponseBeginBlock resp = Types.ResponseBeginBlock.newBuilder().build();
         databaseTransactionManager.createTransaction();
+        updateValidatorPerformance(req.getByzantineValidatorsList(), req.getLastCommitInfo().getVotesList(), req.getHeader().getHeight()-1);
         configService.setTimestamp(getBlockTimeAsMillis(req.getHeader().getTime()));
         String proposerAddress = Hex.encodeHexString(req.getHeader().getProposerAddress().toByteArray());
         long blockHeight = req.getHeader().getHeight();
@@ -725,6 +725,44 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         }
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
+    }
+
+    /**
+     * Update the validator performance in the last block
+     *
+     * @param evidenceList {@link List<Types.Evidence>}
+     * @param votes {@link List<Types.VoteInfo>}
+     * @param blockHeight the block height
+     */
+    private void updateValidatorPerformance(
+            final List<Types.Evidence> evidenceList,
+            final List<Types.VoteInfo> votes,
+            final Long blockHeight
+    ) {
+        List<BlockValidator> blockValidators = blockValidatorRepository.getByBlockHeight(blockHeight);
+        votes.forEach(vote -> {
+            Optional<BlockValidator> blockValidatorOptional = blockValidators.stream()
+                    .filter(v -> v.getValidator().getAddress().equals(vote.getValidator().getAddress().toStringUtf8()))
+                    .findFirst();
+            if(blockValidatorOptional.isPresent()) {
+                BlockValidator blockValidator = blockValidatorOptional.get();
+                blockValidator.setSignedBlock(vote.getSignedLastBlock());
+                BigDecimal ethBalance = ethereumService.getBalance(blockValidator.getValidator().getEthAddress());
+                blockValidator.setSufficientEthBalance(ethBalance.doubleValue() >=
+                        configService.getStatic().getValidatorMinEthBalance().doubleValue());
+            }
+        });
+        evidenceList.forEach(evidence -> {
+            Optional<BlockValidator> blockValidatorOptional = blockValidators.stream()
+                    .filter(v -> v.getValidator().getAddress().equals(evidence.getValidator().getAddress().toStringUtf8()))
+                    .findFirst();
+            if(blockValidatorOptional.isPresent()) {
+                BlockValidator blockValidator = blockValidatorOptional.get();
+                blockValidator.setDuplicateVote(evidence.getType().equals(Types.EvidenceType.DUPLICATE_VOTE));
+                blockValidator.setLightClientAttack(evidence.getType().equals(Types.EvidenceType.LIGHT_CLIENT_ATTACK));
+            }
+        });
+        blockValidatorRepository.saveAll(blockValidators);
     }
 
     /**

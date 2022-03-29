@@ -309,6 +309,7 @@ public class ValidatorService {
             Validator validator = new Validator()
                     .setId(uuidUtils.next())
                     .setPublicKey(publicKey)
+                    .setAddress(publicKey)
                     .setEnabled(true)
                     .setPriority(validators.size())
                     .setDelegation(BigDecimal.ONE);
