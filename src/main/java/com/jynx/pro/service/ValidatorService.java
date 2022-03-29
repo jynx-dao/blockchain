@@ -240,7 +240,8 @@ public class ValidatorService {
                 .filter(v -> v.getDelegation().doubleValue() >= configService.getStatic()
                         .getValidatorMinDelegation().doubleValue())
                 .filter(Validator::getEnabled)
-                .sorted(Comparator.comparing(Validator::getDelegation).reversed().thenComparing(Validator::getPriority))
+                .sorted(Comparator.comparing(Validator::getDelegation).reversed()
+                        .thenComparing(Validator::getPriority))
                 .skip(configService.getStatic().getActiveValidatorCount())
                 .limit(configService.getStatic().getBackupValidatorCount())
                 .collect(Collectors.toList());
@@ -260,7 +261,8 @@ public class ValidatorService {
                 .filter(v -> v.getDelegation().doubleValue() >= configService.getStatic()
                         .getValidatorMinDelegation().doubleValue())
                 .filter(Validator::getEnabled)
-                .sorted(Comparator.comparing(Validator::getDelegation).reversed().thenComparing(Validator::getPriority))
+                .sorted(Comparator.comparing(Validator::getDelegation).reversed()
+                        .thenComparing(Validator::getPriority))
                 .limit(configService.getStatic().getActiveValidatorCount())
                 .collect(Collectors.toList());
     }
@@ -324,8 +326,10 @@ public class ValidatorService {
     public boolean isValidator(
             final String publicKey
     ) {
-        boolean activeValidator = getActiveSet(true).stream().anyMatch(v -> v.getPublicKey().equals(publicKey));
-        boolean backupValidator = getBackupSet(true).stream().anyMatch(v -> v.getPublicKey().equals(publicKey));
+        boolean activeValidator = getActiveSet(true).stream()
+                .anyMatch(v -> v.getPublicKey().equals(publicKey));
+        boolean backupValidator = getBackupSet(true).stream()
+                .anyMatch(v -> v.getPublicKey().equals(publicKey));
         return activeValidator || backupValidator;
     }
 
