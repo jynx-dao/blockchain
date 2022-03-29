@@ -330,8 +330,7 @@ public class EthereumService {
      * @return {@link StaticGasProvider}
      */
     private StaticGasProvider getGasProvider() {
-//        return new StaticGasProvider(getGasPrice(), DefaultGasProvider.GAS_LIMIT);
-        return new StaticGasProvider(DefaultGasProvider.GAS_PRICE, DefaultGasProvider.GAS_LIMIT);
+        return new StaticGasProvider(getGasPrice(), DefaultGasProvider.GAS_LIMIT);
     }
 
     /**
