@@ -62,7 +62,7 @@ public abstract class EntityRepository<T> {
     public T save(
             final T item
     ) {
-        getEntityManager().merge(item);
+        getEntityManager().persist(item);
         return item;
     }
 
@@ -76,7 +76,7 @@ public abstract class EntityRepository<T> {
     public List<T> saveAll(
             final List<T> items
     ) {
-        items.forEach(getEntityManager()::merge);
+        items.forEach(getEntityManager()::persist);
         return items;
     }
 
