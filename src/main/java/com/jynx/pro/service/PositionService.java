@@ -2,6 +2,7 @@ package com.jynx.pro.service;
 
 import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.*;
+import com.jynx.pro.handler.SocketHandler;
 import com.jynx.pro.repository.AccountRepository;
 import com.jynx.pro.repository.OrderRepository;
 import com.jynx.pro.repository.PositionRepository;
@@ -38,6 +39,8 @@ public class PositionService {
     private OrderRepository orderRepository;
     @Autowired
     private UUIDUtils uuidUtils;
+    @Autowired
+    private SocketHandler socketHandler;
 
     /**
      * Get a {@link Position} and create one if it doesn't exist
@@ -63,7 +66,7 @@ public class PositionService {
                         .setLiquidationPrice(BigDecimal.ZERO)
                         .setRealisedPnl(BigDecimal.ZERO)
                         .setUnrealisedPnl(BigDecimal.ZERO));
-        return positionRepository.save(position);
+        return save(position);
     }
 
     /**
@@ -141,7 +144,7 @@ public class PositionService {
             position.setLiquidationPrice(BigDecimal.ZERO);
             position.setLatestMarkPrice(BigDecimal.ZERO);
         }
-        positionRepository.save(position);
+        save(position);
     }
 
     /**
@@ -248,7 +251,7 @@ public class PositionService {
             accountService.allocateMargin(position.getUser(), market, margin);
             updateLiquidationPrice(position);
         }
-        positionRepository.saveAll(positions);
+        positions.forEach(this::save);
     }
 
     /**
@@ -430,7 +433,7 @@ public class PositionService {
         position.setLeverage(BigDecimal.ZERO);
         position.setLiquidationPrice(BigDecimal.ZERO);
         position.setLatestMarkPrice(BigDecimal.ZERO);
-        positionRepository.save(position);
+        save(position);
     }
 
     /**
@@ -504,15 +507,17 @@ public class PositionService {
     }
 
     /**
-     * Save a position
+     * Save position to database
      *
      * @param position {@link Position}
      *
-     * @return the updated {@link Position}
+     * @return {@link Position}
      */
     public Position save(
             final Position position
     ) {
+        socketHandler.sendMessage(WebSocketChannelType.POSITIONS,
+                position.getUser().getPublicKey(), position.getMarket().getId(), position);
         return positionRepository.save(position);
     }
 }

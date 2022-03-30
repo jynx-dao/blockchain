@@ -2,11 +2,13 @@ package com.jynx.pro.service;
 
 import com.jynx.pro.constant.KlineInterval;
 import com.jynx.pro.constant.MarketSide;
+import com.jynx.pro.constant.WebSocketChannelType;
 import com.jynx.pro.entity.Market;
 import com.jynx.pro.entity.Order;
 import com.jynx.pro.entity.Trade;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.handler.SocketHandler;
 import com.jynx.pro.model.Kline;
 import com.jynx.pro.repository.TradeRepository;
 import com.jynx.pro.utils.UUIDUtils;
@@ -30,6 +32,8 @@ public class TradeService {
     private UUIDUtils uuidUtils;
     @Autowired
     private ConfigService configService;
+    @Autowired
+    private SocketHandler socketHandler;
 
     /**
      * Save a new {@link Trade}
@@ -51,7 +55,7 @@ public class TradeService {
             final BigDecimal quantity,
             final MarketSide side
     ) {
-        return tradeRepository.save(new Trade()
+        Trade trade = tradeRepository.save(new Trade()
                 .setMakerOrder(passiveOrder)
                 .setTakerOrder(takerOrder)
                 .setMarket(market)
@@ -60,6 +64,8 @@ public class TradeService {
                 .setExecuted(configService.getTimestamp())
                 .setQuantity(quantity)
                 .setSide(side));
+        socketHandler.sendMessage(WebSocketChannelType.TRADES, market.getId(), trade);
+        return trade;
     }
 
     /**
