@@ -23,7 +23,7 @@ public class Validator {
     private String publicKey;
     @Column(name = "address", nullable = false)
     private String address;
-    @Column(name = "eth_address") // TODO - should not be nullable, but it breaks the tests
+    @Column(name = "eth_address")
     private String ethAddress;
     @Column(name = "delegation", nullable = false)
     private BigDecimal delegation = BigDecimal.ZERO;
