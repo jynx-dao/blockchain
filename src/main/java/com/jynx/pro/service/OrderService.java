@@ -294,7 +294,6 @@ public class OrderService {
     ) {
         BigDecimal originalMarkPrice = market.getMarkPrice();
         int dps = market.getSettlementAsset().getDecimalPlaces();
-        // TODO - should the mark price come from the settlement price source?
         BigDecimal markPrice = getMidPrice(market);
         marketService.updateLastPrice(lastPrice, markPrice, market);
         positionService.updatePassiveLiquidity(market);

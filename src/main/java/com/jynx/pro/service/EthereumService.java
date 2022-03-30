@@ -50,8 +50,6 @@ import java.util.stream.Collectors;
 @Service
 public class EthereumService {
 
-    // TODO - we should not be using DefaultGasProvider
-
     @Setter
     @Value("${ethereum.rpc.base.uri}")
     private String rpcBaseUri;

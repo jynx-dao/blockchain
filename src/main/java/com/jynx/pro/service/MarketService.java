@@ -400,7 +400,7 @@ public class MarketService {
     ) {
         proposalService.checkEnacted(proposal);
         // TODO - the market can only be settled (it cannot be unsuspended
-        // until it has been) and all orders will be canceled
+        //  until it has been) and all orders will be canceled
         updateStatus(proposal, MarketStatus.SUSPENDED);
     }
 
@@ -412,7 +412,7 @@ public class MarketService {
     ) {
         proposalService.checkEnacted(proposal);
         // TODO - the market can only be unsuspended if it was settled, so when it
-        // opens again nobody will have any positions and all orders will be canceled
+        //  opens again nobody will have any positions and all orders will be canceled
         updateStatus(proposal, MarketStatus.ACTIVE);
     }
 
