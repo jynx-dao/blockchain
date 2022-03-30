@@ -326,6 +326,7 @@ public class ValidatorService {
                     .setId(uuidUtils.next())
                     .setPublicKey(publicKey)
                     .setAddress(address)
+                    .setEthAddress(ethAddress)
                     .setEnabled(true)
                     .setPriority(validators.size())
                     .setDelegation(BigDecimal.ONE);

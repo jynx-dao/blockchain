@@ -191,7 +191,7 @@ public class SocketHandler extends TextWebSocketHandler {
         WebSocketSubscription sub = jsonUtils.fromJson(message.getPayload(), WebSocketSubscription.class);
         validateSubscription(sub, session);
         subscriptions.put(session.getId(), sub);
-//        session.sendMessage(new TextMessage("Hello " + message.getPayload() + " !"));
+        // TODO - send a message to the client when the subscription was created successfully
     }
 
     /**

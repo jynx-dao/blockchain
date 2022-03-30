@@ -76,7 +76,7 @@ public class ErrorCode {
     public static final String CAST_VOTE_FAILED = "Failed to cast vote.";
     public static final String UNKNOWN_ERROR = "An unknown error occurred.";
     public static final String SIGNATURE_INVALID = "The signature is invalid.";
-    public static final String INVALID_APP_STATE = "Invalid app state.";
+    public static final String INVALID_APP_STATE = "Blockchain started with invalid app state.";
     public static final String NONCE_ALREADY_USED = "Nonce already used.";
     public static final String NONCE_MANDATORY = "Nonce is mandatory.";
     public static final String ADD_STAKE_FAILED = "Failed to add stake.";

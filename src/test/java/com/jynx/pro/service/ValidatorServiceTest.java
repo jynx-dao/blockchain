@@ -40,6 +40,8 @@ public class ValidatorServiceTest extends IntegrationTest {
 
     @Autowired
     private ValidatorService validatorService;
+    @Autowired
+    private EthereumService ethereumService;
 
     @BeforeEach
     public void setup() {
@@ -67,6 +69,7 @@ public class ValidatorServiceTest extends IntegrationTest {
         request.setTendermintPublicKey(tendermintKey);
         request.setPublicKey(user.getPublicKey());
         request.setUser(user);
+        request.setEthAddress(ethereumService.getAddress());
         Validator validator = validatorService.apply(request);
         Assertions.assertEquals(validator.getDelegation().doubleValue(), 0d);
         Assertions.assertTrue(validator.getEnabled());

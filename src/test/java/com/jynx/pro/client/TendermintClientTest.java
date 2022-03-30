@@ -95,31 +95,8 @@ public class TendermintClientTest extends IntegrationTest {
     public void shutdown() {
         tendermint.stop();
         appStateManager.setBlockHeight(0);
+        ethereumService.setFiltersInitialized(false);
         clearState();
-    }
-
-    private Proposal getAssetProposal(
-            final long openOffset,
-            final long closeOffset,
-            final long enactOffset
-    ) {
-        AddAssetRequest request = new AddAssetRequest()
-                .setAddress("0x0")
-                .setName("USDC")
-                .setDecimalPlaces(5)
-                .setType(AssetType.ERC20);
-        long[] times = proposalTimes(openOffset, closeOffset, enactOffset);
-        request.setOpenTime(times[0]);
-        request.setClosingTime(times[1]);
-        request.setEnactmentTime(times[2]);
-        request.setBridgeNonce("200");
-        request.setNonce(ethereumService.getNonce().toString());
-        String message = jsonUtils.toJson(request);
-        String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
-        request.setPublicKey(takerUser.getPublicKey());
-        request.setSignature(sig);
-        TransactionResponse<Proposal> txResponse = tendermintClient.addAsset(request);
-        return txResponse.getItem();
     }
 
     private Asset addAsset() {

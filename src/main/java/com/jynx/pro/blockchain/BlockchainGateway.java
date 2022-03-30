@@ -19,6 +19,7 @@ import com.jynx.pro.service.*;
 import com.jynx.pro.utils.CryptoUtils;
 import com.jynx.pro.utils.JSONUtils;
 import io.grpc.stub.StreamObserver;
+import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Hex;
@@ -83,12 +84,15 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private JSONUtils jsonUtils;
     @Autowired
     private CryptoUtils cryptoUtils;
+    @Getter
     @Setter
     @Value("${validator.address}")
     private String validatorAddress;
+    @Getter
     @Setter
     @Value("${validator.private.key}")
     private String validatorPrivateKey;
+    @Getter
     @Setter
     @Value("${validator.public.key}")
     private String validatorPublicKey;
@@ -669,7 +673,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         Types.ResponseInitChain resp = Types.ResponseInitChain.newBuilder().build();
         databaseTransactionManager.createTransaction();
         String appState = request.getAppStateBytes().toStringUtf8();
-        JSONArray validators;
+        JSONArray validators = new JSONArray();
         try {
             JSONObject appStateAsJson = new JSONObject(appState);
             validators = appStateAsJson.getJSONArray("validators");
@@ -677,16 +681,18 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             snapshotService.initializeSnapshots();
         } catch (Exception e) {
             log.error(e.getMessage(), e);
-            throw new JynxProException(ErrorCode.INVALID_APP_STATE);
+            log.error(ErrorCode.INVALID_APP_STATE);
         }
+        final JSONArray finalValidators = validators;
         request.getValidatorsList().forEach(v -> {
             String publicKey = Base64.getEncoder().encodeToString(
                     request.getValidatorsList().get(0).getPubKey().getEd25519().toByteArray());
             String address = validatorService.getTendermintAddress(publicKey);
-            String ethAddress = getEthAddressFromGenesis(validators, publicKey);
+            String ethAddress = getEthAddressFromGenesis(finalValidators, publicKey);
             validatorService.addFromGenesis(publicKey, address, ethAddress);
         });
         databaseTransactionManager.commit();
+        ethereumService.initializeFilters();
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }

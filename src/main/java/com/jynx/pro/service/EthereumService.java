@@ -73,6 +73,9 @@ public class EthereumService {
     private TendermintClient tendermintClient;
 
     @Setter
+    private boolean filtersInitialized = false;
+
+    @Setter
     @Value("${validator.private.key}")
     private String validatorPrivateKey;
     @Setter
@@ -257,8 +260,9 @@ public class EthereumService {
      * Initialize the Ethereum event filters
      */
     public void initializeFilters() {
+        if(filtersInitialized) return;
         EthFilter bridgeFilter = new EthFilter(DefaultBlockParameterName.EARLIEST,
-                DefaultBlockParameterName.LATEST, configService.get().getBridgeAddress());
+                DefaultBlockParameterName.LATEST, configService.getStatic().getBridgeAddress());
         getWeb3j().ethLogFlowable(bridgeFilter).subscribe(ethLog -> {
             String eventHash = ethLog.getTopics().get(0);
             String txHash = ethLog.getTransactionHash();
@@ -297,6 +301,7 @@ public class EthereumService {
                 tendermintClient.depositAsset(request);
             }
         });
+        filtersInitialized = true;
     }
 
     /**
