@@ -4,14 +4,16 @@ import com.google.common.hash.Hashing;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Timestamp;
 import com.jynx.pro.constant.TendermintTransaction;
-import com.jynx.pro.entity.*;
+import com.jynx.pro.entity.BridgeUpdate;
+import com.jynx.pro.entity.Snapshot;
+import com.jynx.pro.entity.Validator;
+import com.jynx.pro.entity.WithdrawalBatch;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.manager.AppStateManager;
 import com.jynx.pro.manager.DatabaseTransactionManager;
 import com.jynx.pro.model.CheckTxResult;
 import com.jynx.pro.model.TransactionConfig;
-import com.jynx.pro.repository.BlockValidatorRepository;
 import com.jynx.pro.repository.ReadOnlyRepository;
 import com.jynx.pro.request.*;
 import com.jynx.pro.service.*;
@@ -27,7 +29,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import tendermint.abci.ABCIApplicationGrpc;
 import tendermint.abci.Types;
-import tendermint.crypto.Keys;
 
 import javax.annotation.PostConstruct;
 import java.math.BigDecimal;
@@ -78,8 +79,6 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private DatabaseTransactionManager databaseTransactionManager;
     @Autowired
     private ReadOnlyRepository readOnlyRepository;
-    @Autowired
-    private BlockValidatorRepository blockValidatorRepository;
     @Autowired
     private JSONUtils jsonUtils;
     @Autowired
@@ -641,34 +640,6 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     }
 
     /**
-     * Update the active validator set
-     *
-     * @param blockHeight the current block height
-     * @param builder {@link Types.ResponseEndBlock.Builder}
-     */
-    private void updateValidators(
-            final long blockHeight,
-            final Types.ResponseEndBlock.Builder builder
-    ) {
-        List<Validator> activeValidators = validatorService.getActiveSet();
-        List<Validator> validators = validatorService.getAll();
-        List<UUID> validatorIds = validators.stream().map(Validator::getId).collect(Collectors.toList());
-        List<Validator> nonActiveValidators = validators.stream()
-                .filter(v -> !validatorIds.contains(v.getId())).collect(Collectors.toList());
-        nonActiveValidators.forEach(v -> v.setDelegation(BigDecimal.ZERO));
-        activeValidators.addAll(nonActiveValidators);
-        for(Validator validator : activeValidators) {
-            ByteString key = ByteString.copyFrom(Base64.getDecoder().decode(validator.getPublicKey()));
-            Types.ValidatorUpdate validatorUpdate = Types.ValidatorUpdate.newBuilder()
-                    .setPower(validator.getDelegation().longValue())
-                    .setPubKey(Keys.PublicKey.newBuilder().setEd25519(key).build())
-                    .build();
-            builder.addValidatorUpdates(validatorUpdate);
-        }
-        validatorService.saveBlockValidators(blockHeight);
-    }
-
-    /**
      * {@inheritDoc}
      */
     @Override
@@ -719,7 +690,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     public void beginBlock(Types.RequestBeginBlock req, StreamObserver<Types.ResponseBeginBlock> responseObserver) {
         Types.ResponseBeginBlock resp = Types.ResponseBeginBlock.newBuilder().build();
         databaseTransactionManager.createTransaction();
-        updateValidatorPerformance(req.getByzantineValidatorsList(),
+        validatorService.updateValidatorPerformance(req.getByzantineValidatorsList(),
                 req.getLastCommitInfo().getVotesList(), req.getHeader().getHeight()-1);
         configService.setTimestamp(getBlockTimeAsMillis(req.getHeader().getTime()));
         String proposerAddress = Hex.encodeHexString(req.getHeader().getProposerAddress().toByteArray());
@@ -733,53 +704,13 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     }
 
     /**
-     * Update the validator performance in the last block
-     *
-     * @param evidenceList {@link List<Types.Evidence>}
-     * @param votes {@link List<Types.VoteInfo>}
-     * @param blockHeight the block height
-     */
-    private void updateValidatorPerformance(
-            final List<Types.Evidence> evidenceList,
-            final List<Types.VoteInfo> votes,
-            final Long blockHeight
-    ) {
-        List<BlockValidator> blockValidators = blockValidatorRepository.getByBlockHeight(blockHeight);
-        votes.forEach(vote -> {
-            String address = Hex.encodeHexString(vote.getValidator().getAddress().toByteArray()).toUpperCase(Locale.ROOT);
-            Optional<BlockValidator> blockValidatorOptional = blockValidators.stream()
-                    .filter(v -> v.getValidator().getAddress().equals(address))
-                    .findFirst();
-            if(blockValidatorOptional.isPresent()) {
-                BlockValidator blockValidator = blockValidatorOptional.get();
-                blockValidator.setSignedBlock(vote.getSignedLastBlock());
-                BigDecimal ethBalance = ethereumService.getBalance(blockValidator.getValidator().getEthAddress());
-                blockValidator.setSufficientEthBalance(ethBalance.doubleValue() >=
-                        configService.getStatic().getValidatorMinEthBalance().doubleValue());
-            }
-        });
-        evidenceList.forEach(evidence -> {
-            String address = Hex.encodeHexString(evidence.getValidator().getAddress().toByteArray()).toUpperCase(Locale.ROOT);
-            Optional<BlockValidator> blockValidatorOptional = blockValidators.stream()
-                    .filter(v -> v.getValidator().getAddress().equals(address))
-                    .findFirst();
-            if(blockValidatorOptional.isPresent()) {
-                BlockValidator blockValidator = blockValidatorOptional.get();
-                blockValidator.setDuplicateVote(evidence.getType().equals(Types.EvidenceType.DUPLICATE_VOTE));
-                blockValidator.setLightClientAttack(evidence.getType().equals(Types.EvidenceType.LIGHT_CLIENT_ATTACK));
-            }
-        });
-        blockValidatorRepository.saveAll(blockValidators);
-    }
-
-    /**
      * {@inheritDoc}
      */
     @Override
     public void endBlock(Types.RequestEndBlock req, StreamObserver<Types.ResponseEndBlock> responseObserver) {
         Types.ResponseEndBlock.Builder builder = Types.ResponseEndBlock.newBuilder();
         appStateManager.setBlockHeight(req.getHeight());
-        updateValidators(req.getHeight(), builder);
+        validatorService.updateValidators(req.getHeight(), builder);
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
