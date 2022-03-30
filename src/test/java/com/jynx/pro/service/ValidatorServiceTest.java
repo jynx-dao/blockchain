@@ -336,8 +336,8 @@ public class ValidatorServiceTest extends IntegrationTest {
 
     @Test
     public void testAddFromGenesisOnlyOnce() {
-        validatorService.addFromGenesis(takerUser.getPublicKey(), takerUser.getPublicKey());
-        validatorService.addFromGenesis(takerUser.getPublicKey(), takerUser.getPublicKey());
+        validatorService.addFromGenesis(takerUser.getPublicKey(), takerUser.getPublicKey(), ethereumService.getAddress());
+        validatorService.addFromGenesis(takerUser.getPublicKey(), takerUser.getPublicKey(), ethereumService.getAddress());
         List<Validator> validators = validatorService.getActiveSet();
         Assertions.assertEquals(1, validators.size());
     }

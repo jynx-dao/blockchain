@@ -21,9 +21,9 @@ public class Validator {
     private UUID id;
     @Column(name = "public_key", nullable = false)
     private String publicKey;
-    @Column(name = "address")
+    @Column(name = "address", nullable = false)
     private String address;
-    @Column(name = "eth_address")
+    @Column(name = "eth_address", nullable = false)
     private String ethAddress;
     @Column(name = "delegation", nullable = false)
     private BigDecimal delegation = BigDecimal.ZERO;

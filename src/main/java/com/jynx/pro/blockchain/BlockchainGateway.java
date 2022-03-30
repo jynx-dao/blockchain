@@ -1,6 +1,5 @@
 package com.jynx.pro.blockchain;
 
-import com.google.common.hash.Hashing;
 import com.google.protobuf.ByteString;
 import com.google.protobuf.Timestamp;
 import com.jynx.pro.constant.TendermintTransaction;
@@ -23,6 +22,7 @@ import io.grpc.stub.StreamObserver;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Hex;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
@@ -640,6 +640,27 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     }
 
     /**
+     * Get the ETH address of a validator from Genesis
+     *
+     * @param validators {@link JSONArray} of validator config
+     *
+     * @return the ETH address
+     */
+    private String getEthAddressFromGenesis(
+            final JSONArray validators,
+            final String publicKey
+    ) {
+        String ethAddress = null;
+        for(int i=0; i<validators.length(); i++) {
+            JSONObject obj = validators.optJSONObject(i);
+            if(obj != null) {
+                ethAddress = obj.optString("ethAddress");
+            }
+        }
+        return ethAddress;
+    }
+
+    /**
      * {@inheritDoc}
      */
     @Override
@@ -648,20 +669,22 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         Types.ResponseInitChain resp = Types.ResponseInitChain.newBuilder().build();
         databaseTransactionManager.createTransaction();
         String appState = request.getAppStateBytes().toStringUtf8();
+        JSONArray validators;
         try {
-            configService.initializeNetworkConfig(new JSONObject(appState));
+            JSONObject appStateAsJson = new JSONObject(appState);
+            validators = appStateAsJson.getJSONArray("validators");
+            configService.initializeNetworkConfig(appStateAsJson);
             snapshotService.initializeSnapshots();
         } catch (Exception e) {
             log.error(e.getMessage(), e);
-            log.error(ErrorCode.INVALID_APP_STATE);
+            throw new JynxProException(ErrorCode.INVALID_APP_STATE);
         }
         request.getValidatorsList().forEach(v -> {
             String publicKey = Base64.getEncoder().encodeToString(
                     request.getValidatorsList().get(0).getPubKey().getEd25519().toByteArray());
-            byte[] publicKeyHash = Hashing.sha256().hashBytes(Base64.getDecoder().decode(publicKey)).asBytes();
-            String address = Hex.encodeHexString(Arrays.copyOfRange(publicKeyHash, 0, 20))
-                    .toUpperCase(Locale.ROOT);
-            validatorService.addFromGenesis(publicKey, address);
+            String address = validatorService.getTendermintAddress(publicKey);
+            String ethAddress = getEthAddressFromGenesis(validators, publicKey);
+            validatorService.addFromGenesis(publicKey, address, ethAddress);
         });
         databaseTransactionManager.commit();
         responseObserver.onNext(resp);

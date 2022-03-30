@@ -1,5 +1,6 @@
 package com.jynx.pro.service;
 
+import com.google.common.hash.Hashing;
 import com.google.protobuf.ByteString;
 import com.jynx.pro.constant.BlockValidatorStatus;
 import com.jynx.pro.entity.BlockValidator;
@@ -130,6 +131,8 @@ public class ValidatorService {
         }
     }
 
+    // TODO - validator needs to have a way to change their ETH address without changing their Tendermint key
+
     /**
      * Apply to become a validator
      *
@@ -156,9 +159,13 @@ public class ValidatorService {
         if(totalStake.doubleValue() < configService.get().getValidatorBond().doubleValue()) {
             throw new JynxProException(ErrorCode.INSUFFICIENT_VALIDATOR_STAKE);
         }
+        // TODO - verify Ethereum signature (should sign the base64 Tendermint key)
         List<Validator> validators = getAll();
+        String address = getTendermintAddress(request.getTendermintPublicKey());
         Validator validator = new Validator()
                 .setPublicKey(request.getTendermintPublicKey())
+                .setAddress(address)
+                .setEthAddress(request.getEthAddress())
                 .setEnabled(true)
                 .setPriority(validators.size())
                 .setId(uuidUtils.next());
@@ -305,10 +312,12 @@ public class ValidatorService {
      *
      * @param publicKey the validator's public key
      * @param address the validator's address
+     * @param ethAddress the validator's Etheruem address
      */
     public void addFromGenesis(
             final String publicKey,
-            final String address
+            final String address,
+            final String ethAddress
     ) {
         Optional<Validator> validatorOptional = validatorRepository.findByPublicKey(publicKey);
         List<Validator> validators = getAll();
@@ -385,7 +394,8 @@ public class ValidatorService {
     ) {
         List<BlockValidator> blockValidators = blockValidatorRepository.getByBlockHeight(blockHeight);
         votes.forEach(vote -> {
-            String address = Hex.encodeHexString(vote.getValidator().getAddress().toByteArray()).toUpperCase(Locale.ROOT);
+            String address = Hex.encodeHexString(
+                    vote.getValidator().getAddress().toByteArray()).toUpperCase(Locale.ROOT);
             Optional<BlockValidator> blockValidatorOptional = blockValidators.stream()
                     .filter(v -> v.getValidator().getAddress().equals(address))
                     .findFirst();
@@ -398,7 +408,8 @@ public class ValidatorService {
             }
         });
         evidenceList.forEach(evidence -> {
-            String address = Hex.encodeHexString(evidence.getValidator().getAddress().toByteArray()).toUpperCase(Locale.ROOT);
+            String address = Hex.encodeHexString(
+                    evidence.getValidator().getAddress().toByteArray()).toUpperCase(Locale.ROOT);
             Optional<BlockValidator> blockValidatorOptional = blockValidators.stream()
                     .filter(v -> v.getValidator().getAddress().equals(address))
                     .findFirst();
@@ -437,5 +448,18 @@ public class ValidatorService {
             builder.addValidatorUpdates(validatorUpdate);
         }
         saveBlockValidators(blockHeight);
+    }
+
+    /**
+     * Convert base64 Tendermint public key to Tendermint address
+     *
+     * @param publicKey the base64 public key
+     *
+     * @return the hex address
+     */
+    public String getTendermintAddress(String publicKey) {
+        byte[] publicKeyHash = Hashing.sha256().hashBytes(java.util.Base64.getDecoder().decode(publicKey)).asBytes();
+        return Hex.encodeHexString(Arrays.copyOfRange(publicKeyHash, 0, 20))
+                .toUpperCase(Locale.ROOT);
     }
 }
