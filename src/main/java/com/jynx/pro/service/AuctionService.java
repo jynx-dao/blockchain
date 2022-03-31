@@ -44,6 +44,8 @@ public class AuctionService {
     @Autowired
     private MarketService marketService;
     @Autowired
+    private OrderBookService orderBookService;
+    @Autowired
     private UUIDUtils uuidUtils;
 
     /**
@@ -100,7 +102,7 @@ public class AuctionService {
         List<Market> triggeredMarkets = new ArrayList<>();
         for(Market market : markets) {
             BigDecimal openVolume = market.getOpenVolume();
-            OrderBook orderBook = orderService.getOrderBook(market);
+            OrderBook orderBook = orderBookService.getOrderBookL3(market);
             List<AuctionTrigger> triggers = auctionTriggerRepository.findByMarketId(market.getId());
             if(triggers.size() > 0) {
                 boolean triggered = isAuctionTriggered(openVolume, orderBook, triggers, market);
@@ -125,7 +127,7 @@ public class AuctionService {
             final Market market
     ) {
         int dps = market.getSettlementAsset().getDecimalPlaces();
-        OrderBook orderBook = orderService.getOrderBook(market);
+        OrderBook orderBook = orderBookService.getOrderBookL3(market);
         if(orderBook.getBids().size() == 0 || orderBook.getAsks().size() == 0) {
             return BigDecimal.ZERO;
         }
@@ -161,7 +163,7 @@ public class AuctionService {
     public BigDecimal getUncrossingVolume(
             final Market market
     ) {
-        OrderBook orderBook = orderService.getOrderBook(market);
+        OrderBook orderBook = orderBookService.getOrderBookL3(market);
         if(orderBook.getBids().size() == 0 || orderBook.getAsks().size() == 0) {
             return BigDecimal.ZERO;
         }

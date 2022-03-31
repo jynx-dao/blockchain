@@ -3,10 +3,7 @@ package com.jynx.pro.service;
 import com.google.common.hash.Hashing;
 import com.google.protobuf.ByteString;
 import com.jynx.pro.constant.BlockValidatorStatus;
-import com.jynx.pro.entity.BlockValidator;
-import com.jynx.pro.entity.Delegation;
-import com.jynx.pro.entity.Stake;
-import com.jynx.pro.entity.Validator;
+import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.repository.BlockValidatorRepository;
@@ -25,6 +22,7 @@ import org.springframework.stereotype.Service;
 import tendermint.abci.Types;
 import tendermint.crypto.Keys;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -47,6 +45,8 @@ public class ValidatorService {
     private StakeService stakeService;
     @Autowired
     private EthereumService ethereumService;
+    @Autowired
+    private UserService userService;
     @Autowired
     private UUIDUtils uuidUtils;
 
@@ -313,7 +313,7 @@ public class ValidatorService {
      *
      * @param publicKey the validator's public key
      * @param address the validator's address
-     * @param ethAddress the validator's Etheruem address
+     * @param ethAddress the validator's Ethereum address
      */
     public void addFromGenesis(
             final String publicKey,
@@ -322,6 +322,13 @@ public class ValidatorService {
     ) {
         Optional<Validator> validatorOptional = validatorRepository.findByPublicKey(publicKey);
         List<Validator> validators = getAll();
+        String hexPublicKey = null;
+        try {
+            hexPublicKey = Hex.encodeHexString(Base64.decode(publicKey));
+        } catch (IOException e) {
+            log.error(e.getMessage(), e);
+        }
+        User user = userService.getAndCreate(hexPublicKey);
         if(validatorOptional.isEmpty()) {
             Validator validator = new Validator()
                     .setId(uuidUtils.next())
@@ -329,6 +336,7 @@ public class ValidatorService {
                     .setAddress(address)
                     .setEthAddress(ethAddress)
                     .setEnabled(true)
+                    .setUser(user)
                     .setPriority(validators.size())
                     .setDelegation(BigDecimal.ONE);
             validatorRepository.save(validator);

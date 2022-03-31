@@ -35,6 +35,8 @@ public class OrderService {
     @Autowired
     private PositionService positionService;
     @Autowired
+    private OrderBookService orderBookService;
+    @Autowired
     private UUIDUtils uuidUtils;
     @Autowired
     private ConfigService configService;
@@ -66,7 +68,7 @@ public class OrderService {
     public BigDecimal getMidPrice(
             final Market market
     ) {
-        OrderBook orderBook = getOrderBook(market);
+        OrderBook orderBook = orderBookService.getOrderBookL3(market);
         if(orderBook.getAsks().size() == 0 || orderBook.getBids().size() == 0) {
             return market.getLastPrice();
         }
@@ -82,7 +84,7 @@ public class OrderService {
      *
      * @return a list of {@link Order}s
      */
-    private List<Order> getSideOfBook(
+    public List<Order> getSideOfBook(
             final Market market,
             final MarketSide side
     ) {
@@ -94,32 +96,6 @@ public class OrderService {
             orders.sort(Comparator.comparing(Order::getPrice).reversed().thenComparing(Order::getPriority));
         }
         return orders;
-    }
-
-    /**
-     * Gets the current {@link OrderBook} of given {@link Market}
-     *
-     * @param market the {@link Market}
-     *
-     * @return the {@link OrderBook}
-     */
-    public OrderBook getOrderBook(
-            final Market market
-    ) {
-        // TODO - need to group by price point
-        //  need to add optional limit parameter
-        OrderBook orderBook = new OrderBook();
-        List<OrderBookItem> bids = getSideOfBook(market, MarketSide.BUY)
-                .stream()
-                .map(o -> new OrderBookItem().setQuantity(o.getRemainingQuantity()).setPrice(o.getPrice()))
-                .collect(Collectors.toList());
-        List<OrderBookItem> asks = getSideOfBook(market, MarketSide.SELL)
-                .stream()
-                .map(o -> new OrderBookItem().setQuantity(o.getRemainingQuantity()).setPrice(o.getPrice()))
-                .collect(Collectors.toList());
-        orderBook.setAsks(asks);
-        orderBook.setBids(bids);
-        return orderBook;
     }
 
     /**
@@ -749,7 +725,7 @@ public class OrderService {
             }
         }
         if(!Objects.isNull(request.getPrice())) {
-            OrderBook orderBook = getOrderBook(order.getMarket());
+            OrderBook orderBook = orderBookService.getOrderBookL3(order.getMarket());
             if(order.getSide().equals(MarketSide.BUY) && orderBook.getAsks().size() > 0 &&
                     orderBook.getAsks().get(0).getPrice().doubleValue() < request.getPrice().doubleValue()) {
                 throw new JynxProException(ErrorCode.CANNOT_AMEND_WOULD_EXECUTE);

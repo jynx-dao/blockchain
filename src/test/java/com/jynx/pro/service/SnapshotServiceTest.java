@@ -41,7 +41,7 @@ public class SnapshotServiceTest extends IntegrationTest {
         databaseTransactionManager.commit();
         databaseTransactionManager.createTransaction();
         Assertions.assertEquals(0, configRepository.findAll().size());
-        String content = "{\"data\":[{\"uuidSeed\":106,\"governanceTokenAddress\":\"0x0\",\"minEnactmentDelay\":1,\"minOpenDelay\":1,\"minTotalDelegation\":0,\"ethMaxGasPrice\":0,\"validatorMinEthBalance\":0,\"minClosingDelay\":1,\"networkFee\":1.00,\"minProposerStake\":1,\"participationThreshold\":0.66,\"approvalThreshold\":0.66,\"bridgeAddress\":\"0x0\",\"ethConfirmations\":50,\"activeValidatorCount\":1,\"backupValidatorCount\":1,\"validatorBond\":0.00,\"validatorMinDelegation\":0.00,\"snapshotFrequency\":100,\"asyncTaskFrequency\":60,\"snapshotChunkRows\":10}],\"entityName\":\"com.jynx.pro.entity.Config\"}";
+        String content = "{\"data\":[{\"uuidSeed\":106,\"governanceTokenAddress\":\"0x0\",\"minEnactmentDelay\":1,\"bulkOrderLimit\":1,\"withdrawalBatchLimit\":100,\"exitAuctionRatio\":0.8,\"validatorSigningThreshold\":0.66,\"withdrawalDelay\":60,\"withdrawalBatchFrequency\":3600,\"minOpenDelay\":1,\"minTotalDelegation\":0,\"ethMaxGasPrice\":0,\"validatorMinEthBalance\":0,\"minClosingDelay\":1,\"networkFee\":1.00,\"minProposerStake\":1,\"participationThreshold\":0.66,\"approvalThreshold\":0.66,\"bridgeAddress\":\"0x0\",\"ethConfirmations\":50,\"activeValidatorCount\":1,\"backupValidatorCount\":1,\"validatorBond\":0.00,\"validatorMinDelegation\":0.00,\"snapshotFrequency\":100,\"asyncTaskFrequency\":60,\"snapshotChunkRows\":10}],\"entityName\":\"com.jynx.pro.entity.Config\"}";
         snapshotService.saveChunk(content);
         Assertions.assertEquals(1, configRepository.findAll().size());
     }

@@ -63,7 +63,7 @@ public class AuctionServiceTest extends IntegrationTest {
                 .setMarket(market)
                 .setDepth(depth)
                 .setOpenVolumeRatio(ratio));
-        OrderBook orderBook = orderService.getOrderBook(market);
+        OrderBook orderBook = orderBookService.getOrderBookL3(market);
         return auctionService.isAuctionTriggered(market.getOpenVolume(), orderBook, triggers, market);
     }
 
@@ -419,7 +419,7 @@ public class AuctionServiceTest extends IntegrationTest {
         Assertions.assertEquals(orderBook.getAsks().get(0).getQuantity().doubleValue(), askSize);
         BigDecimal uncrossingPrice = auctionService.getUncrossingPrice(market);
         auctionService.exitAuctions();
-        orderBook = orderService.getOrderBook(market);
+        orderBook = orderBookService.getOrderBookL3(market);
         Assertions.assertEquals(orderBook.getBids().size(), bidCount);
         Assertions.assertEquals(orderBook.getAsks().size(), askCount);
         Assertions.assertEquals(orderBook.getBids().get(0).getPrice().doubleValue(), bidPrice);

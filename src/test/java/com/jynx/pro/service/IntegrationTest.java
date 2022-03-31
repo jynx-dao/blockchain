@@ -136,6 +136,8 @@ public abstract class IntegrationTest {
     protected BlockValidatorRepository blockValidatorRepository;
     @Autowired
     protected DelegationRepository delegationRepository;
+    @Autowired
+    protected OrderBookService orderBookService;
 
     protected static final String ETH_ADDRESS = "0xd7E1236C08731C3632519DCd1A581bFe6876a3B2";
     protected static final String ETH_PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
@@ -362,7 +364,7 @@ public abstract class IntegrationTest {
                     BigDecimal.valueOf(45610+((long) i * stepSize)), BigDecimal.ONE, MarketSide.SELL, OrderType.LIMIT, makerUser));
             Assertions.assertEquals(sellOrder.getStatus(), OrderStatus.OPEN);
         }
-        OrderBook orderBook = orderService.getOrderBook(market);
+        OrderBook orderBook = orderBookService.getOrderBookL3(market);
         Assertions.assertEquals(orderBook.getAsks().size(), asks);
         Assertions.assertEquals(orderBook.getBids().size(), bids);
         BigDecimal marginBalance = BigDecimal.ZERO;
