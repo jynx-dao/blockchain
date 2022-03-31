@@ -496,7 +496,7 @@ public abstract class IntegrationTest {
                         .setMinEnactmentDelay(1L)
                         .setMinOpenDelay(1L)
                         .setMinProposerStake(1L)
-                        .setNetworkFee(BigDecimal.valueOf(0.001))
+                        .setNetworkFee(BigDecimal.valueOf(0.2))
                         .setParticipationThreshold(BigDecimal.valueOf(0.66))
                         .setApprovalThreshold(BigDecimal.valueOf(0.66))
                         .setUuidSeed(1L)

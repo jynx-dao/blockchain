@@ -4,10 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 import lombok.experimental.Accessors;
 
-import javax.persistence.Column;
-import javax.persistence.Entity;
-import javax.persistence.Id;
-import javax.persistence.Table;
+import javax.persistence.*;
 import java.math.BigDecimal;
 import java.util.UUID;
 
@@ -31,4 +28,9 @@ public class Validator {
     private Boolean enabled;
     @Column(name = "priority", nullable = false)
     private Integer priority;
+    @Column(name = "score", nullable = false)
+    private Integer score = 0;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 }

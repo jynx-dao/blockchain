@@ -167,6 +167,11 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                         .setDeliverFn(bridgeUpdateService::executeBridgeUpdates)
                         .setProtectedFn(true)
                         .setRequestType(ExecuteBridgeUpdatesRequest.class));
+        transactionSettings.put(TendermintTransaction.DISTRIBUTE_REWARDS,
+                new TransactionConfig<BatchValidatorRequest>()
+                        .setDeliverFn(accountService::distributeRewards)
+                        .setProtectedFn(true)
+                        .setRequestType(BatchValidatorRequest.class));
     }
 
     /**
@@ -498,6 +503,20 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     }
 
     /**
+     * Distribute rewards
+     *
+     * @param proposerAddress the proposer address
+     * @param blockHeight the current block height
+     */
+    private void distributeRewards(
+            final String proposerAddress,
+            final long blockHeight
+    ) {
+        executorService.submit(() -> tendermintClient.distributeRewards(
+                getBatchRequest(proposerAddress, blockHeight)));
+    }
+
+    /**
      * Sync proposals
      *
      * @param proposerAddress the proposer address
@@ -641,6 +660,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         withdrawSignedBatches();
         signBridgeUpdates();
         executeBridgeUpdates();
+        distributeRewards(proposerAddress, blockHeight);
     }
 
     /**

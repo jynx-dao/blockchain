@@ -6,6 +6,7 @@ import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.handler.SocketHandler;
 import com.jynx.pro.repository.*;
+import com.jynx.pro.request.BatchValidatorRequest;
 import com.jynx.pro.request.CreateWithdrawalRequest;
 import com.jynx.pro.request.DepositAssetRequest;
 import com.jynx.pro.request.SingleItemRequest;
@@ -15,7 +16,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.Optional;
+import java.math.RoundingMode;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -43,6 +45,8 @@ public class AccountService {
     private UUIDUtils uuidUtils;
     @Autowired
     private WithdrawalRepository withdrawalRepository;
+    @Autowired
+    private DelegationRepository delegationRepository;
     @Autowired
     private OrderService orderService;
     @Autowired
@@ -355,6 +359,111 @@ public class AccountService {
         market.getSettlementAsset().setTreasuryBalance(
                 market.getSettlementAsset().getTreasuryBalance().add(treasuryAmount));
         assetRepository.save(market.getSettlementAsset());
+    }
+
+    /**
+     * Distribute the treasury balance to users and validators
+     *
+     * @return {@link List<Asset>}
+     */
+    public List<Asset> distributeRewards(
+            final BatchValidatorRequest request
+    ) {
+        log.debug(request.toString());
+        List<Delegation> delegations = delegationRepository.findAll();
+        BigDecimal totalDelegation = delegations.stream()
+                .map(Delegation::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        Set<User> users = new HashSet<>();
+        Set<Validator> validators = new HashSet<>();
+        Map<UUID, BigDecimal> delegationByUser = new HashMap<>();
+        Map<UUID, BigDecimal> delegationByValidator = new HashMap<>();
+        for(Delegation delegation : delegations) {
+            UUID userId = delegation.getStake().getUser().getId();
+            UUID validatorId = delegation.getValidator().getId();
+            delegationByUser.putIfAbsent(userId, BigDecimal.ZERO);
+            delegationByValidator.putIfAbsent(validatorId, BigDecimal.ZERO);
+            delegationByUser.put(userId, delegationByUser.get(userId).add(delegation.getAmount()));
+            delegationByValidator.put(validatorId, delegationByValidator.get(validatorId).add(delegation.getAmount()));
+            users.add(delegation.getStake().getUser());
+            validators.add(delegation.getValidator());
+        }
+        List<Asset> assets = assetRepository.findAll();
+        for(Asset asset : assets) {
+            distributeUserRewards(users, totalDelegation, delegationByUser, asset);
+            distributeValidatorRewards(validators, totalDelegation, delegationByValidator, asset);
+            asset.setTreasuryBalance(BigDecimal.ZERO);
+        }
+        assetRepository.saveAll(assets);
+        return assets;
+    }
+
+    /**
+     * Distribute validator rewards
+     *
+     * @param validators {@link Set<Validator>}
+     * @param totalDelegation total delegated stake
+     * @param delegationByValidator delegation by validator ID
+     * @param asset {@link Asset}
+     */
+    private void distributeValidatorRewards(
+            final Set<Validator> validators,
+            final BigDecimal totalDelegation,
+            final Map<UUID, BigDecimal> delegationByValidator,
+            final Asset asset
+    ) {
+        int dps = asset.getDecimalPlaces();
+        for(Validator validator : validators) {
+            BigDecimal validatorShare = delegationByValidator.get(validator.getId())
+                    .divide(totalDelegation, dps, RoundingMode.HALF_UP);
+            BigDecimal validatorReward = asset.getTreasuryBalance().multiply(validatorShare)
+                    .multiply(configService.get().getNetworkFee()).multiply(BigDecimal.valueOf(validator.getScore()));
+            Account account = getAndCreate(validator.getUser(), asset);
+            Transaction tx = new Transaction()
+                    .setType(TransactionType.REWARD_CREDIT)
+                    .setAmount(validatorReward)
+                    .setUser(validator.getUser())
+                    .setAsset(asset)
+                    .setTimestamp(configService.getTimestamp());
+            account.setAvailableBalance(account.getAvailableBalance().add(validatorReward));
+            account.setBalance(account.getBalance().add(validatorReward));
+            transactionRepository.save(tx);
+            save(account);
+        }
+    }
+
+    /**
+     * Distribute user rewards
+     *
+     * @param users {@link Set<User>}
+     * @param totalDelegation total delegated stake
+     * @param delegationByUser delegation by user ID
+     * @param asset {@link Asset}
+     */
+    private void distributeUserRewards(
+            final Set<User> users,
+            final BigDecimal totalDelegation,
+            final Map<UUID, BigDecimal> delegationByUser,
+            final Asset asset
+    ) {
+        int dps = asset.getDecimalPlaces();
+        for(User user : users) {
+            BigDecimal userShare = delegationByUser.get(user.getId())
+                    .divide(totalDelegation, dps, RoundingMode.HALF_UP);
+            BigDecimal userReward = asset.getTreasuryBalance().multiply(userShare)
+                    .multiply(BigDecimal.ONE.subtract(configService.get().getNetworkFee()));
+            Account account = getAndCreate(user, asset);
+            Transaction tx = new Transaction()
+                    .setType(TransactionType.REWARD_CREDIT)
+                    .setAmount(userReward)
+                    .setUser(user)
+                    .setAsset(asset)
+                    .setTimestamp(configService.getTimestamp());
+            account.setAvailableBalance(account.getAvailableBalance().add(userReward));
+            account.setBalance(account.getBalance().add(userReward));
+            transactionRepository.save(tx);
+            save(account);
+        }
     }
 
     /**

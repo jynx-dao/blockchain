@@ -167,6 +167,7 @@ public class ValidatorService {
                 .setAddress(address)
                 .setEthAddress(request.getEthAddress())
                 .setEnabled(true)
+                .setUser(request.getUser())
                 .setPriority(validators.size())
                 .setId(uuidUtils.next());
         return validatorRepository.save(validator);
@@ -420,6 +421,7 @@ public class ValidatorService {
                 blockValidator.setLightClientAttack(evidence.getType().equals(Types.EvidenceType.LIGHT_CLIENT_ATTACK));
             }
         });
+        // TODO - should update the validator scores in here
         blockValidatorRepository.saveAll(blockValidators);
     }
 
