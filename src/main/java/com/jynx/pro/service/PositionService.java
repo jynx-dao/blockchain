@@ -408,7 +408,7 @@ public class PositionService {
                 account.setBalance(BigDecimal.ZERO);
                 account.setAvailableBalance(BigDecimal.ZERO);
                 account.setMarginBalance(BigDecimal.ZERO);
-                accountRepository.save(account);
+                accountService.save(account);
             }
         }
         List<Position> liquidatedPositions = positionRepository.findByIdIn(liquidatedPositionIds);
@@ -490,9 +490,9 @@ public class PositionService {
             transactionRepository.save(transaction);
         }
         // TODO - what do we do if we have no accounts with a positive balance?
-        // TODO - or when the sum of all positive balances isn't enough to cover the loss?
-        // TODO - are these scenarios even possible?
-        accountRepository.saveAll(accounts);
+        //  or when the sum of all positive balances isn't enough to cover the loss?
+        //  are these scenarios even possible?
+        accounts.forEach(accountService::save);
     }
 
     /**

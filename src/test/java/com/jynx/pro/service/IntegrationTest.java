@@ -511,6 +511,12 @@ public abstract class IntegrationTest {
                         .setSnapshotChunkRows(10)
                         .setValidatorMinDelegation(BigDecimal.ONE)
                         .setValidatorBond(BigDecimal.ONE)
+                        .setValidatorSigningThreshold(BigDecimal.valueOf(0.66))
+                        .setBulkOrderLimit(25)
+                        .setExitAuctionRatio(BigDecimal.valueOf(0.8))
+                        .setWithdrawalBatchFrequency(60 * 60 * 4L)
+                        .setWithdrawalDelay(60L)
+                        .setWithdrawalBatchLimit(100)
                         .setBridgeAddress(ethereumHelper.getJynxProBridge().getContractAddress());
                 configRepository.save(config);
                 configService.setTimestamp(nowAsMillis());

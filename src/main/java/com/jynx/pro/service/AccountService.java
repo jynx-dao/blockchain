@@ -1,12 +1,10 @@
 package com.jynx.pro.service;
 
-import com.jynx.pro.constant.DepositStatus;
-import com.jynx.pro.constant.EventType;
-import com.jynx.pro.constant.TransactionType;
-import com.jynx.pro.constant.WithdrawalStatus;
+import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.handler.SocketHandler;
 import com.jynx.pro.repository.*;
 import com.jynx.pro.request.CreateWithdrawalRequest;
 import com.jynx.pro.request.DepositAssetRequest;
@@ -47,6 +45,8 @@ public class AccountService {
     private WithdrawalRepository withdrawalRepository;
     @Autowired
     private OrderService orderService;
+    @Autowired
+    private SocketHandler socketHandler;
 
     /**
      * Get an account by user and asset
@@ -83,7 +83,7 @@ public class AccountService {
                     .setAvailableBalance(BigDecimal.ZERO)
                     .setMarginBalance(BigDecimal.ZERO)
                     .setBalance(BigDecimal.ZERO));
-        return accountRepository.save(account);
+        return save(account);
     }
 
     /**
@@ -102,7 +102,7 @@ public class AccountService {
         account.setAvailableBalance(account.getAvailableBalance().add(account.getMarginBalance()));
         account.setMarginBalance(margin);
         account.setAvailableBalance(account.getAvailableBalance().subtract(margin));
-        accountRepository.save(account);
+        save(account);
     }
 
     /**
@@ -140,7 +140,7 @@ public class AccountService {
             account.setBalance(BigDecimal.ZERO);
             account.setAvailableBalance(BigDecimal.ZERO);
             account.setMarginBalance(BigDecimal.ZERO);
-            accountRepository.save(account);
+            save(account);
             positionService.reconcileLiquidatedPosition(position);
         }
     }
@@ -163,7 +163,7 @@ public class AccountService {
         }
         account.setAvailableBalance(account.getAvailableBalance().subtract(request.getAmount()));
         account.setBalance(account.getBalance().subtract(request.getAmount()));
-        accountRepository.save(account);
+        save(account);
         Transaction transaction = new Transaction()
                 .setType(TransactionType.WITHDRAWAL)
                 .setAmount(request.getAmount())
@@ -237,7 +237,7 @@ public class AccountService {
         withdrawal.setStatus(WithdrawalStatus.CANCELED);
         account.setAvailableBalance(account.getAvailableBalance().add(withdrawal.getAmount()));
         account.setBalance(account.getBalance().add(withdrawal.getAmount()));
-        accountRepository.save(account);
+        save(account);
         Transaction transaction = new Transaction()
                 .setType(TransactionType.DEPOSIT)
                 .setAmount(withdrawal.getAmount())
@@ -280,7 +280,7 @@ public class AccountService {
                 .setAsset(deposit.getAsset())
                 .setTimestamp(configService.getTimestamp());
         transactionRepository.save(transaction);
-        accountRepository.save(account);
+        save(account);
         deposit.setStatus(DepositStatus.CREDITED);
         depositRepository.save(deposit);
     }
@@ -323,7 +323,7 @@ public class AccountService {
         Account takerAccount = getAndCreate(taker, market.getSettlementAsset());
         takerAccount.setBalance(takerAccount.getBalance().subtract(takerAmount));
         takerAccount.setAvailableBalance(takerAccount.getAvailableBalance().subtract(takerAmount));
-        accountRepository.save(takerAccount);
+        save(takerAccount);
         Transaction takerTx = new Transaction()
                 .setType(TransactionType.FEE)
                 .setAmount(takerAmount.multiply(BigDecimal.valueOf(-1)))
@@ -339,7 +339,7 @@ public class AccountService {
             Account makerAccount = getAndCreate(maker, market.getSettlementAsset());
             makerAccount.setBalance(makerAccount.getBalance().add(makerAmount));
             makerAccount.setAvailableBalance(makerAccount.getAvailableBalance().add(makerAmount));
-            accountRepository.save(makerAccount);
+            save(makerAccount);
             Transaction makerTx = new Transaction()
                     .setType(TransactionType.FEE)
                     .setAmount(makerAmount)
@@ -372,7 +372,7 @@ public class AccountService {
         Account account = getAndCreate(user, market.getSettlementAsset());
         account.setBalance(account.getBalance().add(realisedProfit));
         account.setAvailableBalance(account.getAvailableBalance().add(realisedProfit));
-        accountRepository.save(account);
+        save(account);
         Transaction tx = new Transaction()
                 .setType(TransactionType.SETTLEMENT)
                 .setAmount(realisedProfit)
@@ -380,5 +380,19 @@ public class AccountService {
                 .setAsset(market.getSettlementAsset())
                 .setTimestamp(configService.getTimestamp());
         transactionRepository.save(tx);
+    }
+
+    /**
+     * Save an account
+     *
+     * @param account {@link Account}
+     *
+     * @return {@link Account}
+     */
+    public Account save(
+            final Account account
+    ) {
+        socketHandler.sendMessage(WebSocketChannelType.ACCOUNTS, account.getUser().getPublicKey(), account);
+        return accountRepository.save(account);
     }
 }

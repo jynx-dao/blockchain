@@ -63,4 +63,16 @@ public class Config {
     private Integer asyncTaskFrequency;
     @Column(name = "snapshot_chunk_rows", nullable = false)
     private Integer snapshotChunkRows;
+    @Column(name = "bulk_order_limit", nullable = false)
+    private Integer bulkOrderLimit;
+    @Column(name = "exit_auction_ratio", nullable = false)
+    private BigDecimal exitAuctionRatio;
+    @Column(name = "validator_signing_threshold", nullable = false)
+    private BigDecimal validatorSigningThreshold;
+    @Column(name = "withdrawal_batch_frequency", nullable = false)
+    private Long withdrawalBatchFrequency;
+    @Column(name = "withdrawal_delay", nullable = false)
+    private Long withdrawalDelay;
+    @Column(name = "withdrawal_batch_limit", nullable = false)
+    private Integer withdrawalBatchLimit;
 }

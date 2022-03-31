@@ -42,6 +42,8 @@ public class AuctionService {
     @Autowired
     private MarketRepository marketRepository;
     @Autowired
+    private MarketService marketService;
+    @Autowired
     private UUIDUtils uuidUtils;
 
     /**
@@ -108,7 +110,7 @@ public class AuctionService {
                 }
             }
         }
-        marketRepository.saveAll(markets);
+        markets.forEach(marketService::save);
         return triggeredMarkets;
     }
 
@@ -339,7 +341,7 @@ public class AuctionService {
         for(Market market : markets) {
             BigDecimal uncrossingPrice = getUncrossingPrice(market);
             BigDecimal expectedOpenVolume = (market.getOpenVolume().add(getUncrossingVolume(market)))
-                    .multiply(BigDecimal.valueOf(0.8)); // TODO - use config variable for this ratio
+                    .multiply(configService.get().getExitAuctionRatio());
             OrderBook expectedOrderBook = getOrderBookAfterUncrossing(market);
             List<AuctionTrigger> triggers = auctionTriggerRepository.findByMarketId(market.getId());
             if(triggers.size() > 0) {
@@ -347,7 +349,7 @@ public class AuctionService {
                 if (!auctionTriggered) {
                     triggeredMarkets.add(market);
                     market.setStatus(MarketStatus.ACTIVE);
-                    marketRepository.save(market);
+                    marketService.save(market);
                     List<Order> uncrossingOrders = getUncrossingOrders(market);
                     BigDecimal volumeBids = uncrossingOrders.stream().filter(o -> o.getSide().equals(MarketSide.BUY))
                             .map(Order::getRemainingQuantity).reduce(BigDecimal.ZERO, BigDecimal::add);

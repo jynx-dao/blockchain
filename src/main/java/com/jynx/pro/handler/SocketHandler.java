@@ -4,9 +4,11 @@ import com.jynx.pro.constant.WebSocketChannelType;
 import com.jynx.pro.entity.Market;
 import com.jynx.pro.entity.User;
 import com.jynx.pro.model.WebSocketSubscription;
+import com.jynx.pro.model.WebSocketSubscriptionStatus;
 import com.jynx.pro.repository.ReadOnlyRepository;
 import com.jynx.pro.utils.JSONUtils;
 import lombok.Getter;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.jetbrains.annotations.NotNull;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,19 +69,6 @@ public class SocketHandler extends TextWebSocketHandler {
             final Object message
     ) {
         sendMessage(type, publicKey, null, message);
-    }
-
-    /**
-     * Send a message to the matching sessions
-     *
-     * @param type {@link WebSocketChannelType}
-     * @param message the message to send
-     */
-    public void sendMessage(
-            final WebSocketChannelType type,
-            final Object message
-    ) {
-        sendMessage(type, null, null, message);
     }
 
     /**
@@ -186,12 +175,13 @@ public class SocketHandler extends TextWebSocketHandler {
     /**
      * {@inheritDoc}
      */
+    @SneakyThrows
     @Override
     public void handleTextMessage(@NotNull WebSocketSession session, @NotNull TextMessage message) {
         WebSocketSubscription sub = jsonUtils.fromJson(message.getPayload(), WebSocketSubscription.class);
         validateSubscription(sub, session);
         subscriptions.put(session.getId(), sub);
-        // TODO - send a message to the client when the subscription was created successfully
+        session.sendMessage(new TextMessage(jsonUtils.toJson(new WebSocketSubscriptionStatus().setConnected(true))));
     }
 
     /**
