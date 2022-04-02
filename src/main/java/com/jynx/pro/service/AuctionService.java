@@ -1,9 +1,6 @@
 package com.jynx.pro.service;
 
-import com.jynx.pro.constant.MarketSide;
-import com.jynx.pro.constant.MarketStatus;
-import com.jynx.pro.constant.OrderAction;
-import com.jynx.pro.constant.OrderStatus;
+import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.model.OrderBook;
 import com.jynx.pro.model.OrderBookItem;
@@ -102,7 +99,7 @@ public class AuctionService {
         List<Market> triggeredMarkets = new ArrayList<>();
         for(Market market : markets) {
             BigDecimal openVolume = market.getOpenVolume();
-            OrderBook orderBook = orderBookService.getOrderBookL3(market);
+            OrderBook orderBook = orderBookService.getOrderBook(OrderBookType.L3, market);
             List<AuctionTrigger> triggers = auctionTriggerRepository.findByMarketId(market.getId());
             if(triggers.size() > 0) {
                 boolean triggered = isAuctionTriggered(openVolume, orderBook, triggers, market);
@@ -127,7 +124,7 @@ public class AuctionService {
             final Market market
     ) {
         int dps = market.getSettlementAsset().getDecimalPlaces();
-        OrderBook orderBook = orderBookService.getOrderBookL3(market);
+        OrderBook orderBook = orderBookService.getOrderBook(OrderBookType.L3, market);
         if(orderBook.getBids().size() == 0 || orderBook.getAsks().size() == 0) {
             return BigDecimal.ZERO;
         }
@@ -163,7 +160,7 @@ public class AuctionService {
     public BigDecimal getUncrossingVolume(
             final Market market
     ) {
-        OrderBook orderBook = orderBookService.getOrderBookL3(market);
+        OrderBook orderBook = orderBookService.getOrderBook(OrderBookType.L3, market);
         if(orderBook.getBids().size() == 0 || orderBook.getAsks().size() == 0) {
             return BigDecimal.ZERO;
         }
@@ -370,6 +367,7 @@ public class AuctionService {
                         fillCrossingOrders(uncrossingAsks, uncrossingPrice, volumeBids);
                         fillCrossingOrders(uncrossingBids, uncrossingPrice, volumeBids);
                     }
+                    orderService.sendOrderBookUpdates(market);
                     orderService.handleMarkPriceChange(market, uncrossingPrice);
                 }
             }

@@ -651,6 +651,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String proposerAddress,
             final long blockHeight
     ) {
+        // TODO - the frequency of each task should be defined independently
         confirmEthereumEvents(proposerAddress, blockHeight);
         settleMarkets(proposerAddress, blockHeight);
         syncProposals(proposerAddress, blockHeight);
@@ -661,6 +662,8 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         signBridgeUpdates();
         executeBridgeUpdates();
         distributeRewards(proposerAddress, blockHeight);
+        // TODO - add a task to build the candlestick data
+        // TODO - add a task to archive 'old' data
     }
 
     /**
@@ -676,9 +679,12 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     ) {
         String ethAddress = null;
         for(int i=0; i<validators.length(); i++) {
-            JSONObject obj = validators.optJSONObject(i);
-            if(obj != null) {
-                ethAddress = obj.optString("ethAddress");
+            JSONObject obj1 = validators.optJSONObject(i);
+            if(obj1 != null) {
+                JSONObject obj2 = obj1.optJSONObject(publicKey);
+                if(obj2 != null) {
+                    ethAddress = obj2.optString("ethAddress");
+                }
             }
         }
         return ethAddress;

@@ -1903,7 +1903,7 @@ public class OrderServiceTest extends IntegrationTest {
         BigDecimal makerRealisedProfit = profitPart1.add(profitPart2).add(makerFee);
         BigDecimal treasuryFee = BigDecimal.ZERO;
         BigDecimal makerMargin = BigDecimal.ZERO;
-        OrderBook orderBook = orderBookService.getOrderBookL3(market);
+        OrderBook orderBook = orderBookService.getOrderBook(OrderBookType.L3, market);
         for(OrderBookItem item : orderBook.getAsks()) {
             makerMargin = makerMargin.add(item.getPrice().multiply(item.getQuantity().multiply(market.getMarginRequirement())));
         }
@@ -1989,7 +1989,7 @@ public class OrderServiceTest extends IntegrationTest {
         BigDecimal makerRealisedProfit = profitPart1.abs().add(profitPart2.abs()).add(makerFee);
         BigDecimal treasuryFee = BigDecimal.ZERO;
         BigDecimal makerMargin = BigDecimal.ZERO;
-        OrderBook orderBook = orderBookService.getOrderBookL3(market);
+        OrderBook orderBook = orderBookService.getOrderBook(OrderBookType.L3, market);
         int i = 0;
         for(OrderBookItem item : orderBook.getAsks()) {
             if(item.getQuantity().doubleValue() > 1) {
@@ -2095,7 +2095,7 @@ public class OrderServiceTest extends IntegrationTest {
         BigDecimal makerRealisedProfit = profitPart1.add(profitPart2).add(makerFee);
         BigDecimal treasuryFee = BigDecimal.ZERO;
         BigDecimal makerMargin = BigDecimal.ZERO;
-        OrderBook orderBook = orderBookService.getOrderBookL3(market);
+        OrderBook orderBook = orderBookService.getOrderBook(OrderBookType.L3, market);
         for(OrderBookItem item : orderBook.getAsks()) {
             makerMargin = makerMargin.add(item.getPrice().multiply(item.getQuantity().multiply(market.getMarginRequirement())));
         }
@@ -2197,7 +2197,7 @@ public class OrderServiceTest extends IntegrationTest {
         BigDecimal makerRealisedProfit = profitPart1.add(profitPart2).add(makerFee);
         BigDecimal treasuryFee = BigDecimal.ZERO;
         BigDecimal makerMargin = BigDecimal.ZERO;
-        OrderBook orderBook = orderBookService.getOrderBookL3(market);
+        OrderBook orderBook = orderBookService.getOrderBook(OrderBookType.L3, market);
         for(OrderBookItem item : orderBook.getAsks()) {
             makerMargin = makerMargin.add(item.getPrice().multiply(item.getQuantity().multiply(market.getMarginRequirement())));
         }
@@ -2289,7 +2289,7 @@ public class OrderServiceTest extends IntegrationTest {
         BigDecimal makerRealisedProfit = profitPart1.abs().add(profitPart2.abs()).add(makerFee);
         BigDecimal treasuryFee = BigDecimal.ZERO;
         BigDecimal makerMargin = BigDecimal.ZERO;
-        OrderBook orderBook = orderBookService.getOrderBookL3(market);
+        OrderBook orderBook = orderBookService.getOrderBook(OrderBookType.L3, market);
         int i = 0;
         for(OrderBookItem item : orderBook.getAsks()) {
             if(item.getQuantity().doubleValue() > 1) {
@@ -2405,7 +2405,7 @@ public class OrderServiceTest extends IntegrationTest {
         BigDecimal makerRealisedProfit = profitPart1.abs().add(profitPart2.abs()).add(makerFee);
         BigDecimal treasuryFee = BigDecimal.ZERO;
         BigDecimal makerMargin = BigDecimal.ZERO;
-        OrderBook orderBook = orderBookService.getOrderBookL3(market);
+        OrderBook orderBook = orderBookService.getOrderBook(OrderBookType.L3, market);
         int i = 0;
         for(OrderBookItem item : orderBook.getAsks()) {
             if(item.getQuantity().doubleValue() > 1) {
@@ -2515,7 +2515,7 @@ public class OrderServiceTest extends IntegrationTest {
         Assertions.assertTrue(assetOptional.isPresent());
         Assertions.assertEquals(assetOptional.get().getTreasuryBalance().setScale(dps, RoundingMode.HALF_UP),
                 treasuryFee.setScale(dps, RoundingMode.HALF_UP));
-        OrderBook orderBook = orderBookService.getOrderBookL3(market);
+        OrderBook orderBook = orderBookService.getOrderBook(OrderBookType.L3, market);
         Assertions.assertEquals(orderBook.getBids().size(), bidCount);
         Assertions.assertEquals(orderBook.getAsks().size(), askCount);
         Assertions.assertTrue(orderBook.getBids().get(0).getQuantity().doubleValue() <= bidSize.doubleValue());

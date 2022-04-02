@@ -1,6 +1,7 @@
 package com.jynx.pro.controller;
 
 import com.jynx.pro.constant.KlineInterval;
+import com.jynx.pro.constant.OrderBookType;
 import com.jynx.pro.entity.Market;
 import com.jynx.pro.entity.Proposal;
 import com.jynx.pro.entity.Trade;
@@ -13,12 +14,14 @@ import com.jynx.pro.model.Quote;
 import com.jynx.pro.request.AddMarketRequest;
 import com.jynx.pro.request.AmendMarketRequest;
 import com.jynx.pro.request.SingleItemRequest;
+import com.jynx.pro.service.OrderBookService;
 import com.jynx.pro.service.TradeService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
@@ -30,20 +33,37 @@ public class MarketController extends AbstractController {
 
     @Autowired
     private TradeService tradeService;
+    @Autowired
+    private OrderBookService orderBookService;
+
+    /**
+     * Get market by ID
+     *
+     * @param id the market ID
+     *
+     * @return {@link Market}
+     */
+    private Market getMarket(
+            final UUID id
+    ) {
+        return readOnlyRepository.getMarketById(id)
+                .orElseThrow(() -> new JynxProException(ErrorCode.MARKET_NOT_FOUND));
+    }
 
     @GetMapping("/{id}/order-book")
     public ResponseEntity<OrderBook> getOrderBook(
-            @PathVariable("id") UUID id
+            @PathVariable("id") UUID id,
+            @RequestParam("depth") BigDecimal depth,
+            @RequestParam("type") OrderBookType type
     ) {
-        return ResponseEntity.ok(readOnlyRepository.getOrderBookByMarketId(id));
+        return ResponseEntity.ok(orderBookService.getOrderBook(type, getMarket(id), depth, true));
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<Market> getById(
             @PathVariable("id") UUID id
     ) {
-        return ResponseEntity.ok(readOnlyRepository.getMarketById(id)
-                .orElseThrow(() -> new JynxProException(ErrorCode.MARKET_NOT_FOUND)));
+        return ResponseEntity.ok(getMarket(id));
     }
 
     @GetMapping("/{id}/trades")
@@ -71,7 +91,7 @@ public class MarketController extends AbstractController {
     public ResponseEntity<Quote> getQuote(
             @PathVariable("id") UUID id
     ) {
-        return ResponseEntity.ok(readOnlyRepository.getQuoteByMarketId(id));
+        return ResponseEntity.ok(orderBookService.getQuote(getMarket(id), true));
     }
 
     @GetMapping("/{id}/statistics")

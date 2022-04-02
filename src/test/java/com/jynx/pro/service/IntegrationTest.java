@@ -364,7 +364,7 @@ public abstract class IntegrationTest {
                     BigDecimal.valueOf(45610+((long) i * stepSize)), BigDecimal.ONE, MarketSide.SELL, OrderType.LIMIT, makerUser));
             Assertions.assertEquals(sellOrder.getStatus(), OrderStatus.OPEN);
         }
-        OrderBook orderBook = orderBookService.getOrderBookL3(market);
+        OrderBook orderBook = orderBookService.getOrderBook(OrderBookType.L3, market);
         Assertions.assertEquals(orderBook.getAsks().size(), asks);
         Assertions.assertEquals(orderBook.getBids().size(), bids);
         BigDecimal marginBalance = BigDecimal.ZERO;
