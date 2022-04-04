@@ -341,15 +341,13 @@ public class TendermintClientTest extends IntegrationTest {
         TransactionResponse<Order[]> txResponse = tendermintClient.createOrderMany(bulkCreateRequest);
         Assertions.assertEquals(txResponse.getItem().length, 10);
         ResponseEntity<OrderBook> responseEntity = this.restTemplate.getForEntity(
-                String.format("http://localhost:%s/market/%s/order-book", port,
+                String.format("http://localhost:%s/market/%s/order-book?type=L2", port,
                         market.getId().toString()), OrderBook.class);
         OrderBook orderBook = responseEntity.getBody();
         Assertions.assertNotNull(orderBook);
         Assertions.assertEquals(0, orderBook.getAsks().size());
-        Assertions.assertEquals(10, orderBook.getBids().size());
-        for(int i=0; i<10; i++) {
-            Assertions.assertEquals(orderBook.getBids().get(i).getQuantity().doubleValue(), 1d, 0.0001d);
-        }
+        Assertions.assertEquals(1, orderBook.getBids().size());
+        Assertions.assertEquals(orderBook.getBids().get(0).getQuantity().doubleValue(), 10d, 0.0001d);
         List<AmendOrderRequest> amendRequest = new ArrayList<>();
         for(int i=0; i<10; i++) {
             amendRequest.add(new AmendOrderRequest()
@@ -366,15 +364,13 @@ public class TendermintClientTest extends IntegrationTest {
         txResponse = tendermintClient.amendOrderMany(bulkAmendRequest);
         Assertions.assertEquals(txResponse.getItem().length, 10);
         responseEntity = this.restTemplate.getForEntity(
-                String.format("http://localhost:%s/market/%s/order-book", port,
+                String.format("http://localhost:%s/market/%s/order-book?type=L2", port,
                         market.getId().toString()), OrderBook.class);
         orderBook = responseEntity.getBody();
         Assertions.assertNotNull(orderBook);
         Assertions.assertEquals(0, orderBook.getAsks().size());
-        Assertions.assertEquals(10, orderBook.getBids().size());
-        for(int i=0; i<10; i++) {
-            Assertions.assertEquals(orderBook.getBids().get(i).getQuantity().doubleValue(), 10d, 0.0001d);
-        }
+        Assertions.assertEquals(1, orderBook.getBids().size());
+        Assertions.assertEquals(orderBook.getBids().get(0).getQuantity().doubleValue(), 100d, 0.0001d);
         List<CancelOrderRequest> cancelRequest = new ArrayList<>();
         for(int i=0; i<10; i++) {
             cancelRequest.add(new CancelOrderRequest()

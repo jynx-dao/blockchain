@@ -53,8 +53,8 @@ public class MarketController extends AbstractController {
     @GetMapping("/{id}/order-book")
     public ResponseEntity<OrderBook> getOrderBook(
             @PathVariable("id") UUID id,
-            @RequestParam("depth") BigDecimal depth,
-            @RequestParam("type") OrderBookType type
+            @RequestParam(value = "depth", defaultValue = "0.01") BigDecimal depth,
+            @RequestParam(value = "type", defaultValue = "L1") OrderBookType type
     ) {
         return ResponseEntity.ok(orderBookService.getOrderBook(type, getMarket(id), depth, true));
     }
