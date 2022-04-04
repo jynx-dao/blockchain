@@ -812,9 +812,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
      * {@inheritDoc}
      */
     @Override
-    public void echo(Types.RequestEcho request, StreamObserver<Types.ResponseEcho> responseObserver) {
-        Types.ResponseEcho response = Types.ResponseEcho.newBuilder().setMessage(request.getMessage()).build();
-        responseObserver.onNext(response);
+    public void echo(Types.RequestEcho req, StreamObserver<Types.ResponseEcho> responseObserver) {
+        Types.ResponseEcho resp = Types.ResponseEcho.newBuilder().setMessage(req.getMessage()).build();
+        responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
 
@@ -822,9 +822,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
      * {@inheritDoc}
      */
     @Override
-    public void info(Types.RequestInfo request, StreamObserver<Types.ResponseInfo> responseObserver) {
-        Types.ResponseInfo response = Types.ResponseInfo.newBuilder().build();
-        responseObserver.onNext(response);
+    public void info(Types.RequestInfo req, StreamObserver<Types.ResponseInfo> responseObserver) {
+        Types.ResponseInfo resp = Types.ResponseInfo.newBuilder().build();
+        responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
 
@@ -832,9 +832,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
      * {@inheritDoc}
      */
     @Override
-    public void flush(Types.RequestFlush request, StreamObserver<Types.ResponseFlush> responseObserver) {
-        Types.ResponseFlush response = Types.ResponseFlush.newBuilder().build();
-        responseObserver.onNext(response);
+    public void flush(Types.RequestFlush req, StreamObserver<Types.ResponseFlush> responseObserver) {
+        Types.ResponseFlush resp = Types.ResponseFlush.newBuilder().build();
+        responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
 
@@ -842,10 +842,10 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
      * {@inheritDoc}
      */
     @Override
-    public void listSnapshots(Types.RequestListSnapshots request,
+    public void listSnapshots(Types.RequestListSnapshots req,
                               StreamObserver<Types.ResponseListSnapshots> responseObserver) {
         List<Snapshot> snapshots = snapshotService.getLatestSnapshots(10L);
-        Types.ResponseListSnapshots response = Types.ResponseListSnapshots.newBuilder()
+        Types.ResponseListSnapshots resp = Types.ResponseListSnapshots.newBuilder()
                 .addAllSnapshots(snapshots.stream().map(s -> Types.Snapshot.newBuilder()
                         .setChunks(s.getTotalChunks())
                         .setHeight(s.getBlockHeight())
@@ -853,6 +853,22 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                         .setHash(ByteString.copyFromUtf8(s.getHash()))
                         .setMetadata(ByteString.copyFromUtf8(s.getHash()))
                         .build()).collect(Collectors.toList()))
+                .build();
+        responseObserver.onNext(resp);
+        responseObserver.onCompleted();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void offerSnapshot(Types.RequestOfferSnapshot req,
+                              StreamObserver<Types.ResponseOfferSnapshot> responseObserver) {
+        snapshotService.clearState();
+        appStateManager.setBlockHeight(req.getSnapshot().getHeight());
+        appStateManager.setAppState(new BigInteger(req.getAppHash().toByteArray()).intValue());
+        Types.ResponseOfferSnapshot response = Types.ResponseOfferSnapshot.newBuilder()
+                .setResult(Types.ResponseOfferSnapshot.Result.ACCEPT)
                 .build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
@@ -862,23 +878,10 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
      * {@inheritDoc}
      */
     @Override
-    public void offerSnapshot(Types.RequestOfferSnapshot request,
-                              StreamObserver<Types.ResponseOfferSnapshot> responseObserver) {
-        // TODO - should we be checking that this is the right block height here before accepting the snapshot?
-        snapshotService.clearState();
-        Types.ResponseOfferSnapshot response = Types.ResponseOfferSnapshot.newBuilder().build();
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void loadSnapshotChunk(Types.RequestLoadSnapshotChunk request,
+    public void loadSnapshotChunk(Types.RequestLoadSnapshotChunk req,
                                   StreamObserver<Types.ResponseLoadSnapshotChunk> responseObserver) {
         Types.ResponseLoadSnapshotChunk.Builder builder = Types.ResponseLoadSnapshotChunk.newBuilder();
-        Optional<String> chunkContent = snapshotService.getChunkContent(request.getHeight(), request.getChunk());
+        Optional<String> chunkContent = snapshotService.getChunkContent(req.getHeight(), req.getChunk());
         chunkContent.ifPresent(s -> builder.setChunk(ByteString.copyFromUtf8(s)));
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
@@ -888,12 +891,13 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
      * {@inheritDoc}
      */
     @Override
-    public void applySnapshotChunk(Types.RequestApplySnapshotChunk request,
+    public void applySnapshotChunk(Types.RequestApplySnapshotChunk req,
                                    StreamObserver<Types.ResponseApplySnapshotChunk> responseObserver) {
-        snapshotService.saveChunk(request.getChunk().toStringUtf8());
-        // TODO - we definitely need some verification somewhere to ensure we have restored the correct app state
-        Types.ResponseApplySnapshotChunk response = Types.ResponseApplySnapshotChunk.newBuilder().build();
-        responseObserver.onNext(response);
+        snapshotService.saveChunk(req.getChunk().toStringUtf8());
+        Types.ResponseApplySnapshotChunk resp = Types.ResponseApplySnapshotChunk.newBuilder()
+                .setResult(Types.ResponseApplySnapshotChunk.Result.ACCEPT)
+                .build();
+        responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
 }

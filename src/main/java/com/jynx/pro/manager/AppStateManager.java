@@ -11,7 +11,8 @@ import java.util.List;
 public class AppStateManager {
 
     @Getter
-    private int appState;
+    @Setter
+    private int appState = 0;
     @Setter
     @Getter
     private long blockHeight = 0L;
