@@ -104,4 +104,6 @@ public class ErrorCode {
     public static final String ADD_DELEGATION_FAILED = "Failed to add delegation.";
     public static final String VALIDATOR_APPLICATION_FAILED = "Validator application failed.";
     public static final String VALIDATOR_RESIGNATION_FAILED = "Validator resignation failed.";
+    public static final String INSUFFICIENT_TOTAL_DELEGATION = "Minimum total delegation has not been met.";
+    public static final String DISTRIBUTE_REWARDS_FAILED = "Failed to distribute rewards.";
 }

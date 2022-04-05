@@ -13,6 +13,7 @@ import com.jynx.pro.repository.*;
 import com.jynx.pro.request.AddAssetRequest;
 import com.jynx.pro.request.AddMarketRequest;
 import com.jynx.pro.request.CreateOrderRequest;
+import com.jynx.pro.response.TransactionResponse;
 import com.jynx.pro.utils.*;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.DecoderException;
@@ -112,6 +113,10 @@ public abstract class IntegrationTest {
     @Autowired
     protected WithdrawalBatchSignatureRepository withdrawalBatchSignatureRepository;
     @Autowired
+    protected SnapshotChunkRepository snapshotChunkRepository;
+    @Autowired
+    protected SnapshotRepository snapshotRepository;
+    @Autowired
     protected ValidatorRepository validatorRepository;
     @Autowired
     protected AuctionTriggerRepository auctionTriggerRepository;
@@ -135,6 +140,8 @@ public abstract class IntegrationTest {
     protected BlockValidatorRepository blockValidatorRepository;
     @Autowired
     protected DelegationRepository delegationRepository;
+    @Autowired
+    protected OrderBookService orderBookService;
 
     protected static final String ETH_ADDRESS = "0xd7E1236C08731C3632519DCd1A581bFe6876a3B2";
     protected static final String ETH_PRIVATE_KEY = "0xb219d340d8e6aacdca54cecf104e6998b21411c9858ff1d25324a98d38ed034c";
@@ -187,11 +194,49 @@ public abstract class IntegrationTest {
 
     protected void waitForBlockchain() {
         long blockHeight = appStateManager.getBlockHeight();
+        int exit = 1000;
         while(blockHeight < 1) {
             blockHeight = appStateManager.getBlockHeight();
             log.info("Block height = {}", blockHeight);
             sleepUtils.sleep(500L);
+            exit--;
+            if(exit < 0) {
+                break;
+            }
         }
+    }
+
+    protected Proposal getAssetProposal(
+            final long openOffset,
+            final long closeOffset,
+            final long enactOffset,
+            final String name
+    ) {
+        AddAssetRequest request = new AddAssetRequest()
+                .setAddress("0x0")
+                .setName(name)
+                .setDecimalPlaces(5)
+                .setType(AssetType.ERC20);
+        long[] times = proposalTimes(openOffset, closeOffset, enactOffset);
+        request.setOpenTime(times[0]);
+        request.setClosingTime(times[1]);
+        request.setEnactmentTime(times[2]);
+        request.setBridgeNonce("200");
+        request.setNonce(ethereumService.getNonce().toString());
+        String message = jsonUtils.toJson(request);
+        String sig = cryptoUtils.sign(message, PRIVATE_KEY).orElse("");
+        request.setPublicKey(PUBLIC_KEY);
+        request.setSignature(sig);
+        TransactionResponse<Proposal> txResponse = tendermintClient.addAsset(request);
+        return txResponse.getItem();
+    }
+
+    protected Proposal getAssetProposal(
+            final long openOffset,
+            final long closeOffset,
+            final long enactOffset
+    ) {
+        return getAssetProposal(openOffset, closeOffset, enactOffset, "USDC");
     }
 
     protected Asset createAndEnactAsset(
@@ -323,7 +368,7 @@ public abstract class IntegrationTest {
                     BigDecimal.valueOf(45610+((long) i * stepSize)), BigDecimal.ONE, MarketSide.SELL, OrderType.LIMIT, makerUser));
             Assertions.assertEquals(sellOrder.getStatus(), OrderStatus.OPEN);
         }
-        OrderBook orderBook = orderService.getOrderBook(market);
+        OrderBook orderBook = orderBookService.getOrderBook(OrderBookType.L3, market);
         Assertions.assertEquals(orderBook.getAsks().size(), asks);
         Assertions.assertEquals(orderBook.getBids().size(), bids);
         BigDecimal marginBalance = BigDecimal.ZERO;
@@ -427,6 +472,8 @@ public abstract class IntegrationTest {
         eventRepository.deleteAll();
         stakeRepository.deleteAll();
         userRepository.deleteAll();
+        snapshotChunkRepository.deleteAll();
+        snapshotRepository.deleteAll();
         configRepository.deleteAll();
         databaseTransactionManager.commit();
     }
@@ -434,36 +481,56 @@ public abstract class IntegrationTest {
     protected void initializeState(
             final boolean createAsset
     ) {
+        initializeState(createAsset, false);
+    }
+
+    protected void initializeState(
+            final boolean createAsset,
+            final boolean skipConfig
+    ) {
         databaseTransactionManager.createTransaction();
         if(!setupComplete) {
             if(!ganache.isRunning()) {
                 ganache.start();
             }
             ethereumHelper.deploy(ganache.getHost(), ganache.getFirstMappedPort(), ETH_PRIVATE_KEY);
-            ethereumService.setRpcHost(ganache.getHost());
+            ethereumService.setRpcBaseUri(String.format("http://%s", ganache.getHost()));
             ethereumService.setRpcPort(ganache.getFirstMappedPort());
-            Config config = new Config()
-                    .setId(1L)
-                    .setGovernanceTokenAddress(ethereumHelper.getJynxToken().getContractAddress())
-                    .setMinClosingDelay(1L)
-                    .setMinEnactmentDelay(1L)
-                    .setMinOpenDelay(1L)
-                    .setMinProposerStake(1L)
-                    .setNetworkFee(BigDecimal.valueOf(0.001))
-                    .setParticipationThreshold(BigDecimal.valueOf(0.66))
-                    .setApprovalThreshold(BigDecimal.valueOf(0.66))
-                    .setUuidSeed(1L)
-                    .setEthConfirmations(0)
-                    .setActiveValidatorCount(1)
-                    .setBackupValidatorCount(1)
-                    .setAsyncTaskFrequency(1)
-                    .setSnapshotFrequency(1)
-                    .setSnapshotChunkRows(10)
-                    .setValidatorMinDelegation(BigDecimal.ONE)
-                    .setValidatorBond(BigDecimal.ONE)
-                    .setBridgeAddress(ethereumHelper.getJynxProBridge().getContractAddress());
-            configRepository.save(config);
-            configService.setTimestamp(nowAsMillis());
+            if(!skipConfig) {
+                Config config = new Config()
+                        .setId(1L)
+                        .setGovernanceTokenAddress(ethereumHelper.getJynxToken().getContractAddress())
+                        .setMinClosingDelay(1L)
+                        .setMinEnactmentDelay(1L)
+                        .setMinOpenDelay(1L)
+                        .setMinProposerStake(1L)
+                        .setNetworkFee(BigDecimal.valueOf(0.2))
+                        .setParticipationThreshold(BigDecimal.valueOf(0.66))
+                        .setApprovalThreshold(BigDecimal.valueOf(0.66))
+                        .setUuidSeed(1L)
+                        .setMinTotalDelegation(BigDecimal.ZERO)
+                        .setEthConfirmations(0)
+                        .setEthMaxGasPrice(1000000000)
+                        .setValidatorMinEthBalance(BigDecimal.ZERO)
+                        .setActiveValidatorCount(1)
+                        .setBackupValidatorCount(1)
+                        .setAsyncTaskFrequency(1)
+                        .setSnapshotFrequency(1)
+                        .setSnapshotChunkRows(10)
+                        .setValidatorMinDelegation(BigDecimal.ONE)
+                        .setValidatorBond(BigDecimal.ONE)
+                        .setValidatorSigningThreshold(BigDecimal.valueOf(0.66))
+                        .setBulkOrderLimit(25)
+                        .setExitAuctionRatio(BigDecimal.valueOf(0.8))
+                        .setWithdrawalBatchFrequency(60 * 60 * 4L)
+                        .setWithdrawalDelay(60L)
+                        .setWithdrawalBatchLimit(100)
+                        .setBridgeAddress(ethereumHelper.getJynxProBridge().getContractAddress());
+                configRepository.save(config);
+                configService.setTimestamp(nowAsMillis());
+            }
+            databaseTransactionManager.commit();
+            databaseTransactionManager.createTransaction();
             ethereumService.initializeFilters();
             setupComplete = true;
         }

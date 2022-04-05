@@ -4,10 +4,11 @@ import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.handler.SocketHandler;
 import com.jynx.pro.model.OrderBook;
-import com.jynx.pro.model.OrderBookItem;
 import com.jynx.pro.repository.OrderHistoryRepository;
 import com.jynx.pro.repository.OrderRepository;
+import com.jynx.pro.repository.ReadOnlyRepository;
 import com.jynx.pro.request.*;
 import com.jynx.pro.utils.UUIDUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,8 @@ public class OrderService {
     @Autowired
     private OrderRepository orderRepository;
     @Autowired
+    private ReadOnlyRepository readOnlyRepository;
+    @Autowired
     private TradeService tradeService;
     @Autowired
     private MarketService marketService;
@@ -34,13 +37,15 @@ public class OrderService {
     @Autowired
     private PositionService positionService;
     @Autowired
+    private OrderBookService orderBookService;
+    @Autowired
     private UUIDUtils uuidUtils;
     @Autowired
     private ConfigService configService;
     @Autowired
     private OrderHistoryRepository orderHistoryRepository;
-
-    private static final int MAX_BULK = 25; // TODO - should be configured at network level
+    @Autowired
+    private SocketHandler socketHandler;
 
     /**
      * Gets the opposite {@link MarketSide}
@@ -65,7 +70,7 @@ public class OrderService {
     public BigDecimal getMidPrice(
             final Market market
     ) {
-        OrderBook orderBook = getOrderBook(market);
+        OrderBook orderBook = orderBookService.getOrderBook(OrderBookType.L3, market);
         if(orderBook.getAsks().size() == 0 || orderBook.getBids().size() == 0) {
             return market.getLastPrice();
         }
@@ -81,11 +86,28 @@ public class OrderService {
      *
      * @return a list of {@link Order}s
      */
-    private List<Order> getSideOfBook(
+    public List<Order> getSideOfBook(
             final Market market,
             final MarketSide side
     ) {
-        List<Order> orders = getOpenLimitOrders(market).stream()
+        return getSideOfBook(market, side, false);
+    }
+
+    /**
+     * Get the orders from one side of the order book of a given {@link Market}
+     *
+     * @param market the {@link Market}
+     * @param side the {@link MarketSide}
+     * @param readOnly use static data
+     *
+     * @return a list of {@link Order}s
+     */
+    public List<Order> getSideOfBook(
+            final Market market,
+            final MarketSide side,
+            final boolean readOnly
+    ) {
+        List<Order> orders = getOpenLimitOrders(market, readOnly).stream()
                 .filter(o -> o.getSide().equals(side))
                 .sorted(Comparator.comparing(Order::getPrice).thenComparing(Order::getPriority))
                 .collect(Collectors.toList());
@@ -93,32 +115,6 @@ public class OrderService {
             orders.sort(Comparator.comparing(Order::getPrice).reversed().thenComparing(Order::getPriority));
         }
         return orders;
-    }
-
-    /**
-     * Gets the current {@link OrderBook} of given {@link Market}
-     *
-     * @param market the {@link Market}
-     *
-     * @return the {@link OrderBook}
-     */
-    public OrderBook getOrderBook(
-            final Market market
-    ) {
-        // TODO - need to group by price point
-        // TODO - need to add optional limit parameter
-        OrderBook orderBook = new OrderBook();
-        List<OrderBookItem> bids = getSideOfBook(market, MarketSide.BUY)
-                .stream()
-                .map(o -> new OrderBookItem().setQuantity(o.getRemainingQuantity()).setPrice(o.getPrice()))
-                .collect(Collectors.toList());
-        List<OrderBookItem> asks = getSideOfBook(market, MarketSide.SELL)
-                .stream()
-                .map(o -> new OrderBookItem().setQuantity(o.getRemainingQuantity()).setPrice(o.getPrice()))
-                .collect(Collectors.toList());
-        orderBook.setAsks(asks);
-        orderBook.setBids(bids);
-        return orderBook;
     }
 
     /**
@@ -131,7 +127,25 @@ public class OrderService {
     public List<Order> getOpenLimitOrders(
             final Market market
     ) {
+        return getOpenLimitOrders(market, false);
+    }
+
+    /**
+     * Get all open limit orders for given {@link Market}
+     *
+     * @param market the {@link Market}
+     * @param readOnly use static data
+     *
+     * @return a list of {@link Order}s
+     */
+    public List<Order> getOpenLimitOrders(
+            final Market market,
+            final boolean readOnly
+    ) {
         List<OrderStatus> statusList = Arrays.asList(OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED);
+        if(readOnly) {
+            return readOnlyRepository.getOrdersByStatusInAndTypeAndMarket(statusList, OrderType.LIMIT, market);
+        }
         return orderRepository.findByStatusInAndTypeAndMarket(statusList, OrderType.LIMIT, market);
     }
 
@@ -158,9 +172,10 @@ public class OrderService {
             throw new JynxProException(ErrorCode.INVALID_ORDER_STATUS);
         }
         order.setStatus(OrderStatus.CANCELED);
-        order = orderRepository.save(order);
+        order = save(order);
         BigDecimal margin = getMarginRequirement(order.getMarket(), order.getUser());
         accountService.allocateMargin(request.getUser(), order.getMarket(), margin);
+        sendOrderBookUpdates(order.getMarket());
         OrderHistory orderHistory = new OrderHistory()
                 .setOrder(order)
                 .setId(uuidUtils.next())
@@ -214,7 +229,7 @@ public class OrderService {
                 .setReduceOnly(request.getReduceOnly())
                 .setType(request.getType())
                 .setPriority(getLimitOrderPriority(market, request.getSide(), request.getPrice()));
-        order = orderRepository.save(order);
+        order = save(order);
         accountService.allocateMargin(request.getUser(), market);
         handleMarkPriceChange(market, market.getLastPrice());
         return order;
@@ -273,8 +288,8 @@ public class OrderService {
                 break;
             }
         }
-        orderRepository.saveAll(passiveOrders);
-        Order takerOrder = orderRepository.save(order);
+        passiveOrders.forEach(this::save);
+        Order takerOrder = save(order);
         handleMarkPriceChange(market, price);
         return takerOrder;
     }
@@ -294,7 +309,6 @@ public class OrderService {
     ) {
         BigDecimal originalMarkPrice = market.getMarkPrice();
         int dps = market.getSettlementAsset().getDecimalPlaces();
-        // TODO - should the mark price come from the settlement price source?
         BigDecimal markPrice = getMidPrice(market);
         marketService.updateLastPrice(lastPrice, markPrice, market);
         positionService.updatePassiveLiquidity(market);
@@ -403,10 +417,10 @@ public class OrderService {
         if(quantity.doubleValue() > passiveVolume.doubleValue()) {
             order.setStatus(OrderStatus.REJECTED);
             order.setRejectedReason(ErrorCode.INSUFFICIENT_PASSIVE_VOLUME);
-            orderRepository.save(order);
+            save(order);
             throw new JynxProException(ErrorCode.INSUFFICIENT_PASSIVE_VOLUME);
         }
-        order = orderRepository.save(order);
+        order = save(order);
         BigDecimal margin = getMarginRequirementWithNewOrder(market, side, quantity, price, user);
         accountService.allocateMargin(user, market, margin);
         return matchOrders(passiveOrders, order, market);
@@ -498,7 +512,7 @@ public class OrderService {
         if(market.getStatus().equals(MarketStatus.AUCTION) && isStopTriggered(order, triggerPrice)) {
             throw new JynxProException(ErrorCode.MARKET_ORDER_NOT_SUPPORTED);
         }
-        order = orderRepository.save(order);
+        order = save(order);
         accountService.allocateMargin(request.getUser(), market);
         if(isStopTriggered(order, triggerPrice)) {
             executeStopLoss(order, market);
@@ -544,7 +558,7 @@ public class OrderService {
                 .setRemainingQuantity(request.getQuantity())
                 .setPrice(request.getPrice())
                 .setPriority(getLimitOrderPriority(market, request.getSide(), request.getPrice()));
-        order = orderRepository.save(order);
+        order = save(order);
         accountService.allocateMargin(request.getUser(), market);
         return matchOrders(passiveOrders, order, market);
     }
@@ -610,6 +624,7 @@ public class OrderService {
         } else {
             order = createMarketOrder(request, market);
         }
+        sendOrderBookUpdates(order.getMarket());
         OrderHistory orderHistory = new OrderHistory()
                 .setOrder(order)
                 .setId(uuidUtils.next())
@@ -617,6 +632,22 @@ public class OrderService {
                 .setUpdated(configService.getTimestamp());
         orderHistoryRepository.save(orderHistory);
         return order;
+    }
+
+    /**
+     * Send order book updates over web sockets
+     *
+     * @param market {@link Market}
+     */
+    public void sendOrderBookUpdates(
+            final Market market
+    ) {
+        socketHandler.sendMessage(WebSocketChannelType.ORDER_BOOK_L1, market.getId(),
+                orderBookService.getOrderBook(OrderBookType.L1, market));
+        socketHandler.sendMessage(WebSocketChannelType.ORDER_BOOK_L2, market.getId(),
+                orderBookService.getOrderBook(OrderBookType.L2, market));
+        socketHandler.sendMessage(WebSocketChannelType.ORDER_BOOK_L3, market.getId(),
+                orderBookService.getOrderBook(OrderBookType.L3, market));
     }
 
     /**
@@ -749,7 +780,7 @@ public class OrderService {
             }
         }
         if(!Objects.isNull(request.getPrice())) {
-            OrderBook orderBook = getOrderBook(order.getMarket());
+            OrderBook orderBook = orderBookService.getOrderBook(OrderBookType.L3, order.getMarket());
             if(order.getSide().equals(MarketSide.BUY) && orderBook.getAsks().size() > 0 &&
                     orderBook.getAsks().get(0).getPrice().doubleValue() < request.getPrice().doubleValue()) {
                 throw new JynxProException(ErrorCode.CANNOT_AMEND_WOULD_EXECUTE);
@@ -770,8 +801,9 @@ public class OrderService {
         BigDecimal combinedMargin = getMarginRequirementWithNewOrder(order.getMarket(), order.getSide(),
                 order.getRemainingQuantity(), order.getPrice(), request.getUser());
         BigDecimal newMargin = combinedMargin.subtract(originalMargin);
-        order = orderRepository.save(order);
+        order = save(order);
         accountService.allocateMargin(request.getUser(), order.getMarket(), newMargin);
+        sendOrderBookUpdates(order.getMarket());
         OrderHistory orderHistory = new OrderHistory()
                 .setOrder(order)
                 .setId(uuidUtils.next())
@@ -795,7 +827,7 @@ public class OrderService {
     public List<Order> createMany(
             final BulkCreateOrderRequest request
     ) {
-        if(request.getOrders().size() > MAX_BULK) {
+        if(request.getOrders().size() > configService.get().getBulkOrderLimit()) {
             throw new JynxProException(ErrorCode.MAX_BULK_EXCEEDED);
         }
         request.getOrders().forEach(o -> o.setUser(request.getUser()));
@@ -812,7 +844,7 @@ public class OrderService {
     public List<Order> amendMany(
             final BulkAmendOrderRequest request
     ) {
-        if(request.getOrders().size() > MAX_BULK) {
+        if(request.getOrders().size() > configService.get().getBulkOrderLimit()) {
             throw new JynxProException(ErrorCode.MAX_BULK_EXCEEDED);
         }
         request.getOrders().forEach(o -> o.setUser(request.getUser()));
@@ -829,7 +861,7 @@ public class OrderService {
     public List<Order> cancelMany(
             final BulkCancelOrderRequest request
     ) {
-        if(request.getOrders().size() > MAX_BULK) {
+        if(request.getOrders().size() > configService.get().getBulkOrderLimit()) {
             throw new JynxProException(ErrorCode.MAX_BULK_EXCEEDED);
         }
         request.getOrders().forEach(o -> o.setUser(request.getUser()));
@@ -1000,5 +1032,20 @@ public class OrderService {
         if(account.getBalance().compareTo(margin) < 0) {
             throw new JynxProException(ErrorCode.INSUFFICIENT_MARGIN);
         }
+    }
+
+    /**
+     * Save an order
+     *
+     * @param order {@link Order}
+     *
+     * @return {@link Order}
+     */
+    public Order save(
+            final Order order
+    ) {
+        socketHandler.sendMessage(WebSocketChannelType.ORDERS,
+                order.getUser().getPublicKey(), order.getMarket().getId(), order);
+        return orderRepository.save(order);
     }
 }

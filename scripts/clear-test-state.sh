@@ -15,3 +15,4 @@ export SNAPSHOT_SERVICE_TEST=false
 export STAKE_SERVICE_TEST=false
 export VALIDATOR_SERVICE_TEST=false
 export CRYPTO_UTILS_TEST=false
+export ORDER_BOOK_SERVICE_TEST=false

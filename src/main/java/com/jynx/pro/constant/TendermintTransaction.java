@@ -33,5 +33,6 @@ public enum TendermintTransaction {
     CONFIRM_ETHEREUM_EVENTS,
     SETTLE_MARKETS,
     SYNC_PROPOSALS,
+    DISTRIBUTE_REWARDS,
     UNKNOWN
 }

@@ -36,7 +36,9 @@ import org.web3j.protocol.core.methods.response.Log;
 import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.protocol.http.HttpService;
 import org.web3j.tx.gas.DefaultGasProvider;
+import org.web3j.tx.gas.StaticGasProvider;
 
+import java.io.IOException;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
@@ -49,8 +51,8 @@ import java.util.stream.Collectors;
 public class EthereumService {
 
     @Setter
-    @Value("${ethereum.rpc.host}")
-    private String rpcHost;
+    @Value("${ethereum.rpc.base.uri}")
+    private String rpcBaseUri;
     @Setter
     @Value("${ethereum.rpc.port}")
     private Integer rpcPort;
@@ -69,6 +71,9 @@ public class EthereumService {
     private CryptoUtils cryptoUtils;
     @Autowired
     private TendermintClient tendermintClient;
+
+    @Setter
+    private boolean filtersInitialized = false;
 
     @Setter
     @Value("${validator.private.key}")
@@ -99,6 +104,19 @@ public class EthereumService {
     private final String ADD_STAKE_HASH = EventEncoder.encode(ADD_STAKE);
     private final String REMOVE_STAKE_HASH = EventEncoder.encode(REMOVE_STAKE);
     private final String DEPOSIT_ASSET_HASH = EventEncoder.encode(DEPOSIT_ASSET);
+
+    /**
+     * Get current gas price
+     *
+     * @return the gas price
+     */
+    public BigInteger getGasPrice() {
+        try {
+            return getWeb3j().ethGasPrice().send().getGasPrice();
+        } catch (IOException e) {
+            return BigInteger.ZERO;
+        }
+    }
 
     /**
      * Decode address event parameters from Ethereum
@@ -242,8 +260,9 @@ public class EthereumService {
      * Initialize the Ethereum event filters
      */
     public void initializeFilters() {
+        if(filtersInitialized) return;
         EthFilter bridgeFilter = new EthFilter(DefaultBlockParameterName.EARLIEST,
-                DefaultBlockParameterName.LATEST, configService.get().getBridgeAddress());
+                DefaultBlockParameterName.LATEST, configService.getStatic().getBridgeAddress());
         getWeb3j().ethLogFlowable(bridgeFilter).subscribe(ethLog -> {
             String eventHash = ethLog.getTopics().get(0);
             String txHash = ethLog.getTransactionHash();
@@ -282,6 +301,7 @@ public class EthereumService {
                 tendermintClient.depositAsset(request);
             }
         });
+        filtersInitialized = true;
     }
 
     /**
@@ -290,9 +310,7 @@ public class EthereumService {
      * @return {@link Web3j} interface
      */
     private Web3j getWeb3j() {
-        // TODO - allow https or http
-        String provider = String.format("http://%s:%s", rpcHost, rpcPort);
-        return Web3j.build(new HttpService(provider));
+        return Web3j.build(new HttpService(String.format("%s:%s", rpcBaseUri, rpcPort)));
     }
 
     /**
@@ -306,7 +324,16 @@ public class EthereumService {
             final String contractAddress
     ) {
         return ERC20Detailed.load(contractAddress, getWeb3j(),
-                Credentials.create(ethereumPrivateKey), new DefaultGasProvider());
+                Credentials.create(ethereumPrivateKey), getGasProvider());
+    }
+
+    /**
+     * Get gas provider
+     *
+     * @return {@link StaticGasProvider}
+     */
+    private StaticGasProvider getGasProvider() {
+        return new StaticGasProvider(getGasPrice(), DefaultGasProvider.GAS_LIMIT);
     }
 
     /**
@@ -371,7 +398,7 @@ public class EthereumService {
         try {
             Credentials credentials = Credentials.create(ethereumPrivateKey);
             JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.getStatic().getBridgeAddress(), getWeb3j(),
-                    credentials, new DefaultGasProvider());
+                    credentials, getGasProvider());
             return jynxProBridge.withdraw_assets(destinations, amounts, assets, nonce, signature).send();
         } catch(Exception e) {
             log.error(e.getMessage(), e);
@@ -423,7 +450,7 @@ public class EthereumService {
         try {
             Credentials credentials = Credentials.create(ethereumPrivateKey);
             JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.get().getBridgeAddress(), getWeb3j(),
-                    credentials, new DefaultGasProvider());
+                    credentials, getGasProvider());
             return jynxProBridge.assets(asset).send();
         } catch(Exception e) {
             log.error(e.getMessage(), e);
@@ -444,7 +471,7 @@ public class EthereumService {
         try {
             Credentials credentials = Credentials.create(ethereumPrivateKey);
             JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.getStatic().getBridgeAddress(), getWeb3j(),
-                    credentials, new DefaultGasProvider());
+                    credentials, getGasProvider());
             return jynxProBridge.used_nonces(new BigInteger(nonce)).send();
         } catch(Exception e) {
             log.error(e.getMessage(), e);
@@ -469,7 +496,7 @@ public class EthereumService {
         try {
             Credentials credentials = Credentials.create(ethereumPrivateKey);
             JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.getStatic().getBridgeAddress(), getWeb3j(),
-                    credentials, new DefaultGasProvider());
+                    credentials, getGasProvider());
             return jynxProBridge.add_asset(asset, nonce, signature).send();
         } catch(Exception e) {
             log.error(e.getMessage(), e);
@@ -494,7 +521,7 @@ public class EthereumService {
         try {
             Credentials credentials = Credentials.create(ethereumPrivateKey);
             JynxPro_Bridge jynxProBridge = JynxPro_Bridge.load(configService.getStatic().getBridgeAddress(), getWeb3j(),
-                    credentials, new DefaultGasProvider());
+                    credentials, getGasProvider());
             return jynxProBridge.remove_asset(asset, nonce, signature).send();
         } catch(Exception e) {
             log.error(e.getMessage(), e);
@@ -546,6 +573,33 @@ public class EthereumService {
      */
     public BigInteger getNonce() {
         return new BigInteger(256, new SecureRandom());
+    }
+
+    /**
+     * Get the validator's Ethereum address
+     *
+     * @return the address
+     */
+    public String getAddress() {
+        return Credentials.create(ethereumPrivateKey).getAddress();
+    }
+
+    /**
+     * Get Ether balance for address
+     *
+     * @param address the address
+     *
+     * @return the balance
+     */
+    public BigDecimal getBalance(
+            final String address
+    ) {
+        try {
+            return priceUtils.fromBigInteger(getWeb3j()
+                    .ethGetBalance(address, DefaultBlockParameterName.LATEST).send().getBalance());
+        } catch (IOException e) {
+            return BigDecimal.ZERO;
+        }
     }
 
     /**

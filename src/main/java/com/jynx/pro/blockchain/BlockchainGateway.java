@@ -19,19 +19,21 @@ import com.jynx.pro.service.*;
 import com.jynx.pro.utils.CryptoUtils;
 import com.jynx.pro.utils.JSONUtils;
 import io.grpc.stub.StreamObserver;
+import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.codec.binary.Hex;
+import org.json.JSONArray;
 import org.json.JSONObject;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import tendermint.abci.ABCIApplicationGrpc;
 import tendermint.abci.Types;
-import tendermint.crypto.Keys;
 
 import javax.annotation.PostConstruct;
 import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -82,12 +84,15 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     private JSONUtils jsonUtils;
     @Autowired
     private CryptoUtils cryptoUtils;
+    @Getter
     @Setter
     @Value("${validator.address}")
     private String validatorAddress;
+    @Getter
     @Setter
     @Value("${validator.private.key}")
     private String validatorPrivateKey;
+    @Getter
     @Setter
     @Value("${validator.public.key}")
     private String validatorPublicKey;
@@ -162,6 +167,11 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                         .setDeliverFn(bridgeUpdateService::executeBridgeUpdates)
                         .setProtectedFn(true)
                         .setRequestType(ExecuteBridgeUpdatesRequest.class));
+        transactionSettings.put(TendermintTransaction.DISTRIBUTE_REWARDS,
+                new TransactionConfig<BatchValidatorRequest>()
+                        .setDeliverFn(accountService::distributeRewards)
+                        .setProtectedFn(true)
+                        .setRequestType(BatchValidatorRequest.class));
     }
 
     /**
@@ -398,10 +408,31 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             SignedRequest request = (SignedRequest) jsonUtils.fromJson(txAsJson,
                     transactionSettings.get(tendermintTx).getRequestType());
             verifySignature(request, transactionSettings.get(tendermintTx).isProtectedFn());
+            checkDelegationThreshold(tendermintTx);
             return new CheckTxResult().setCode(0);
         } catch(Exception e) {
             log.error(e.getMessage(), e);
             return new CheckTxResult().setCode(1).setError(e.getMessage());
+        }
+    }
+
+    /**
+     * Check if the minimum total delegation has been met
+     *
+     * @param tendermintTx {@link TendermintTransaction}
+     */
+    private void checkDelegationThreshold(
+            final TendermintTransaction tendermintTx
+    ) {
+        List<TendermintTransaction> validTransactions = List.of(TendermintTransaction.ADD_DELEGATION,
+                TendermintTransaction.REMOVE_DELEGATION);
+        if(!validTransactions.contains(tendermintTx)) {
+            List<Validator> validators = readOnlyRepository.getAllByEntity(Validator.class);
+            BigDecimal totalDelegation = validators.stream().map(Validator::getDelegation)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+            if(totalDelegation.doubleValue() < configService.getStatic().getMinTotalDelegation().doubleValue()) {
+                throw new JynxProException(ErrorCode.INSUFFICIENT_TOTAL_DELEGATION);
+            }
         }
     }
 
@@ -468,6 +499,20 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final long blockHeight
     ) {
         executorService.submit(() -> tendermintClient.settleMarkets(
+                getBatchRequest(proposerAddress, blockHeight)));
+    }
+
+    /**
+     * Distribute rewards
+     *
+     * @param proposerAddress the proposer address
+     * @param blockHeight the current block height
+     */
+    private void distributeRewards(
+            final String proposerAddress,
+            final long blockHeight
+    ) {
+        executorService.submit(() -> tendermintClient.distributeRewards(
                 getBatchRequest(proposerAddress, blockHeight)));
     }
 
@@ -540,10 +585,13 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                     List<UUID> ids = batches.stream().map(WithdrawalBatch::getId).collect(Collectors.toList());
                     DebitWithdrawalsRequest request = new DebitWithdrawalsRequest().setBatchIds(ids);
                     ethereumService.addSignatureToRequest(request);
-                    // TODO - we should check that the node has sufficient gas before broadcasting the Tendermint tx
-                    tendermintClient.debitWithdrawals(request);
-                    // TODO - how do we undo the previous Tendermint transactions if the node has insufficient gas??
-                    withdrawalService.withdrawSignedBatches(batches);
+                    BigDecimal balance = ethereumService.getBalance(ethereumService.getAddress());
+                    BigInteger gasPrice = ethereumService.getGasPrice().divide(BigInteger.valueOf(1000000000));
+                    if(balance.doubleValue() >= configService.getStatic().getValidatorMinEthBalance().doubleValue() &&
+                            gasPrice.intValue() < configService.getStatic().getEthMaxGasPrice()) {
+                        tendermintClient.debitWithdrawals(request);
+                        withdrawalService.withdrawSignedBatches(batches);
+                    }
                 }
             } catch(Exception e) {
                 log.error(e.getMessage(), e);
@@ -579,10 +627,13 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                     List<UUID> ids = updates.stream().map(BridgeUpdate::getId).collect(Collectors.toList());
                     ExecuteBridgeUpdatesRequest request = new ExecuteBridgeUpdatesRequest().setUpdateIds(ids);
                     ethereumService.addSignatureToRequest(request);
-                    // TODO - we should check that the node has sufficient gas before broadcasting the Tendermint tx
-                    tendermintClient.executeBridgeUpdates(request);
-                    // TODO - how do we undo the previous Tendermint transactions if the node has insufficient gas??
-                    bridgeUpdateService.processSignedUpdates(updates);
+                    BigDecimal balance = ethereumService.getBalance(ethereumService.getAddress());
+                    BigInteger gasPrice = ethereumService.getGasPrice().divide(BigInteger.valueOf(1000000000));
+                    if(balance.doubleValue() >= configService.getStatic().getValidatorMinEthBalance().doubleValue() &&
+                            gasPrice.intValue() < configService.getStatic().getEthMaxGasPrice()) {
+                        tendermintClient.executeBridgeUpdates(request);
+                        bridgeUpdateService.processSignedUpdates(updates);
+                    }
                 }
             } catch(Exception e) {
                 log.error(e.getMessage(), e);
@@ -600,6 +651,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
             final String proposerAddress,
             final long blockHeight
     ) {
+        // TODO - the frequency of each task should be defined independently
         confirmEthereumEvents(proposerAddress, blockHeight);
         settleMarkets(proposerAddress, blockHeight);
         syncProposals(proposerAddress, blockHeight);
@@ -609,34 +661,33 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         withdrawSignedBatches();
         signBridgeUpdates();
         executeBridgeUpdates();
+        distributeRewards(proposerAddress, blockHeight);
+        // TODO - add a task to build the candlestick data
+        // TODO - add a task to archive 'old' data
     }
 
     /**
-     * Update the active validator set
+     * Get the ETH address of a validator from Genesis
      *
-     * @param blockHeight the current block height
-     * @param builder {@link Types.ResponseEndBlock.Builder}
+     * @param validators {@link JSONArray} of validator config
+     *
+     * @return the ETH address
      */
-    private void updateValidators(
-            final long blockHeight,
-            final Types.ResponseEndBlock.Builder builder
+    private String getEthAddressFromGenesis(
+            final JSONArray validators,
+            final String publicKey
     ) {
-        List<Validator> activeValidators = validatorService.getActiveSet();
-        List<Validator> validators = validatorService.getAll();
-        List<UUID> validatorIds = validators.stream().map(Validator::getId).collect(Collectors.toList());
-        List<Validator> nonActiveValidators = validators.stream()
-                .filter(v -> !validatorIds.contains(v.getId())).collect(Collectors.toList());
-        nonActiveValidators.forEach(v -> v.setDelegation(BigDecimal.ZERO));
-        activeValidators.addAll(nonActiveValidators);
-        for(Validator validator : activeValidators) {
-            ByteString key = ByteString.copyFrom(Base64.getDecoder().decode(validator.getPublicKey()));
-            Types.ValidatorUpdate validatorUpdate = Types.ValidatorUpdate.newBuilder()
-                    .setPower(validator.getDelegation().longValue())
-                    .setPubKey(Keys.PublicKey.newBuilder().setEd25519(key).build())
-                    .build();
-            builder.addValidatorUpdates(validatorUpdate);
+        String ethAddress = null;
+        for(int i=0; i<validators.length(); i++) {
+            JSONObject obj1 = validators.optJSONObject(i);
+            if(obj1 != null) {
+                JSONObject obj2 = obj1.optJSONObject(publicKey);
+                if(obj2 != null) {
+                    ethAddress = obj2.optString("ethAddress");
+                }
+            }
         }
-        validatorService.saveBlockValidators(blockHeight);
+        return ethAddress;
     }
 
     /**
@@ -648,22 +699,26 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
         Types.ResponseInitChain resp = Types.ResponseInitChain.newBuilder().build();
         databaseTransactionManager.createTransaction();
         String appState = request.getAppStateBytes().toStringUtf8();
+        JSONArray validators = new JSONArray();
         try {
-            configService.initializeNetworkConfig(new JSONObject(appState));
+            JSONObject appStateAsJson = new JSONObject(appState);
+            validators = appStateAsJson.getJSONArray("validators");
+            configService.initializeNetworkConfig(appStateAsJson);
             snapshotService.initializeSnapshots();
         } catch (Exception e) {
             log.error(e.getMessage(), e);
             log.error(ErrorCode.INVALID_APP_STATE);
         }
-        // TODO - the chain should not start until the genesis validator's have sufficient delegation
-        // TODO - we'll implement this elsewhere, by effectively blocking all transactions until the
-        // TODO - required threshold has been met
+        final JSONArray finalValidators = validators;
         request.getValidatorsList().forEach(v -> {
             String publicKey = Base64.getEncoder().encodeToString(
                     request.getValidatorsList().get(0).getPubKey().getEd25519().toByteArray());
-            validatorService.addFromGenesis(publicKey);
+            String address = validatorService.getTendermintAddress(publicKey);
+            String ethAddress = getEthAddressFromGenesis(finalValidators, publicKey);
+            validatorService.addFromGenesis(publicKey, address, ethAddress);
         });
         databaseTransactionManager.commit();
+        ethereumService.initializeFilters();
         responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
@@ -688,9 +743,10 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
      */
     @Override
     public void beginBlock(Types.RequestBeginBlock req, StreamObserver<Types.ResponseBeginBlock> responseObserver) {
-        // TODO - in here we can track the performance of each validator by looking at LastCommitInfo
         Types.ResponseBeginBlock resp = Types.ResponseBeginBlock.newBuilder().build();
         databaseTransactionManager.createTransaction();
+        validatorService.updateValidatorPerformance(req.getByzantineValidatorsList(),
+                req.getLastCommitInfo().getVotesList(), req.getHeader().getHeight()-1);
         configService.setTimestamp(getBlockTimeAsMillis(req.getHeader().getTime()));
         String proposerAddress = Hex.encodeHexString(req.getHeader().getProposerAddress().toByteArray());
         long blockHeight = req.getHeader().getHeight();
@@ -709,7 +765,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
     public void endBlock(Types.RequestEndBlock req, StreamObserver<Types.ResponseEndBlock> responseObserver) {
         Types.ResponseEndBlock.Builder builder = Types.ResponseEndBlock.newBuilder();
         appStateManager.setBlockHeight(req.getHeight());
-        updateValidators(req.getHeight(), builder);
+        validatorService.updateValidators(req.getHeight(), builder);
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
     }
@@ -745,7 +801,7 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                 .build();
         long blockHeight = appStateManager.getBlockHeight();
         if(blockHeight % configService.getStatic().getSnapshotFrequency() == 0 && enableSnapshots) {
-            snapshotService.capture(blockHeight); // TODO - this should happen on another Thread !?
+            snapshotService.capture(blockHeight);
         }
         databaseTransactionManager.commit();
         responseObserver.onNext(resp);
@@ -756,9 +812,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
      * {@inheritDoc}
      */
     @Override
-    public void echo(Types.RequestEcho request, StreamObserver<Types.ResponseEcho> responseObserver) {
-        Types.ResponseEcho response = Types.ResponseEcho.newBuilder().setMessage(request.getMessage()).build();
-        responseObserver.onNext(response);
+    public void echo(Types.RequestEcho req, StreamObserver<Types.ResponseEcho> responseObserver) {
+        Types.ResponseEcho resp = Types.ResponseEcho.newBuilder().setMessage(req.getMessage()).build();
+        responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
 
@@ -766,9 +822,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
      * {@inheritDoc}
      */
     @Override
-    public void info(Types.RequestInfo request, StreamObserver<Types.ResponseInfo> responseObserver) {
-        Types.ResponseInfo response = Types.ResponseInfo.newBuilder().build();
-        responseObserver.onNext(response);
+    public void info(Types.RequestInfo req, StreamObserver<Types.ResponseInfo> responseObserver) {
+        Types.ResponseInfo resp = Types.ResponseInfo.newBuilder().build();
+        responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
 
@@ -776,9 +832,9 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
      * {@inheritDoc}
      */
     @Override
-    public void flush(Types.RequestFlush request, StreamObserver<Types.ResponseFlush> responseObserver) {
-        Types.ResponseFlush response = Types.ResponseFlush.newBuilder().build();
-        responseObserver.onNext(response);
+    public void flush(Types.RequestFlush req, StreamObserver<Types.ResponseFlush> responseObserver) {
+        Types.ResponseFlush resp = Types.ResponseFlush.newBuilder().build();
+        responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
 
@@ -786,10 +842,10 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
      * {@inheritDoc}
      */
     @Override
-    public void listSnapshots(Types.RequestListSnapshots request,
+    public void listSnapshots(Types.RequestListSnapshots req,
                               StreamObserver<Types.ResponseListSnapshots> responseObserver) {
         List<Snapshot> snapshots = snapshotService.getLatestSnapshots(10L);
-        Types.ResponseListSnapshots response = Types.ResponseListSnapshots.newBuilder()
+        Types.ResponseListSnapshots resp = Types.ResponseListSnapshots.newBuilder()
                 .addAllSnapshots(snapshots.stream().map(s -> Types.Snapshot.newBuilder()
                         .setChunks(s.getTotalChunks())
                         .setHeight(s.getBlockHeight())
@@ -797,6 +853,22 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
                         .setHash(ByteString.copyFromUtf8(s.getHash()))
                         .setMetadata(ByteString.copyFromUtf8(s.getHash()))
                         .build()).collect(Collectors.toList()))
+                .build();
+        responseObserver.onNext(resp);
+        responseObserver.onCompleted();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
+    public void offerSnapshot(Types.RequestOfferSnapshot req,
+                              StreamObserver<Types.ResponseOfferSnapshot> responseObserver) {
+        snapshotService.clearState();
+        appStateManager.setBlockHeight(req.getSnapshot().getHeight());
+        appStateManager.setAppState(new BigInteger(req.getAppHash().toByteArray()).intValue());
+        Types.ResponseOfferSnapshot response = Types.ResponseOfferSnapshot.newBuilder()
+                .setResult(Types.ResponseOfferSnapshot.Result.ACCEPT)
                 .build();
         responseObserver.onNext(response);
         responseObserver.onCompleted();
@@ -806,23 +878,10 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
      * {@inheritDoc}
      */
     @Override
-    public void offerSnapshot(Types.RequestOfferSnapshot request,
-                              StreamObserver<Types.ResponseOfferSnapshot> responseObserver) {
-        // TODO - should we be checking that this is the right block height here before accepting the snapshot?
-        snapshotService.clearState();
-        Types.ResponseOfferSnapshot response = Types.ResponseOfferSnapshot.newBuilder().build();
-        responseObserver.onNext(response);
-        responseObserver.onCompleted();
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    @Override
-    public void loadSnapshotChunk(Types.RequestLoadSnapshotChunk request,
+    public void loadSnapshotChunk(Types.RequestLoadSnapshotChunk req,
                                   StreamObserver<Types.ResponseLoadSnapshotChunk> responseObserver) {
         Types.ResponseLoadSnapshotChunk.Builder builder = Types.ResponseLoadSnapshotChunk.newBuilder();
-        Optional<String> chunkContent = snapshotService.getChunkContent(request.getHeight(), request.getChunk());
+        Optional<String> chunkContent = snapshotService.getChunkContent(req.getHeight(), req.getChunk());
         chunkContent.ifPresent(s -> builder.setChunk(ByteString.copyFromUtf8(s)));
         responseObserver.onNext(builder.build());
         responseObserver.onCompleted();
@@ -832,12 +891,13 @@ public class BlockchainGateway extends ABCIApplicationGrpc.ABCIApplicationImplBa
      * {@inheritDoc}
      */
     @Override
-    public void applySnapshotChunk(Types.RequestApplySnapshotChunk request,
+    public void applySnapshotChunk(Types.RequestApplySnapshotChunk req,
                                    StreamObserver<Types.ResponseApplySnapshotChunk> responseObserver) {
-        snapshotService.saveChunk(request.getChunk().toStringUtf8());
-        // TODO - we definitely need some verification somewhere to ensure we have restored the correct app state
-        Types.ResponseApplySnapshotChunk response = Types.ResponseApplySnapshotChunk.newBuilder().build();
-        responseObserver.onNext(response);
+        snapshotService.saveChunk(req.getChunk().toStringUtf8());
+        Types.ResponseApplySnapshotChunk resp = Types.ResponseApplySnapshotChunk.newBuilder()
+                .setResult(Types.ResponseApplySnapshotChunk.Result.ACCEPT)
+                .build();
+        responseObserver.onNext(resp);
         responseObserver.onCompleted();
     }
 }

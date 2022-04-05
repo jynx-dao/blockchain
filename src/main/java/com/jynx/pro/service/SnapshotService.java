@@ -345,28 +345,6 @@ public class SnapshotService {
     }
 
     /**
-     * Verify that the hash matches
-     *
-     * @param hash the hash
-     * @param blockHeight the current block height
-     */
-    private void verifyHash(
-            final String hash,
-            final long blockHeight
-    ) {
-        try {
-            File hashFile = new File(String.format("%s/hash.json", getBaseDir(blockHeight)));
-            String hashFromFile = FileUtils.readFileToString(hashFile, StandardCharsets.UTF_8);
-            if(!hash.equals(hashFromFile)) {
-                throw new JynxProException(ErrorCode.SNAPSHOT_HASH_MISMATCH);
-            }
-        } catch(Exception e) {
-            log.error(e.getMessage(), e);
-            throw new JynxProException(ErrorCode.SNAPSHOT_HASH_MISMATCH);
-        }
-    }
-
-    /**
      * Get base snapshot directory
      *
      * @param blockHeight the current block height
@@ -399,8 +377,8 @@ public class SnapshotService {
                     .getSnapshotChunksBySnapshotIdAndChunkIndex(snapshot.getId(), chunkIndex);
             if(snapshotChunkOptional.isPresent()) {
                 SnapshotChunk snapshotChunk = snapshotChunkOptional.get();
-                File chunkFile = new File(String.format("%s/%s.json",
-                        getBaseDir(snapshot.getBlockHeight()), snapshotChunk.getFileName()));
+                File chunkFile = new File(String.format("%s/%s.%s.json",
+                        getBaseDir(snapshot.getBlockHeight()), chunkIndex, snapshotChunk.getFileName()));
                 try {
                     String chunkContent = FileUtils.readFileToString(chunkFile, StandardCharsets.UTF_8);
                     return Optional.of(chunkContent);

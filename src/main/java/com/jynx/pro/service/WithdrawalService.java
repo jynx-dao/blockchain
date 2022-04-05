@@ -51,13 +51,16 @@ public class WithdrawalService {
         log.debug(request.toString());
         Optional<WithdrawalBatch> batchOptional = withdrawalBatchRepository.findAll().stream()
                 .max(Comparator.comparing(WithdrawalBatch::getCreated));
-        long timeThreshold = configService.getTimestamp() - (60 * 60 * 4); // TODO - use config variable for withdrawal batch frequency
-        long timeThresholdWithdrawal = configService.getTimestamp() - 60; // TODO - use config variable for withdrawal delay
+        long timeThreshold = configService.getTimestamp() - configService.getStatic().getWithdrawalBatchFrequency();
+        long timeThresholdWithdrawal = configService.getTimestamp() - configService.getStatic().getWithdrawalDelay();
+        int withdrawalBatchLimit = configService.getStatic().getWithdrawalBatchLimit();
         List<Withdrawal> withdrawals = new ArrayList<>();
         if(batchOptional.isEmpty() || batchOptional.get().getCreated() < timeThreshold) {
             withdrawals = withdrawalRepository.findByStatus(WithdrawalStatus.PENDING).stream()
                     .filter(w -> w.getWithdrawalBatch() == null)
                     .filter(w -> w.getCreated() < timeThresholdWithdrawal)
+                    .sorted(Comparator.comparing(Withdrawal::getCreated))
+                    .limit(withdrawalBatchLimit)
                     .collect(Collectors.toList());
             if(withdrawals.size() > 0) {
                 WithdrawalBatch withdrawalBatch = new WithdrawalBatch()
@@ -174,7 +177,8 @@ public class WithdrawalService {
             List<WithdrawalBatchSignature> batchSignatures = readOnlyRepository
                     .getSignatureByWithdrawalBatchId(batch.getId());
             List<Validator> validators = readOnlyRepository.getAllByEntity(Validator.class);
-            double threshold = validators.size() * 0.667; // TODO - use config variable for signature threshold [??]
+            double threshold = validators.size() * configService.getStatic()
+                    .getValidatorSigningThreshold().doubleValue();
             if(batchSignatures.size() >= threshold) {
                 List<Withdrawal> withdrawals = readOnlyRepository.getWithdrawalsByWithdrawalBatchId(batch.getId());
                 List<String> destinations = withdrawals.stream().map(Withdrawal::getDestination)

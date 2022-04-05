@@ -5,17 +5,19 @@ import com.jynx.pro.constant.WithdrawalStatus;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
-import com.jynx.pro.model.OrderBook;
 import com.jynx.pro.request.BatchValidatorRequest;
 import com.jynx.pro.request.CreateWithdrawalRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.json.JSONObject;
-import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
+import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.shaded.org.apache.commons.io.IOUtils;
@@ -67,7 +69,6 @@ public class EthereumServiceTest extends IntegrationTest {
                         .withExposedPorts(26657)
                         .withCommand("node --abci grpc --proxy_app tcp://host.docker.internal:26658")
                         .withExtraHost("host.docker.internal", "host-gateway");
-//        tendermint.withCopyFileToContainer(); // TODO - could be used to copy the app state to genesis [??]
         tendermint.start();
         String dest = "target/priv_validator_key.json";
         tendermint.copyFileFromContainer("/tendermint/config/priv_validator_key.json", dest);
@@ -84,6 +85,7 @@ public class EthereumServiceTest extends IntegrationTest {
     public void shutdown() {
         tendermint.stop();
         appStateManager.setBlockHeight(0);
+        ethereumService.setFiltersInitialized(false);
         clearState();
     }
 
@@ -169,6 +171,8 @@ public class EthereumServiceTest extends IntegrationTest {
     }
 
     private Asset depositAsset() throws Exception {
+        getAssetProposal(1, 2, 3);
+        sleepUtils.sleep(5000L);
         Asset asset = getDai();
         boolean assetActive = ethereumHelper.getJynxProBridge().assets(asset.getAddress()).send();
         Assertions.assertTrue(assetActive);

@@ -1,13 +1,12 @@
 package com.jynx.pro.service;
 
-import com.jynx.pro.constant.DepositStatus;
-import com.jynx.pro.constant.EventType;
-import com.jynx.pro.constant.TransactionType;
-import com.jynx.pro.constant.WithdrawalStatus;
+import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.handler.SocketHandler;
 import com.jynx.pro.repository.*;
+import com.jynx.pro.request.BatchValidatorRequest;
 import com.jynx.pro.request.CreateWithdrawalRequest;
 import com.jynx.pro.request.DepositAssetRequest;
 import com.jynx.pro.request.SingleItemRequest;
@@ -17,7 +16,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
-import java.util.Optional;
+import java.math.RoundingMode;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -46,7 +46,11 @@ public class AccountService {
     @Autowired
     private WithdrawalRepository withdrawalRepository;
     @Autowired
+    private DelegationRepository delegationRepository;
+    @Autowired
     private OrderService orderService;
+    @Autowired
+    private SocketHandler socketHandler;
 
     /**
      * Get an account by user and asset
@@ -83,7 +87,7 @@ public class AccountService {
                     .setAvailableBalance(BigDecimal.ZERO)
                     .setMarginBalance(BigDecimal.ZERO)
                     .setBalance(BigDecimal.ZERO));
-        return accountRepository.save(account);
+        return save(account);
     }
 
     /**
@@ -102,7 +106,7 @@ public class AccountService {
         account.setAvailableBalance(account.getAvailableBalance().add(account.getMarginBalance()));
         account.setMarginBalance(margin);
         account.setAvailableBalance(account.getAvailableBalance().subtract(margin));
-        accountRepository.save(account);
+        save(account);
     }
 
     /**
@@ -140,7 +144,7 @@ public class AccountService {
             account.setBalance(BigDecimal.ZERO);
             account.setAvailableBalance(BigDecimal.ZERO);
             account.setMarginBalance(BigDecimal.ZERO);
-            accountRepository.save(account);
+            save(account);
             positionService.reconcileLiquidatedPosition(position);
         }
     }
@@ -163,7 +167,7 @@ public class AccountService {
         }
         account.setAvailableBalance(account.getAvailableBalance().subtract(request.getAmount()));
         account.setBalance(account.getBalance().subtract(request.getAmount()));
-        accountRepository.save(account);
+        save(account);
         Transaction transaction = new Transaction()
                 .setType(TransactionType.WITHDRAWAL)
                 .setAmount(request.getAmount())
@@ -237,7 +241,7 @@ public class AccountService {
         withdrawal.setStatus(WithdrawalStatus.CANCELED);
         account.setAvailableBalance(account.getAvailableBalance().add(withdrawal.getAmount()));
         account.setBalance(account.getBalance().add(withdrawal.getAmount()));
-        accountRepository.save(account);
+        save(account);
         Transaction transaction = new Transaction()
                 .setType(TransactionType.DEPOSIT)
                 .setAmount(withdrawal.getAmount())
@@ -280,7 +284,7 @@ public class AccountService {
                 .setAsset(deposit.getAsset())
                 .setTimestamp(configService.getTimestamp());
         transactionRepository.save(transaction);
-        accountRepository.save(account);
+        save(account);
         deposit.setStatus(DepositStatus.CREDITED);
         depositRepository.save(deposit);
     }
@@ -323,7 +327,7 @@ public class AccountService {
         Account takerAccount = getAndCreate(taker, market.getSettlementAsset());
         takerAccount.setBalance(takerAccount.getBalance().subtract(takerAmount));
         takerAccount.setAvailableBalance(takerAccount.getAvailableBalance().subtract(takerAmount));
-        accountRepository.save(takerAccount);
+        save(takerAccount);
         Transaction takerTx = new Transaction()
                 .setType(TransactionType.FEE)
                 .setAmount(takerAmount.multiply(BigDecimal.valueOf(-1)))
@@ -339,7 +343,7 @@ public class AccountService {
             Account makerAccount = getAndCreate(maker, market.getSettlementAsset());
             makerAccount.setBalance(makerAccount.getBalance().add(makerAmount));
             makerAccount.setAvailableBalance(makerAccount.getAvailableBalance().add(makerAmount));
-            accountRepository.save(makerAccount);
+            save(makerAccount);
             Transaction makerTx = new Transaction()
                     .setType(TransactionType.FEE)
                     .setAmount(makerAmount)
@@ -358,6 +362,111 @@ public class AccountService {
     }
 
     /**
+     * Distribute the treasury balance to users and validators
+     *
+     * @return {@link List<Asset>}
+     */
+    public List<Asset> distributeRewards(
+            final BatchValidatorRequest request
+    ) {
+        log.debug(request.toString());
+        List<Delegation> delegations = delegationRepository.findAll();
+        BigDecimal totalDelegation = delegations.stream()
+                .map(Delegation::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        Set<User> users = new HashSet<>();
+        Set<Validator> validators = new HashSet<>();
+        Map<UUID, BigDecimal> delegationByUser = new HashMap<>();
+        Map<UUID, BigDecimal> delegationByValidator = new HashMap<>();
+        for(Delegation delegation : delegations) {
+            UUID userId = delegation.getStake().getUser().getId();
+            UUID validatorId = delegation.getValidator().getId();
+            delegationByUser.putIfAbsent(userId, BigDecimal.ZERO);
+            delegationByValidator.putIfAbsent(validatorId, BigDecimal.ZERO);
+            delegationByUser.put(userId, delegationByUser.get(userId).add(delegation.getAmount()));
+            delegationByValidator.put(validatorId, delegationByValidator.get(validatorId).add(delegation.getAmount()));
+            users.add(delegation.getStake().getUser());
+            validators.add(delegation.getValidator());
+        }
+        List<Asset> assets = assetRepository.findAll();
+        for(Asset asset : assets) {
+            distributeUserRewards(users, totalDelegation, delegationByUser, asset);
+            distributeValidatorRewards(validators, totalDelegation, delegationByValidator, asset);
+            asset.setTreasuryBalance(BigDecimal.ZERO);
+        }
+        assetRepository.saveAll(assets);
+        return assets;
+    }
+
+    /**
+     * Distribute validator rewards
+     *
+     * @param validators {@link Set<Validator>}
+     * @param totalDelegation total delegated stake
+     * @param delegationByValidator delegation by validator ID
+     * @param asset {@link Asset}
+     */
+    private void distributeValidatorRewards(
+            final Set<Validator> validators,
+            final BigDecimal totalDelegation,
+            final Map<UUID, BigDecimal> delegationByValidator,
+            final Asset asset
+    ) {
+        int dps = asset.getDecimalPlaces();
+        for(Validator validator : validators) {
+            BigDecimal validatorShare = delegationByValidator.get(validator.getId())
+                    .divide(totalDelegation, dps, RoundingMode.HALF_UP);
+            BigDecimal validatorReward = asset.getTreasuryBalance().multiply(validatorShare)
+                    .multiply(configService.get().getNetworkFee()).multiply(BigDecimal.valueOf(validator.getScore()));
+            Account account = getAndCreate(validator.getUser(), asset);
+            Transaction tx = new Transaction()
+                    .setType(TransactionType.REWARD_CREDIT)
+                    .setAmount(validatorReward)
+                    .setUser(validator.getUser())
+                    .setAsset(asset)
+                    .setTimestamp(configService.getTimestamp());
+            account.setAvailableBalance(account.getAvailableBalance().add(validatorReward));
+            account.setBalance(account.getBalance().add(validatorReward));
+            transactionRepository.save(tx);
+            save(account);
+        }
+    }
+
+    /**
+     * Distribute user rewards
+     *
+     * @param users {@link Set<User>}
+     * @param totalDelegation total delegated stake
+     * @param delegationByUser delegation by user ID
+     * @param asset {@link Asset}
+     */
+    private void distributeUserRewards(
+            final Set<User> users,
+            final BigDecimal totalDelegation,
+            final Map<UUID, BigDecimal> delegationByUser,
+            final Asset asset
+    ) {
+        int dps = asset.getDecimalPlaces();
+        for(User user : users) {
+            BigDecimal userShare = delegationByUser.get(user.getId())
+                    .divide(totalDelegation, dps, RoundingMode.HALF_UP);
+            BigDecimal userReward = asset.getTreasuryBalance().multiply(userShare)
+                    .multiply(BigDecimal.ONE.subtract(configService.get().getNetworkFee()));
+            Account account = getAndCreate(user, asset);
+            Transaction tx = new Transaction()
+                    .setType(TransactionType.REWARD_CREDIT)
+                    .setAmount(userReward)
+                    .setUser(user)
+                    .setAsset(asset)
+                    .setTimestamp(configService.getTimestamp());
+            account.setAvailableBalance(account.getAvailableBalance().add(userReward));
+            account.setBalance(account.getBalance().add(userReward));
+            transactionRepository.save(tx);
+            save(account);
+        }
+    }
+
+    /**
      * Book realised profit or loss against a user's account
      *
      * @param user the {@link User}
@@ -372,7 +481,7 @@ public class AccountService {
         Account account = getAndCreate(user, market.getSettlementAsset());
         account.setBalance(account.getBalance().add(realisedProfit));
         account.setAvailableBalance(account.getAvailableBalance().add(realisedProfit));
-        accountRepository.save(account);
+        save(account);
         Transaction tx = new Transaction()
                 .setType(TransactionType.SETTLEMENT)
                 .setAmount(realisedProfit)
@@ -380,5 +489,19 @@ public class AccountService {
                 .setAsset(market.getSettlementAsset())
                 .setTimestamp(configService.getTimestamp());
         transactionRepository.save(tx);
+    }
+
+    /**
+     * Save an account
+     *
+     * @param account {@link Account}
+     *
+     * @return {@link Account}
+     */
+    public Account save(
+            final Account account
+    ) {
+        socketHandler.sendMessage(WebSocketChannelType.ACCOUNTS, account.getUser().getPublicKey(), account);
+        return accountRepository.save(account);
     }
 }

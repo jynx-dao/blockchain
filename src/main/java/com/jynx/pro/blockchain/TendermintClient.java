@@ -203,6 +203,18 @@ public class TendermintClient {
     }
 
     /**
+     * Distribute rewards
+     *
+     * @param request {@link BatchValidatorRequest}
+     */
+    public void distributeRewards(
+            final BatchValidatorRequest request
+    ) {
+        processTransaction(request, Object.class,
+                TendermintTransaction.DISTRIBUTE_REWARDS, ErrorCode.DISTRIBUTE_REWARDS_FAILED);
+    }
+
+    /**
      * Batch withdrawals
      *
      * @param request {@link BatchWithdrawalRequest}

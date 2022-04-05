@@ -9,4 +9,6 @@ import lombok.experimental.Accessors;
 @Accessors(chain = true)
 public class ValidatorApplicationRequest extends SignedRequest {
     private String tendermintPublicKey;
+    private String ethAddress;
+    private String ethSignature;
 }

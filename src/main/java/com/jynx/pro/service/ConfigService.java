@@ -36,7 +36,7 @@ public class ConfigService {
         Config config = jsonUtils.fromJson(
                 appState.getJSONObject("networkConfig").toString(), Config.class);
         config.setId(1L);
-        this.configRepository.save(config);
+        configRepository.save(config);
     }
 
     /**

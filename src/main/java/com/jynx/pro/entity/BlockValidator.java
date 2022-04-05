@@ -25,5 +25,12 @@ public class BlockValidator {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private BlockValidatorStatus status;
-    // TODO - performance stats can be saved in here
+    @Column(name = "sufficient_eth_balance")
+    private Boolean sufficientEthBalance;
+    @Column(name = "signed_block")
+    private Boolean signedBlock;
+    @Column(name = "duplicate_vote", nullable = false)
+    private Boolean duplicateVote = false;
+    @Column(name = "light_client_attack", nullable = false)
+    private Boolean lightClientAttack = false;
 }

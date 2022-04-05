@@ -43,6 +43,8 @@ public class Config {
     private String bridgeAddress;
     @Column(name = "eth_confirmations", nullable = false)
     private Integer ethConfirmations;
+    @Column(name = "eth_max_gas_price", nullable = false)
+    private Integer ethMaxGasPrice;
     @Column(name = "active_validator_count", nullable = false)
     private Integer activeValidatorCount;
     @Column(name = "backup_validator_count", nullable = false)
@@ -51,10 +53,26 @@ public class Config {
     private BigDecimal validatorBond;
     @Column(name = "validator_min_delegation", nullable = false)
     private BigDecimal validatorMinDelegation;
+    @Column(name = "validator_min_eth_balance", nullable = false)
+    private BigDecimal validatorMinEthBalance;
+    @Column(name = "min_total_delegation", nullable = false)
+    private BigDecimal minTotalDelegation;
     @Column(name = "snapshot_frequency", nullable = false)
     private Integer snapshotFrequency;
     @Column(name = "async_task_frequency", nullable = false)
     private Integer asyncTaskFrequency;
     @Column(name = "snapshot_chunk_rows", nullable = false)
     private Integer snapshotChunkRows;
+    @Column(name = "bulk_order_limit", nullable = false)
+    private Integer bulkOrderLimit;
+    @Column(name = "exit_auction_ratio", nullable = false)
+    private BigDecimal exitAuctionRatio;
+    @Column(name = "validator_signing_threshold", nullable = false)
+    private BigDecimal validatorSigningThreshold;
+    @Column(name = "withdrawal_batch_frequency", nullable = false)
+    private Long withdrawalBatchFrequency;
+    @Column(name = "withdrawal_delay", nullable = false)
+    private Long withdrawalDelay;
+    @Column(name = "withdrawal_batch_limit", nullable = false)
+    private Integer withdrawalBatchLimit;
 }

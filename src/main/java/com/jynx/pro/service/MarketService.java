@@ -4,6 +4,7 @@ import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
+import com.jynx.pro.handler.SocketHandler;
 import com.jynx.pro.repository.*;
 import com.jynx.pro.request.AddMarketRequest;
 import com.jynx.pro.request.AmendMarketRequest;
@@ -50,11 +51,11 @@ public class MarketService {
     @Autowired
     private TransactionRepository transactionRepository;
     @Autowired
-    private AccountRepository accountRepository;
-    @Autowired
     private AuctionTriggerRepository auctionTriggerRepository;
     @Autowired
     private PendingAuctionTriggerRepository pendingAuctionTriggerRepository;
+    @Autowired
+    private SocketHandler socketHandler;
 
     /**
      * Get a market by ID if it exists
@@ -97,7 +98,7 @@ public class MarketService {
                 .setAsset(market.getSettlementAsset())
                 .setTimestamp(configService.getTimestamp());
         transactionRepository.save(transaction);
-        accountRepository.save(account);
+        accountService.save(account);
         accountService.reconcileNegativeBalance(account.getUser(), market);
     }
 
@@ -173,7 +174,7 @@ public class MarketService {
                 .setStatus(MarketStatus.PENDING)
                 .setId(uuidUtils.next())
                 .setLastSettlement(0L);
-        marketRepository.save(market);
+        save(market);
         if(request.getAuctionTriggers().size() > 0) {
             List<AuctionTrigger> auctionTriggers = request.getAuctionTriggers().stream()
                     .map(t -> new AuctionTrigger()
@@ -250,7 +251,7 @@ public class MarketService {
                     .collect(Collectors.toList());
             pendingAuctionTriggerRepository.saveAll(auctionTriggers);
         }
-        market = marketRepository.save(market);
+        market = save(market);
         return proposalService.create(request.getUser(), request.getOpenTime(), request.getClosingTime(),
                 request.getEnactmentTime(), market.getId(), ProposalType.AMEND_MARKET);
     }
@@ -310,7 +311,7 @@ public class MarketService {
         if(status.equals(MarketStatus.ACTIVE)) {
             market.setLastSettlement(configService.getTimestamp());
         }
-        marketRepository.save(market);
+        save(market);
     }
 
     /**
@@ -386,10 +387,10 @@ public class MarketService {
             market.setPendingStepSize(null);
         }
         // TODO - orders breaching the new step size, tick size, or decimal places will be canceled
-        // TODO - orders breaching the new margin requirements will be canceled
-        // TODO - positions that would breach the new margin requirements will be closed out
-        // TODO - increasing liquidation fee will force out positions that become distressed
-        marketRepository.save(market);
+        //  orders breaching the new margin requirements will be canceled
+        //  positions that would breach the new margin requirements will be closed out
+        //  increasing liquidation fee will force out positions that become distressed
+        save(market);
     }
 
     /**
@@ -400,7 +401,7 @@ public class MarketService {
     ) {
         proposalService.checkEnacted(proposal);
         // TODO - the market can only be settled (it cannot be unsuspended
-        // until it has been) and all orders will be canceled
+        //  until it has been) and all orders will be canceled
         updateStatus(proposal, MarketStatus.SUSPENDED);
     }
 
@@ -412,7 +413,7 @@ public class MarketService {
     ) {
         proposalService.checkEnacted(proposal);
         // TODO - the market can only be unsuspended if it was settled, so when it
-        // opens again nobody will have any positions and all orders will be canceled
+        //  opens again nobody will have any positions and all orders will be canceled
         updateStatus(proposal, MarketStatus.ACTIVE);
     }
 
@@ -431,7 +432,21 @@ public class MarketService {
         market.setLastPrice(lastPrice);
         market.setMarkPrice(markPrice);
         market.setOpenVolume(positionService.calculateOpenVolume(market));
-        marketRepository.save(market);
+        save(market);
         positionService.updateUnrealisedProfit(market);
+    }
+
+    /**
+     * Save a market
+     *
+     * @param market {@link Market}
+     *
+     * @return {@link Market}
+     */
+    public Market save(
+            final Market market
+    ) {
+        socketHandler.sendMessage(WebSocketChannelType.MARKETS, market.getId(), market);
+        return marketRepository.save(market);
     }
 }

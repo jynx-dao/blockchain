@@ -41,6 +41,8 @@ public class BridgeUpdateService {
     private ValidatorRepository validatorRepository;
     @Autowired
     private UUIDUtils uuidUtils;
+    @Autowired
+    private ConfigService configService;
 
     /**
      * Get unprocessed bridge updates
@@ -163,7 +165,8 @@ public class BridgeUpdateService {
             List<BridgeUpdateSignature> updateSignatures = readOnlyRepository
                     .getSignatureByBridgeUpdateId(update.getId());
             List<Validator> validators = readOnlyRepository.getAllByEntity(Validator.class);
-            double threshold = validators.size() * 0.667; // TODO - use config variable for signature threshold [??]
+            double threshold = validators.size() * configService.getStatic()
+                    .getValidatorSigningThreshold().doubleValue();
             if(updateSignatures.size() >= threshold) {
                 BigInteger nonce = new BigInteger(update.getNonce());
                 ByteArrayOutputStream signatureStream = new ByteArrayOutputStream();

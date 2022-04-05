@@ -1,5 +1,6 @@
 package com.jynx.pro.controller;
 
+import com.jynx.pro.entity.BlockValidator;
 import com.jynx.pro.entity.Delegation;
 import com.jynx.pro.entity.Validator;
 import com.jynx.pro.error.ErrorCode;
@@ -29,6 +30,13 @@ public class ValidatorController extends AbstractController {
     @GetMapping
     public ResponseEntity<List<Validator>> getAll() {
         return ResponseEntity.ok(readOnlyRepository.getAllByEntity(Validator.class));
+    }
+
+    @GetMapping("/block/{height}")
+    public ResponseEntity<List<BlockValidator>> getAtBlock(
+            @PathVariable("height") Long height
+    ) {
+        return ResponseEntity.ok(readOnlyRepository.getBlockValidatorsByBlockHeight(height));
     }
 
     @PostMapping("/apply")

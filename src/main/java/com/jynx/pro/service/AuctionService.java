@@ -1,9 +1,6 @@
 package com.jynx.pro.service;
 
-import com.jynx.pro.constant.MarketSide;
-import com.jynx.pro.constant.MarketStatus;
-import com.jynx.pro.constant.OrderAction;
-import com.jynx.pro.constant.OrderStatus;
+import com.jynx.pro.constant.*;
 import com.jynx.pro.entity.*;
 import com.jynx.pro.model.OrderBook;
 import com.jynx.pro.model.OrderBookItem;
@@ -41,6 +38,10 @@ public class AuctionService {
     private OrderHistoryRepository orderHistoryRepository;
     @Autowired
     private MarketRepository marketRepository;
+    @Autowired
+    private MarketService marketService;
+    @Autowired
+    private OrderBookService orderBookService;
     @Autowired
     private UUIDUtils uuidUtils;
 
@@ -98,7 +99,7 @@ public class AuctionService {
         List<Market> triggeredMarkets = new ArrayList<>();
         for(Market market : markets) {
             BigDecimal openVolume = market.getOpenVolume();
-            OrderBook orderBook = orderService.getOrderBook(market);
+            OrderBook orderBook = orderBookService.getOrderBook(OrderBookType.L3, market);
             List<AuctionTrigger> triggers = auctionTriggerRepository.findByMarketId(market.getId());
             if(triggers.size() > 0) {
                 boolean triggered = isAuctionTriggered(openVolume, orderBook, triggers, market);
@@ -108,7 +109,7 @@ public class AuctionService {
                 }
             }
         }
-        marketRepository.saveAll(markets);
+        markets.forEach(marketService::save);
         return triggeredMarkets;
     }
 
@@ -123,7 +124,7 @@ public class AuctionService {
             final Market market
     ) {
         int dps = market.getSettlementAsset().getDecimalPlaces();
-        OrderBook orderBook = orderService.getOrderBook(market);
+        OrderBook orderBook = orderBookService.getOrderBook(OrderBookType.L3, market);
         if(orderBook.getBids().size() == 0 || orderBook.getAsks().size() == 0) {
             return BigDecimal.ZERO;
         }
@@ -159,7 +160,7 @@ public class AuctionService {
     public BigDecimal getUncrossingVolume(
             final Market market
     ) {
-        OrderBook orderBook = orderService.getOrderBook(market);
+        OrderBook orderBook = orderBookService.getOrderBook(OrderBookType.L3, market);
         if(orderBook.getBids().size() == 0 || orderBook.getAsks().size() == 0) {
             return BigDecimal.ZERO;
         }
@@ -339,7 +340,7 @@ public class AuctionService {
         for(Market market : markets) {
             BigDecimal uncrossingPrice = getUncrossingPrice(market);
             BigDecimal expectedOpenVolume = (market.getOpenVolume().add(getUncrossingVolume(market)))
-                    .multiply(BigDecimal.valueOf(0.8)); // TODO - use config variable for this ratio
+                    .multiply(configService.get().getExitAuctionRatio());
             OrderBook expectedOrderBook = getOrderBookAfterUncrossing(market);
             List<AuctionTrigger> triggers = auctionTriggerRepository.findByMarketId(market.getId());
             if(triggers.size() > 0) {
@@ -347,7 +348,7 @@ public class AuctionService {
                 if (!auctionTriggered) {
                     triggeredMarkets.add(market);
                     market.setStatus(MarketStatus.ACTIVE);
-                    marketRepository.save(market);
+                    marketService.save(market);
                     List<Order> uncrossingOrders = getUncrossingOrders(market);
                     BigDecimal volumeBids = uncrossingOrders.stream().filter(o -> o.getSide().equals(MarketSide.BUY))
                             .map(Order::getRemainingQuantity).reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -366,6 +367,7 @@ public class AuctionService {
                         fillCrossingOrders(uncrossingAsks, uncrossingPrice, volumeBids);
                         fillCrossingOrders(uncrossingBids, uncrossingPrice, volumeBids);
                     }
+                    orderService.sendOrderBookUpdates(market);
                     orderService.handleMarkPriceChange(market, uncrossingPrice);
                 }
             }

@@ -15,5 +15,6 @@ export SNAPSHOT_SERVICE_TEST=true
 export STAKE_SERVICE_TEST=true
 export VALIDATOR_SERVICE_TEST=true
 export CRYPTO_UTILS_TEST=true
+export ORDER_BOOK_SERVICE_TEST=true
 mvn clean install
 ./$(dirname $0)/clear-test-state.sh

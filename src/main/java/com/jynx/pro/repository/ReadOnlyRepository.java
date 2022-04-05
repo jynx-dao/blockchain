@@ -1,6 +1,5 @@
 package com.jynx.pro.repository;
 
-import com.jynx.pro.constant.MarketSide;
 import com.jynx.pro.constant.OrderStatus;
 import com.jynx.pro.constant.OrderType;
 import com.jynx.pro.entity.*;
@@ -8,9 +7,6 @@ import com.jynx.pro.error.ErrorCode;
 import com.jynx.pro.exception.JynxProException;
 import com.jynx.pro.manager.DatabaseTransactionManager;
 import com.jynx.pro.model.MarketStatistics;
-import com.jynx.pro.model.OrderBook;
-import com.jynx.pro.model.OrderBookItem;
-import com.jynx.pro.model.Quote;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
@@ -19,12 +15,9 @@ import javax.persistence.criteria.CriteriaBuilder;
 import javax.persistence.criteria.CriteriaQuery;
 import javax.persistence.criteria.Path;
 import javax.persistence.criteria.Root;
-import java.math.BigDecimal;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Repository
 public class ReadOnlyRepository {
@@ -56,6 +49,30 @@ public class ReadOnlyRepository {
         } catch(Exception e) {
             return Optional.empty();
         }
+    }
+
+    /**
+     * Get {@link Order}s by status, type and market
+     *
+     * @param statusList {@link List<OrderStatus>}
+     * @param type {@link OrderType}
+     * @param market {@link Market}
+     *
+     * @return {@link List<Order>}
+     */
+    public List<Order> getOrdersByStatusInAndTypeAndMarket(
+            final List<OrderStatus> statusList,
+            final OrderType type,
+            final Market market
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<Order> query = cb.createQuery(Order.class);
+        Root<Order> rootType = query.from(Order.class);
+        Path<UUID> marketId = rootType.join("market").get("id");
+        Path<OrderType> orderType = rootType.get("type");
+        query = query.select(rootType).where(cb.equal(marketId, market.getId()),
+                cb.equal(orderType, type), rootType.get("status").in(statusList));
+        return getEntityManager().createQuery(query).getResultList();
     }
 
     /**
@@ -147,31 +164,6 @@ public class ReadOnlyRepository {
     }
 
     /**
-     * Get the latest {@link OrderBook} by market ID
-     *
-     * @param marketId the market ID
-     *
-     * @return {@link OrderBook}
-     */
-    public OrderBook getOrderBookByMarketId(
-            final UUID marketId
-    ) {
-        List<Order> openLimitOrders = getOpenLimitOrdersByMarketId(marketId);
-        // TODO - should aggregate by price
-        List<OrderBookItem> bids = openLimitOrders.stream()
-                .filter(o -> o.getSide().equals(MarketSide.BUY))
-                .sorted(Comparator.comparing(Order::getPrice).reversed().thenComparing(Order::getPriority))
-                .map(o -> new OrderBookItem().setQuantity(o.getRemainingQuantity()).setPrice(o.getPrice()))
-                .collect(Collectors.toList());
-        List<OrderBookItem> asks = openLimitOrders.stream()
-                .filter(o -> o.getSide().equals(MarketSide.SELL))
-                .sorted(Comparator.comparing(Order::getPrice).thenComparing(Order::getPriority))
-                .map(o -> new OrderBookItem().setQuantity(o.getRemainingQuantity()).setPrice(o.getPrice()))
-                .collect(Collectors.toList());
-        return new OrderBook().setBids(bids).setAsks(asks);
-    }
-
-    /**
      * Get {@link Market} by ID
      *
      * @param id the ID
@@ -209,24 +201,6 @@ public class ReadOnlyRepository {
         Path<UUID> market_id = rootType.join("market").get("id");
         query = query.select(rootType).where(cb.equal(market_id, marketId));
         return getEntityManager().createQuery(query).getResultList();
-    }
-
-    /**
-     * Get {@link Quote} by market ID
-     *
-     * @param marketId the market ID
-     *
-     * @return {@link Quote}
-     */
-    public Quote getQuoteByMarketId(
-            final UUID marketId
-    ) {
-        OrderBook orderBook = getOrderBookByMarketId(marketId);
-        return new Quote()
-                .setAskPrice(orderBook.getAsks().size() > 0 ? orderBook.getAsks().get(0).getPrice() : BigDecimal.ZERO)
-                .setAskSize(orderBook.getAsks().size() > 0 ? orderBook.getAsks().get(0).getQuantity() : BigDecimal.ZERO)
-                .setBidPrice(orderBook.getBids().size() > 0 ? orderBook.getBids().get(0).getPrice() : BigDecimal.ZERO)
-                .setBidSize(orderBook.getBids().size() > 0 ? orderBook.getBids().get(0).getQuantity() : BigDecimal.ZERO);
     }
 
     /**
@@ -666,6 +640,23 @@ public class ReadOnlyRepository {
         Root<BridgeUpdateSignature> rootType = query.from(BridgeUpdateSignature.class);
         Path<UUID> batch_id = rootType.join("bridgeUpdate").get("id");
         query = query.select(rootType).where(cb.equal(batch_id, updateId));
+        return getEntityManager().createQuery(query).getResultList();
+    }
+
+    /**
+     * Get {@link BlockValidator}s by height
+     *
+     * @param blockHeight the block height
+     *
+     * @return {@link List<BlockValidator>}
+     */
+    public List<BlockValidator> getBlockValidatorsByBlockHeight(
+            final Long blockHeight
+    ) {
+        CriteriaBuilder cb = getEntityManager().getCriteriaBuilder();
+        CriteriaQuery<BlockValidator> query = cb.createQuery(BlockValidator.class);
+        Root<BlockValidator> rootType = query.from(BlockValidator.class);
+        query = query.select(rootType).where(cb.equal(rootType.get("blockHeight"), blockHeight));
         return getEntityManager().createQuery(query).getResultList();
     }
 
