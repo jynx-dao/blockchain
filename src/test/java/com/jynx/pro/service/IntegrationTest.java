@@ -113,6 +113,10 @@ public abstract class IntegrationTest {
     @Autowired
     protected WithdrawalBatchSignatureRepository withdrawalBatchSignatureRepository;
     @Autowired
+    protected SnapshotChunkRepository snapshotChunkRepository;
+    @Autowired
+    protected SnapshotRepository snapshotRepository;
+    @Autowired
     protected ValidatorRepository validatorRepository;
     @Autowired
     protected AuctionTriggerRepository auctionTriggerRepository;
@@ -468,6 +472,8 @@ public abstract class IntegrationTest {
         eventRepository.deleteAll();
         stakeRepository.deleteAll();
         userRepository.deleteAll();
+        snapshotChunkRepository.deleteAll();
+        snapshotRepository.deleteAll();
         configRepository.deleteAll();
         databaseTransactionManager.commit();
     }

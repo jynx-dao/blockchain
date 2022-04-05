@@ -1,6 +1,7 @@
 package com.jynx.pro.service;
 
 import com.jynx.pro.Application;
+import com.jynx.pro.entity.Snapshot;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -11,6 +12,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.junit.jupiter.Testcontainers;
+
+import java.util.List;
+import java.util.Optional;
 
 @Slf4j
 @Testcontainers
@@ -35,7 +39,7 @@ public class SnapshotServiceTest extends IntegrationTest {
     }
 
     @Test
-    public void testSaveSnapshotAndChunks() {
+    public void testSaveChunk() {
         Assertions.assertEquals(1, configRepository.findAll().size());
         snapshotService.clearState();
         databaseTransactionManager.commit();
@@ -44,5 +48,46 @@ public class SnapshotServiceTest extends IntegrationTest {
         String content = "{\"data\":[{\"uuidSeed\":106,\"governanceTokenAddress\":\"0x0\",\"minEnactmentDelay\":1,\"bulkOrderLimit\":1,\"withdrawalBatchLimit\":100,\"exitAuctionRatio\":0.8,\"validatorSigningThreshold\":0.66,\"withdrawalDelay\":60,\"withdrawalBatchFrequency\":3600,\"minOpenDelay\":1,\"minTotalDelegation\":0,\"ethMaxGasPrice\":0,\"validatorMinEthBalance\":0,\"minClosingDelay\":1,\"networkFee\":1.00,\"minProposerStake\":1,\"participationThreshold\":0.66,\"approvalThreshold\":0.66,\"bridgeAddress\":\"0x0\",\"ethConfirmations\":50,\"activeValidatorCount\":1,\"backupValidatorCount\":1,\"validatorBond\":0.00,\"validatorMinDelegation\":0.00,\"snapshotFrequency\":100,\"asyncTaskFrequency\":60,\"snapshotChunkRows\":10}],\"entityName\":\"com.jynx.pro.entity.Config\"}";
         snapshotService.saveChunk(content);
         Assertions.assertEquals(1, configRepository.findAll().size());
+    }
+
+    @Test
+    public void testSaveChunkFails() {
+        Assertions.assertEquals(1, configRepository.findAll().size());
+        snapshotService.clearState();
+        databaseTransactionManager.commit();
+        databaseTransactionManager.createTransaction();
+        Assertions.assertEquals(0, configRepository.findAll().size());
+        String content = "{\"data\":[{\"uuidSeed\":106,\"governanceTokenAddress\":\"0x0\",\"minEnactmentDelay\":1,\"bulkOrderLimit\":1,\"withdrawalBatchLimit\":100,\"exitAuctionRatio\":0.8,\"validatorSigningThreshold\":0.66,\"withdrawalDelay\":60,\"withdrawalBatchFrequency\":3600,\"minOpenDelay\":1,\"minTotalDelegation\":0,\"ethMaxGasPrice\":0,\"validatorMinEthBalance\":0,\"minClosingDelay\":1,\"networkFee\":1.00,\"minProposerStake\":1,\"participationThreshold\":0.66,\"approvalThreshold\":0.66,\"bridgeAddress\":\"0x0\",\"ethConfirmations\":50,\"activeValidatorCount\":1,\"backupValidatorCount\":1,\"validatorBond\":0.00,\"validatorMinDelegation\":0.00,\"snapshotFrequency\":100,\"asyncTaskFrequency\":60,\"snapshotChunkRows\":10}],\"entityName\":\"com.jynx.pro.entity.Config2\"}";
+        snapshotService.saveChunk(content);
+        Assertions.assertEquals(0, configRepository.findAll().size());
+    }
+
+    private Snapshot captureSnapshot() {
+        databaseTransactionManager.createTransaction();
+        snapshotService.capture(1);
+        databaseTransactionManager.commit();
+        databaseTransactionManager.createTransaction();
+        List<Snapshot> snapshots = snapshotService.getLatestSnapshots(1);
+        Assertions.assertEquals(1, snapshots.size());
+        return snapshots.get(0);
+    }
+
+    @Test
+    public void testCaptureSnapshot() {
+        captureSnapshot();
+    }
+
+    @Test
+    public void testGetChunkContent() {
+        Snapshot snapshot = captureSnapshot();
+        for(int i=0; i<snapshot.getTotalChunks(); i++) {
+            Optional<String> contentOptional = snapshotService.getChunkContent(1, i);
+            Assertions.assertTrue(contentOptional.isPresent());
+            log.info(contentOptional.get());
+        }
+        Optional<String> contentOptional = snapshotService.getChunkContent(1, snapshot.getTotalChunks());
+        Assertions.assertTrue(contentOptional.isEmpty());
+        contentOptional = snapshotService.getChunkContent(2, 0);
+        Assertions.assertTrue(contentOptional.isEmpty());
     }
 }
